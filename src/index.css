@@ -1,0 +1,190 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+   * Design system: glassmorphism minimalista.
+   * Paleta neutra cinza-azulada, acento único azul-violeta (#6366f1 = 243 75% 59%).
+   */
+  :root {
+    --background: 220 30% 97%;
+    --foreground: 222 32% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 32% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 32% 14%;
+
+    --primary: 243 75% 59%; /* #6366f1 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 93%;
+    --secondary-foreground: 222 28% 22%;
+
+    --muted: 220 18% 94%;
+    --muted-foreground: 220 12% 44%;
+
+    --accent: 243 75% 96%;
+    --accent-foreground: 243 60% 34%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 18% 88%;
+    --input: 220 18% 88%;
+    --ring: 243 75% 59%;
+
+    --radius: 0.875rem;
+
+    /* Camada de "vidro" */
+    --glass-bg: 255 255 255 / 0.62;
+    --glass-bg-strong: 255 255 255 / 0.78;
+    --glass-border: 255 255 255 / 0.55;
+    --glass-blur: 16px;
+
+    /* Gradiente neutro sutil do fundo */
+    --bg-blob-a: 243 75% 59% / 0.10;
+    --bg-blob-b: 199 89% 48% / 0.08;
+  }
+
+  .dark {
+    --background: 224 32% 8%;
+    --foreground: 220 22% 94%;
+
+    --card: 222 28% 13%;
+    --card-foreground: 220 22% 94%;
+
+    --popover: 222 28% 13%;
+    --popover-foreground: 220 22% 94%;
+
+    --primary: 243 75% 66%;
+    --primary-foreground: 226 40% 10%;
+
+    --secondary: 222 22% 19%;
+    --secondary-foreground: 220 20% 90%;
+
+    --muted: 222 22% 17%;
+    --muted-foreground: 220 12% 64%;
+
+    --accent: 243 40% 22%;
+    --accent-foreground: 243 80% 88%;
+
+    --destructive: 0 63% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 16% 24%;
+    --input: 220 16% 24%;
+    --ring: 243 75% 66%;
+
+    --glass-bg: 30 41 59 / 0.42;
+    --glass-bg-strong: 30 41 59 / 0.62;
+    --glass-border: 148 163 184 / 0.16;
+
+    --bg-blob-a: 243 75% 62% / 0.16;
+    --bg-blob-b: 199 89% 55% / 0.10;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  /* Gradiente neutro sutil por trás de todo o "vidro". */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60rem 40rem at 12% -10%, hsl(var(--bg-blob-a)), transparent 60%),
+      radial-gradient(50rem 36rem at 96% 8%, hsl(var(--bg-blob-b)), transparent 62%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+  }
+
+  /* A tela de preview público imita o Instagram: sem glass, sem gradiente. */
+  body[data-surface='instagram']::before {
+    display: none;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* --- Camadas de vidro --- */
+  .glass {
+    background-color: rgb(var(--glass-bg));
+    border: 1px solid rgb(var(--glass-border));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    @apply shadow-glass;
+  }
+
+  .glass-strong {
+    background-color: rgb(var(--glass-bg-strong));
+    border: 1px solid rgb(var(--glass-border));
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(180%);
+    backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(180%);
+    @apply shadow-glass-lg;
+  }
+
+  .glass-panel {
+    @apply glass rounded-xl;
+  }
+
+  .glass-hover {
+    @apply transition-all duration-250 hover:-translate-y-px hover:shadow-glass-lg;
+  }
+
+  /* Rótulo dos dias da semana: caixa alta pequena */
+  .weekday-label {
+    @apply text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.35);
+    border-radius: 9999px;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Respeita usuários que pedem menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
