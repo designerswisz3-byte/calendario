@@ -28,7 +28,7 @@ port = 54323
 enabled = true
 # O bucket `media` é criado pela migração 20260914000200, junto com as
 # políticas de leitura pública e escrita restrita ao dono.
-file_size_limit = "100MiB"
+file_size_limit = "300MiB"
 
 [auth]
 enabled = true

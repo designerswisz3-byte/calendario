@@ -20,10 +20,26 @@ interface Props {
  */
 export function InstagramCarousel({ slides, alt }: Props) {
   const [index, setIndex] = React.useState(0)
+  const [proporcao, setProporcao] = React.useState<number | null>(null)
   const touchStartX = React.useRef<number | null>(null)
   const videoRefs = React.useRef<Array<HTMLVideoElement | null>>([])
 
   const total = slides.length
+
+  /**
+   * A moldura assume a proporção real da PRIMEIRA mídia, como no Instagram:
+   * o app escolhe uma proporção para o carrossel inteiro e encaixa os demais
+   * slides nela. Sem isso, tudo virava quadrado e uma arte 4:5 perdia topo e
+   * base — inclusive a chamada final, que costuma ficar embaixo.
+   *
+   * O intervalo é o que o Instagram aceita de fato: de 1.91:1 (paisagem) a
+   * 4:5 (retrato). Arte mais alta que 4:5 ele corta mesmo, e o preview
+   * precisa mostrar esse corte em vez de mentir que cabe.
+   */
+  const registrarProporcao = React.useCallback((largura: number, altura: number) => {
+    if (!largura || !altura) return
+    setProporcao((atual) => atual ?? Math.min(1.91, Math.max(0.8, largura / altura)))
+  }, [])
 
   const goTo = React.useCallback(
     (next: number) =>
@@ -68,7 +84,8 @@ export function InstagramCarousel({ slides, alt }: Props) {
   return (
     <div className="w-full">
       <div
-        className="relative aspect-square w-full select-none overflow-hidden bg-black"
+        className="relative w-full select-none overflow-hidden bg-black"
+        style={{ aspectRatio: proporcao ?? 1 }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onKeyDown={handleKeyDown}
@@ -95,6 +112,11 @@ export function InstagramCarousel({ slides, alt }: Props) {
                 playsInline
                 preload="metadata"
                 controls={false}
+                onLoadedMetadata={(event) => {
+                  if (i !== 0) return
+                  const el = event.currentTarget
+                  registrarProporcao(el.videoWidth, el.videoHeight)
+                }}
               />
             ) : (
               <img
@@ -104,6 +126,11 @@ export function InstagramCarousel({ slides, alt }: Props) {
                 className="h-full w-full shrink-0 object-cover"
                 draggable={false}
                 loading={i === 0 ? 'eager' : 'lazy'}
+                onLoad={(event) => {
+                  if (i !== 0) return
+                  const el = event.currentTarget
+                  registrarProporcao(el.naturalWidth, el.naturalHeight)
+                }}
               />
             ),
           )}

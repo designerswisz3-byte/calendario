@@ -1,17 +1,18 @@
 -- ============================================================================
 -- SETUP COMPLETO DO BANCO — cole tudo isto no SQL Editor do Supabase e rode.
 -- ============================================================================
--- Este arquivo é a junção das três migrações de supabase/migrations/, na
--- ordem correta, para quem prefere um único copiar-e-colar em vez de rodar
--- arquivo por arquivo. É idempotente: pode rodar de novo sem quebrar nada.
+-- Este arquivo é a junção das migrações de supabase/migrations/, na ordem
+-- correta, para quem prefere um único copiar-e-colar em vez de rodar arquivo
+-- por arquivo. É idempotente: pode rodar de novo sem quebrar nada.
 --
 --   1. 20260914000100 — tabelas, índices, triggers e RLS
 --   2. 20260914000200 — bucket `media` no Storage e suas políticas
 --   3. 20260914000300 — fecha a leitura anônima e cria get_public_preview()
+--   4. 20260914000400 — sobe o limite de upload do bucket para 300 MB
 --
--- Se a parte 2 falhar com "must be owner of table objects", rode as partes
--- 1 e 3 por aqui e crie o bucket `media` pela interface (Storage > New
--- bucket > nome "media" > Public).
+-- Se a parte 2 falhar com "must be owner of table objects", rode as demais
+-- por aqui e crie o bucket `media` pela interface (Storage > New bucket >
+-- nome "media" > Public).
 -- ============================================================================
 
 
@@ -380,4 +381,42 @@ grant execute on function public.get_public_preview(uuid) to anon, authenticated
 comment on function public.get_public_preview(uuid) is
   'Leitura pública de um preview, exigindo o id. Substitui o SELECT anônimo '
   'na tabela, que permitia listar todos os previews de todos os usuários.';
+
+
+-- >>>>>>>>>>>>>>>>>>>> 20260914000400_limite_video_300mb.sql <<<<<<<<<<<<<<<<<<<<
+
+-- ============================================================================
+-- Aumenta o limite de upload do bucket `media` de 100 MB para 300 MB.
+-- ============================================================================
+-- O limite existe em três lugares e todos precisam concordar, senão o upload
+-- falha em algum ponto do caminho:
+--   1. o app (MAX_VIDEO_SIZE_MB, validado antes de subir)
+--   2. o bucket (esta migração)
+--   3. o teto do plano do projeto no Supabase
+--
+-- O item 3 não se resolve por SQL. No plano Free o teto por arquivo é de
+-- 50 MB, e nenhuma configuração de bucket passa por cima disso — um vídeo de
+-- 300 MB só sobe em plano pago.
+-- ============================================================================
+
+update storage.buckets
+set file_size_limit = 314572800 -- 300 MB
+where id = 'media';
+
+-- Garante o bucket mesmo em banco novo, onde a migração 200 ainda não passou.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'media',
+  'media',
+  true,
+  314572800,
+  array[
+    'image/jpeg','image/png','image/webp','image/gif','image/avif',
+    'video/mp4','video/quicktime','video/webm'
+  ]
+)
+on conflict (id) do update
+  set file_size_limit = excluded.file_size_limit,
+      public = excluded.public,
+      allowed_mime_types = excluded.allowed_mime_types;
 

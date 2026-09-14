@@ -28,7 +28,13 @@ export function InstagramReel({ expert, legenda, midia, variant }: Props) {
             controls={false}
           />
         ) : midia ? (
-          <img src={midia.url} alt={`Conteúdo de ${expert}`} className="h-full w-full object-cover" />
+          // object-contain: reels/story são 9:16, e uma arte 4:5 aqui perderia
+          // metade do conteúdo com object-cover. Melhor mostrar inteira.
+          <img
+            src={midia.url}
+            alt={`Conteúdo de ${expert}`}
+            className="h-full w-full object-contain"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-neutral-500">
             Sem mídia
