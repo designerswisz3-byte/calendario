@@ -131,7 +131,7 @@ export function useCreateCalendarItem() {
 
   return useMutation({
     mutationFn: async (input: CalendarItemInput): Promise<CalendarItemRow> => {
-      if (!user) throw new Error('Sessão expirada. Faça login novamente.')
+      if (!user) throw new Error('Sessão ainda não aberta. Recarregue a página.')
       const { data, error } = await supabase
         .from('calendar_items')
         .insert({

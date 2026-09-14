@@ -32,10 +32,14 @@ file_size_limit = "100MiB"
 
 [auth]
 enabled = true
+# Sem tela de login: o app abre uma sessão anônima sozinho no primeiro acesso.
+# O usuário anônimo recebe role `authenticated` no JWT, então todas as
+# políticas de RLS (auth.uid() = user_id) continuam valendo sem alteração.
+enable_anonymous_sign_ins = true
 # Em produção, troque para a URL da Vercel e adicione-a também em
 # Authentication > URL Configuration no dashboard do Supabase.
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173"]
+site_url = "https://calendario-rapha20.vercel.app"
+additional_redirect_urls = ["http://localhost:5173", "https://calendario-rapha20.vercel.app"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10

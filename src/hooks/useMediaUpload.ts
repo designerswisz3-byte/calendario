@@ -32,7 +32,7 @@ export function useMediaUpload() {
 
   const upload = React.useCallback(
     async (file: File): Promise<string> => {
-      if (!user) throw new Error('Sessão expirada. Faça login novamente.')
+      if (!user) throw new Error('Sessão ainda não aberta. Recarregue a página.')
 
       const path = `${user.id}/${crypto.randomUUID()}.${extensionOf(file)}`
       const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {

@@ -1,21 +1,41 @@
 import * as React from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { errorMessage, isSupabaseConfigured, supabase } from '@/lib/supabase'
 
 interface AuthContextValue {
   session: Session | null
   user: User | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>
-  signOut: () => Promise<void>
+  /** Preenchido quando não foi possível abrir sessão (ex: login anônimo desligado). */
+  error: string | null
 }
 
 const AuthContext = React.createContext<AuthContextValue | undefined>(undefined)
 
+/**
+ * Evita abrir duas sessões anônimas.
+ *
+ * O StrictMode roda o efeito duas vezes em desenvolvimento; sem esta trava,
+ * seriam criados dois usuários anônimos e o segundo não enxergaria os dados
+ * gravados pelo primeiro.
+ */
+let sessaoEmCurso: Promise<Session | null> | null = null
+
+async function abrirSessao(): Promise<Session | null> {
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+  if (data.session) return data.session
+
+  // Sem sessão guardada: cria uma anônima. É o que dispensa a tela de login.
+  const { data: anonima, error: erroAnonimo } = await supabase.auth.signInAnonymously()
+  if (erroAnonimo) throw erroAnonimo
+  return anonima.session
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<Session | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -23,46 +43,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    let active = true
+    let ativo = true
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      setLoading(false)
-    })
+    sessaoEmCurso = sessaoEmCurso ?? abrirSessao()
+    sessaoEmCurso
+      .then((nova) => {
+        if (!ativo) return
+        setSession(nova)
+        setError(null)
+      })
+      .catch((erro) => {
+        if (!ativo) return
+        sessaoEmCurso = null
+        setError(errorMessage(erro, 'Não foi possível abrir a sessão.'))
+      })
+      .finally(() => {
+        if (ativo) setLoading(false)
+      })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      setLoading(false)
+    const { data: listener } = supabase.auth.onAuthStateChange((_evento, proxima) => {
+      if (!ativo) return
+      // Só reage a sessões reais: um null aqui é o efeito de limpeza do
+      // StrictMode, e trocar o estado por ele derrubaria a sessão recém-criada.
+      if (proxima) setSession(proxima)
     })
 
     return () => {
-      active = false
+      ativo = false
       listener.subscription.unsubscribe()
     }
   }, [])
 
   const value = React.useMemo<AuthContextValue>(
-    () => ({
-      session,
-      user: session?.user ?? null,
-      loading,
-      async signIn(email, password) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-      },
-      async signUp(email, password) {
-        const { data, error } = await supabase.auth.signUp({ email, password })
-        if (error) throw error
-        // Quando a confirmação de e-mail está ligada, o Supabase devolve user sem session.
-        return { needsConfirmation: Boolean(data.user) && !data.session }
-      },
-      async signOut() {
-        const { error } = await supabase.auth.signOut()
-        if (error) throw error
-      },
-    }),
-    [session, loading],
+    () => ({ session, user: session?.user ?? null, loading, error }),
+    [session, loading, error],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

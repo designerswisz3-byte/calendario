@@ -86,7 +86,9 @@ Em **Project Settings → API**, copie a URL e a chave `anon` — elas vão no `
 
 > A integração com o GitHub aplica o **banco**, mas não entrega as chaves para o frontend. `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` continuam sendo configuração da Vercel.
 
-E em **Authentication → URL Configuration**, coloque a URL da Vercel em *Site URL*, senão o link de confirmação de e-mail aponta para `localhost`.
+E em **Authentication → Sign In / Providers**, ligue **Anonymous sign-ins**. Sem isso o app não consegue abrir sessão e mostra uma tela dizendo exatamente onde ligar.
+
+Em **Authentication → URL Configuration**, coloque a URL da Vercel em *Site URL*.
 
 ### 3. Configurar o ambiente
 
@@ -160,13 +162,24 @@ Resultado, validado contra um Postgres real: anônimo lista `0` linhas nas tabel
 
 ## Rotas
 
-| Rota | Login | O que é |
-| --- | --- | --- |
-| `/login` | não | Entrar / cadastrar |
-| `/criar` | sim | Criação do conteúdo + preview ao vivo |
-| `/criar?calendar_item_id=<id>` | sim | Idem, já vinculado a um dia do calendário |
-| `/preview/:id` | **não** | Simulação do Instagram, somente leitura — é o link que vai para o cliente |
-| `/calendario` | sim | Calendário mensal + lista + painel do dia |
+| Rota | O que é |
+| --- | --- |
+| `/criar` | Criação do conteúdo + preview ao vivo |
+| `/criar?calendar_item_id=<id>` | Idem, já vinculado a um dia do calendário |
+| `/preview/:id` | Simulação do Instagram, somente leitura — é o link que vai para o cliente |
+| `/calendario` | Calendário mensal + lista + painel do dia |
+
+**Não existe tela de login.** No primeiro acesso o app abre sozinho uma sessão
+anônima do Supabase. O usuário anônimo recebe `role: authenticated` no JWT, então
+todas as políticas de RLS (`auth.uid() = user_id`) continuam valendo sem alteração
+— seus dados seguem isolados, só que sem formulário no caminho.
+
+> **A sessão mora no navegador.** Cada navegador/dispositivo abre uma sessão
+> anônima própria e vê o próprio calendário. Abrir no celular mostra um calendário
+> vazio, e limpar os dados do site faz perder o acesso ao que foi planejado (as
+> linhas continuam no banco, mas sem dono alcançável). Quando isso incomodar, o
+> caminho é vincular um e-mail à sessão anônima (`supabase.auth.updateUser`), que
+> converte o usuário anônimo em permanente **sem perder nada**.
 
 ---
 
@@ -237,14 +250,14 @@ Sem essas duas variáveis o build passa, o link abre — e mostra a tela "Config
 ```
 src/
 ├── components/
-│   ├── auth/        AuthProvider, ProtectedRoute
+│   ├── auth/        AuthProvider (sessão anônima automática), SessionGate
 │   ├── calendar/    MonthGrid, DayCell, DayPanel, ListView, AgendaView, filtros, tags
 │   ├── layout/      AppShell, ThemeToggle, SupabaseSetupNotice
 │   ├── preview/     InstagramPreview (feed + reels/story), MediaUploader
 │   └── ui/          shadcn/ui (button, dialog, sheet, select, toast, …)
 ├── hooks/           React Query: calendar items, previews, tags, upload, tema, media query
 ├── lib/             cliente Supabase, constantes, helpers de data, cn()
-├── pages/           Login, Create, PublicPreview, Calendar, NotFound
+├── pages/           Create, PublicPreview, Calendar, NotFound
 └── types/           tipos do banco
 supabase/migrations/ schema + RLS + bucket de storage
 ```
