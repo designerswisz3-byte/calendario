@@ -196,7 +196,9 @@ As classes utilitárias `.glass`, `.glass-strong` e `.glass-panel` estão em `sr
 
 **Drag-and-drop otimista.** O card se move na hora; se o banco recusar, o estado volta e aparece um toast.
 
-**Reordenação do carrossel.** A posição das imagens na tela de criação é gravada em `media_assets.ordem` — é a ordem que o cliente vê no link.
+**Mídias.** Até 20 por conteúdo, misturando imagens e vídeos no mesmo conjunto — é o que o carrossel do Instagram aceita. A posição na tela de criação é gravada em `media_assets.ordem`, e é a ordem que o cliente vê no link.
+
+O upload sempre aceita as 20; quem decide quantas aparecem é o formato. Carrossel exibe todos os slides (imagem e vídeo, só o slide visível toca); Post único, Reels e Story usam a primeira mídia e avisam na tela quando há outras guardadas. Assim trocar de formato não descarta upload nenhum.
 
 **Code splitting.** As rotas são lazy. O link público não baixa o bundle do calendário para renderizar um post.
 

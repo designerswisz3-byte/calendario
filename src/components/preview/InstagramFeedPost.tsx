@@ -1,19 +1,19 @@
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react'
 import { InstagramAvatar } from '@/components/preview/InstagramAvatar'
-import { InstagramCarousel } from '@/components/preview/InstagramCarousel'
+import { InstagramCarousel, type CarouselSlide } from '@/components/preview/InstagramCarousel'
 import { InstagramCaption } from '@/components/preview/InstagramCaption'
 
 interface Props {
   expert: string
   legenda: string
-  images: string[]
+  slides: CarouselSlide[]
 }
 
 /**
  * Simulação do post no feed (carrossel ou post único).
  * Os ícones de interação são apenas visuais — esta tela é somente leitura.
  */
-export function InstagramFeedPost({ expert, legenda, images }: Props) {
+export function InstagramFeedPost({ expert, legenda, slides }: Props) {
   return (
     <article className="w-full max-w-[470px] overflow-hidden border-neutral-200 bg-white text-neutral-900 sm:rounded-lg sm:border dark:border-neutral-800 dark:bg-black dark:text-neutral-50">
       {/* Cabeçalho */}
@@ -26,8 +26,8 @@ export function InstagramFeedPost({ expert, legenda, images }: Props) {
       </header>
 
       {/* Mídia */}
-      {images.length > 0 ? (
-        <InstagramCarousel images={images} alt={`Post de ${expert}`} />
+      {slides.length > 0 ? (
+        <InstagramCarousel slides={slides} alt={`Post de ${expert}`} />
       ) : (
         <div className="flex aspect-square w-full items-center justify-center bg-neutral-100 text-sm text-neutral-400 dark:bg-neutral-900">
           Sem mídia

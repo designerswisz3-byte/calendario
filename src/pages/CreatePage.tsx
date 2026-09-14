@@ -19,7 +19,13 @@ import { MediaUploader, type MediaItem } from '@/components/preview/MediaUploade
 import { InstagramPreview } from '@/components/preview/InstagramPreview'
 import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
-import { CAPTION_MAX_LENGTH, CONTENT_TYPES, TYPE_LABEL, isVideoType } from '@/lib/constants'
+import {
+  CAPTION_MAX_LENGTH,
+  CONTENT_TYPES,
+  MAX_MEDIA_ITEMS,
+  TYPE_LABEL,
+  aceitaVariasMidias,
+} from '@/lib/constants'
 import { formatShortDate } from '@/lib/date'
 import { useMediaUpload, validateFile } from '@/hooks/useMediaUpload'
 import { usePreviewByCalendarItem, useSavePreview } from '@/hooks/useContentPreviews'
@@ -75,34 +81,33 @@ export default function CreatePage() {
     if (calendarItem.tipo !== 'ideia') setTipo(calendarItem.tipo as ContentType)
   }, [calendarItem])
 
-  const mediaMode = isVideoType(tipo) ? 'video' : 'imagem'
-  const visibleMedia = React.useMemo(
-    () => media.filter((item) => item.tipo === mediaMode),
-    [media, mediaMode],
-  )
   const isEditing = Boolean(previewId)
+  // Formatos de mídia única mostram só a primeira; o upload guarda todas.
+  const midiasIgnoradas = aceitaVariasMidias(tipo) ? 0 : Math.max(0, media.length - 1)
   const captionLeft = CAPTION_MAX_LENGTH - legenda.length
 
   async function handleFiles(files: File[]) {
-    const expected = mediaMode
-    const invalid = files.map((file) => validateFile(file, expected)).find(Boolean)
-    if (invalid) {
-      toast({ variant: 'destructive', title: 'Arquivo inválido', description: invalid })
-      return
+    if (!files.length) return
+
+    // Valida tudo antes de subir qualquer coisa: nada pior que metade no ar.
+    const tipos: MediaItem['tipo'][] = []
+    for (const file of files) {
+      const resultado = validateFile(file)
+      if (!resultado.ok) {
+        toast({ variant: 'destructive', title: 'Arquivo inválido', description: resultado.erro })
+        return
+      }
+      tipos.push(resultado.tipo)
     }
 
     try {
       const urls = await uploadMany(files)
-      const uploaded: MediaItem[] = urls.map((url) => ({
+      const enviados: MediaItem[] = urls.map((url, index) => ({
         id: crypto.randomUUID(),
         url,
-        tipo: expected,
+        tipo: tipos[index],
       }))
-      setMedia((current) =>
-        expected === 'video'
-          ? uploaded.slice(0, 1)
-          : [...current.filter((item) => item.tipo === 'imagem'), ...uploaded],
-      )
+      setMedia((current) => [...current, ...enviados].slice(0, MAX_MEDIA_ITEMS))
     } catch (error) {
       toast({ variant: 'destructive', title: 'Falha no upload', description: errorMessage(error) })
     }
@@ -116,11 +121,11 @@ export default function CreatePage() {
       toast({ variant: 'destructive', title: 'Informe o nome do expert' })
       return
     }
-    if (visibleMedia.length === 0) {
+    if (media.length === 0) {
       toast({
         variant: 'destructive',
         title: 'Adicione pelo menos uma mídia',
-        description: mediaMode === 'video' ? 'Envie o vídeo do conteúdo.' : 'Envie ao menos uma imagem.',
+        description: 'Envie ao menos uma imagem ou vídeo.',
       })
       return
     }
@@ -140,7 +145,7 @@ export default function CreatePage() {
         nomeExpert,
         legenda,
         tipo,
-        media: visibleMedia.map((item) => ({ url_arquivo: item.url, tipo: item.tipo })),
+        media: media.map((item) => ({ url_arquivo: item.url, tipo: item.tipo })),
       })
 
       setPreviewId(saved.id)
@@ -268,19 +273,20 @@ export default function CreatePage() {
               </div>
 
               <div className="space-y-2">
-                <Label>{mediaMode === 'video' ? 'Vídeo' : 'Imagens do carrossel'}</Label>
+                <Label>Mídias</Label>
                 <MediaUploader
-                  mode={mediaMode}
-                  items={visibleMedia}
-                  onChange={(items) =>
-                    setMedia((current) => [
-                      ...current.filter((item) => item.tipo !== mediaMode),
-                      ...items,
-                    ])
-                  }
+                  items={media}
+                  onChange={setMedia}
                   onFilesSelected={handleFiles}
                   uploading={uploading}
                 />
+                {midiasIgnoradas > 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {TYPE_LABEL[tipo]} usa só a primeira mídia. As outras{' '}
+                    {midiasIgnoradas === 1 ? 'ficará guardada' : `${midiasIgnoradas} ficarão guardadas`},
+                    mas não aparecem no preview — troque para Carrossel para mostrar todas.
+                  </p>
+                )}
               </div>
 
               <Button type="submit" className="w-full" loading={savePreview.isPending || uploading}>
@@ -322,7 +328,7 @@ export default function CreatePage() {
               expert={nomeExpert}
               legenda={legenda}
               tipo={tipo}
-              media={visibleMedia.map((item) => ({ url_arquivo: item.url, tipo: item.tipo }))}
+              media={media.map((item) => ({ url_arquivo: item.url, tipo: item.tipo }))}
             />
           </div>
           <p className="text-center text-xs text-muted-foreground">

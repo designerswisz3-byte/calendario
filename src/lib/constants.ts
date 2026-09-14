@@ -83,4 +83,14 @@ export const TAG_COLORS = [
 
 export const MAX_IMAGE_SIZE_MB = 10
 export const MAX_VIDEO_SIZE_MB = 100
-export const MAX_CAROUSEL_IMAGES = 10
+
+/**
+ * Teto de mídias por conteúdo. O carrossel do Instagram aceita até 20 slides,
+ * misturando foto e vídeo — é esse o número que espelhamos aqui.
+ */
+export const MAX_MEDIA_ITEMS = 20
+
+/** Formatos que exibem mais de uma mídia. Os demais usam só a primeira. */
+export const MULTI_MEDIA_TYPES: ContentType[] = ['carrossel']
+
+export const aceitaVariasMidias = (tipo: ContentType) => MULTI_MEDIA_TYPES.includes(tipo)

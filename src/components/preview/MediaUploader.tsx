@@ -17,10 +17,10 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, ImagePlus, Loader2, Trash2, Video } from 'lucide-react'
+import { GripVertical, ImagePlus, Loader2, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { MAX_CAROUSEL_IMAGES } from '@/lib/constants'
+import { MAX_IMAGE_SIZE_MB, MAX_MEDIA_ITEMS, MAX_VIDEO_SIZE_MB } from '@/lib/constants'
 import type { MediaType } from '@/types/database'
 
 export interface MediaItem {
@@ -31,14 +31,13 @@ export interface MediaItem {
 }
 
 interface Props {
-  mode: MediaType
   items: MediaItem[]
   onChange: (items: MediaItem[]) => void
   onFilesSelected: (files: File[]) => void | Promise<void>
   uploading?: boolean
 }
 
-function SortableImage({
+function SortableMedia({
   item,
   index,
   onRemove,
@@ -51,6 +50,8 @@ function SortableImage({
     id: item.id,
   })
 
+  const ehVideo = item.tipo === 'video'
+
   return (
     <li
       ref={setNodeRef}
@@ -60,7 +61,25 @@ function SortableImage({
         isDragging && 'z-10 opacity-80 shadow-glass-lg',
       )}
     >
-      <img src={item.url} alt={`Imagem ${index + 1}`} className="h-full w-full object-cover" />
+      {ehVideo ? (
+        <>
+          {/* preload=metadata basta para o navegador desenhar o primeiro quadro */}
+          <video
+            src={item.url}
+            className="h-full w-full object-cover"
+            preload="metadata"
+            muted
+            playsInline
+          />
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white">
+              <Play className="h-3.5 w-3.5 fill-current" />
+            </span>
+          </span>
+        </>
+      ) : (
+        <img src={item.url} alt={`Mídia ${index + 1}`} className="h-full w-full object-cover" />
+      )}
 
       <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[0.65rem] font-semibold text-white">
         {index + 1}
@@ -69,7 +88,7 @@ function SortableImage({
       <button
         type="button"
         onClick={onRemove}
-        aria-label={`Remover imagem ${index + 1}`}
+        aria-label={`Remover mídia ${index + 1}`}
         className="absolute right-1.5 top-1.5 rounded bg-black/60 p-1 text-white opacity-0 transition-opacity duration-200 hover:bg-destructive focus:opacity-100 group-hover:opacity-100"
       >
         <Trash2 className="h-3.5 w-3.5" />
@@ -78,7 +97,7 @@ function SortableImage({
       <button
         type="button"
         className="absolute bottom-1.5 left-1.5 cursor-grab rounded bg-black/60 p-1 text-white active:cursor-grabbing"
-        aria-label={`Reordenar imagem ${index + 1}`}
+        aria-label={`Reordenar mídia ${index + 1}`}
         {...attributes}
         {...listeners}
       >
@@ -89,11 +108,10 @@ function SortableImage({
 }
 
 /**
- * Upload de mídia:
- * - modo "imagem": múltiplas imagens reordenáveis por drag-and-drop (carrossel)
- * - modo "video": um único vídeo (reels/story)
+ * Upload de mídia: imagens e vídeos no mesmo conjunto, até MAX_MEDIA_ITEMS,
+ * reordenáveis por drag-and-drop. A ordem daqui é a ordem dos slides.
  */
-export function MediaUploader({ mode, items, onChange, onFilesSelected, uploading }: Props) {
+export function MediaUploader({ items, onChange, onFilesSelected, uploading }: Props) {
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = React.useState(false)
 
@@ -102,8 +120,8 @@ export function MediaUploader({ mode, items, onChange, onFilesSelected, uploadin
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const isImageMode = mode === 'imagem'
-  const atLimit = isImageMode && items.length >= MAX_CAROUSEL_IMAGES
+  const restantes = MAX_MEDIA_ITEMS - items.length
+  const noLimite = restantes <= 0
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -116,8 +134,8 @@ export function MediaUploader({ mode, items, onChange, onFilesSelected, uploadin
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList?.length) return
-    const files = Array.from(fileList)
-    await onFilesSelected(isImageMode ? files : files.slice(0, 1))
+    // Corta no que ainda cabe: melhor subir o que dá do que recusar o lote todo.
+    await onFilesSelected(Array.from(fileList).slice(0, Math.max(0, restantes)))
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -137,25 +155,23 @@ export function MediaUploader({ mode, items, onChange, onFilesSelected, uploadin
         className={cn(
           'flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/80 bg-background/40 px-4 py-8 text-center transition-colors duration-250',
           dragOver && 'border-primary bg-accent/60',
-          atLimit && 'opacity-60',
+          noLimite && 'opacity-60',
         )}
       >
         {uploading ? (
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        ) : isImageMode ? (
-          <ImagePlus className="h-5 w-5 text-muted-foreground" />
         ) : (
-          <Video className="h-5 w-5 text-muted-foreground" />
+          <ImagePlus className="h-5 w-5 text-muted-foreground" />
         )}
 
         <div className="space-y-1">
           <p className="text-sm font-medium">
-            {isImageMode ? 'Arraste as imagens do carrossel' : 'Arraste o vídeo'}
+            {noLimite ? `Limite de ${MAX_MEDIA_ITEMS} mídias atingido` : 'Arraste imagens e vídeos'}
           </p>
           <p className="text-xs text-muted-foreground">
-            {isImageMode
-              ? `PNG, JPG ou WEBP — até ${MAX_CAROUSEL_IMAGES} imagens`
-              : 'MP4, MOV ou WEBM — vertical 9:16'}
+            {noLimite
+              ? 'Remova alguma para adicionar outra.'
+              : `${items.length}/${MAX_MEDIA_ITEMS} · imagem até ${MAX_IMAGE_SIZE_MB} MB, vídeo até ${MAX_VIDEO_SIZE_MB} MB`}
           </p>
         </div>
 
@@ -164,25 +180,25 @@ export function MediaUploader({ mode, items, onChange, onFilesSelected, uploadin
           variant="outline"
           size="sm"
           onClick={() => inputRef.current?.click()}
-          disabled={uploading || atLimit}
+          disabled={uploading || noLimite}
         >
-          Escolher {isImageMode ? 'imagens' : 'vídeo'}
+          Escolher arquivos
         </Button>
 
         <input
           ref={inputRef}
           type="file"
-          accept={isImageMode ? 'image/*' : 'video/*'}
-          multiple={isImageMode}
+          accept="image/*,video/*"
+          multiple
           className="hidden"
           onChange={(event) => void handleFiles(event.target.files)}
         />
       </div>
 
-      {isImageMode && items.length > 0 && (
+      {items.length > 0 && (
         <>
           <p className="text-xs text-muted-foreground">
-            Arraste pelo punho para reordenar — a ordem aqui é a ordem do carrossel.
+            Arraste pelo punho para reordenar — a ordem aqui é a ordem dos slides.
           </p>
           <DndContext
             sensors={sensors}
@@ -191,9 +207,9 @@ export function MediaUploader({ mode, items, onChange, onFilesSelected, uploadin
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                 {items.map((item, index) => (
-                  <SortableImage
+                  <SortableMedia
                     key={item.id}
                     item={item}
                     index={index}
@@ -204,20 +220,6 @@ export function MediaUploader({ mode, items, onChange, onFilesSelected, uploadin
             </SortableContext>
           </DndContext>
         </>
-      )}
-
-      {!isImageMode && items.length > 0 && (
-        <div className="relative w-40 overflow-hidden rounded-lg border border-white/30 bg-black">
-          <video src={items[0].url} className="aspect-[9/16] w-full object-cover" muted loop autoPlay playsInline />
-          <button
-            type="button"
-            onClick={() => onChange([])}
-            aria-label="Remover vídeo"
-            className="absolute right-1.5 top-1.5 rounded bg-black/60 p-1 text-white transition-colors hover:bg-destructive"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
       )}
     </div>
   )

@@ -5,20 +5,21 @@ import { InstagramCaption } from '@/components/preview/InstagramCaption'
 interface Props {
   expert: string
   legenda: string
-  videoUrl: string | null
+  /** A mídia em destaque. Um story também pode ser uma imagem parada. */
+  midia: { url: string; tipo: 'imagem' | 'video' } | null
   variant: 'reels' | 'story'
 }
 
 /** Formato vertical 9:16, vídeo em loop e legenda em overlay. */
-export function InstagramReel({ expert, legenda, videoUrl, variant }: Props) {
+export function InstagramReel({ expert, legenda, midia, variant }: Props) {
   const isStory = variant === 'story'
 
   return (
     <div className="w-full max-w-[380px]">
       <div className="relative aspect-[9/16] w-full overflow-hidden bg-black sm:rounded-xl">
-        {videoUrl ? (
+        {midia?.tipo === 'video' ? (
           <video
-            src={videoUrl}
+            src={midia.url}
             className="h-full w-full object-cover"
             autoPlay
             loop
@@ -26,6 +27,8 @@ export function InstagramReel({ expert, legenda, videoUrl, variant }: Props) {
             playsInline
             controls={false}
           />
+        ) : midia ? (
+          <img src={midia.url} alt={`Conteúdo de ${expert}`} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-neutral-500">
             Sem mídia

@@ -1,6 +1,6 @@
 import { InstagramFeedPost } from '@/components/preview/InstagramFeedPost'
 import { InstagramReel } from '@/components/preview/InstagramReel'
-import { isVideoType } from '@/lib/constants'
+import { aceitaVariasMidias, isVideoType } from '@/lib/constants'
 import type { ContentType, MediaAssetRow } from '@/types/database'
 
 interface Props {
@@ -10,22 +10,32 @@ interface Props {
   media: Pick<MediaAssetRow, 'url_arquivo' | 'tipo'>[]
 }
 
-/** Escolhe entre feed (carrossel/post) e vertical 9:16 (reels/story). */
+/**
+ * Escolhe entre feed (carrossel/post) e vertical 9:16 (reels/story).
+ *
+ * O upload aceita até 20 mídias, mas cada formato mostra o que o Instagram
+ * mostraria: o carrossel exibe todos os slides; os demais usam a primeira.
+ */
 export function InstagramPreview({ expert, legenda, tipo, media }: Props) {
   const nome = expert.trim() || 'seu_perfil'
+  const slides = media.map((asset) => ({ url: asset.url_arquivo, tipo: asset.tipo }))
 
   if (isVideoType(tipo)) {
-    const video = media.find((asset) => asset.tipo === 'video')
     return (
       <InstagramReel
         expert={nome}
         legenda={legenda}
-        videoUrl={video?.url_arquivo ?? null}
+        midia={slides[0] ?? null}
         variant={tipo === 'story' ? 'story' : 'reels'}
       />
     )
   }
 
-  const images = media.filter((asset) => asset.tipo === 'imagem').map((asset) => asset.url_arquivo)
-  return <InstagramFeedPost expert={nome} legenda={legenda} images={images} />
+  return (
+    <InstagramFeedPost
+      expert={nome}
+      legenda={legenda}
+      slides={aceitaVariasMidias(tipo) ? slides : slides.slice(0, 1)}
+    />
+  )
 }

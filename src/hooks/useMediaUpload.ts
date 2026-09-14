@@ -11,18 +11,30 @@ function extensionOf(file: File) {
   return fromType ? fromType.toLowerCase() : 'bin'
 }
 
-export function validateFile(file: File, expected: MediaType): string | null {
-  if (expected === 'imagem' && !file.type.startsWith('image/')) {
-    return `"${file.name}" não é uma imagem.`
-  }
-  if (expected === 'video' && !file.type.startsWith('video/')) {
-    return `"${file.name}" não é um vídeo.`
-  }
-  const limitMb = expected === 'imagem' ? MAX_IMAGE_SIZE_MB : MAX_VIDEO_SIZE_MB
-  if (file.size > limitMb * 1024 * 1024) {
-    return `"${file.name}" passa do limite de ${limitMb} MB.`
-  }
+/** Deduz se o arquivo é imagem ou vídeo pelo MIME type. */
+export function detectarTipo(file: File): MediaType | null {
+  if (file.type.startsWith('image/')) return 'imagem'
+  if (file.type.startsWith('video/')) return 'video'
   return null
+}
+
+/**
+ * Valida um arquivo e já devolve o tipo detectado — imagem e vídeo convivem
+ * no mesmo upload, então quem chama não precisa saber de antemão qual é.
+ */
+export type ResultadoValidacao =
+  | { ok: true; tipo: MediaType }
+  | { ok: false; erro: string }
+
+export function validateFile(file: File): ResultadoValidacao {
+  const tipo = detectarTipo(file)
+  if (!tipo) return { ok: false, erro: `"${file.name}" não é imagem nem vídeo.` }
+
+  const limitMb = tipo === 'imagem' ? MAX_IMAGE_SIZE_MB : MAX_VIDEO_SIZE_MB
+  if (file.size > limitMb * 1024 * 1024) {
+    return { ok: false, erro: `"${file.name}" passa do limite de ${limitMb} MB para ${tipo}.` }
+  }
+  return { ok: true, tipo }
 }
 
 /** Faz upload para o bucket `media`, em `<user_id>/<uuid>.<ext>`. */
