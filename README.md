@@ -57,11 +57,35 @@ npm install
 
 ### 2. Criar o projeto no Supabase
 
+Há dois caminhos. Escolha **um**.
+
+#### Caminho A — integração GitHub → Supabase (automático)
+
+Se você conectou este repositório ao projeto no **Supabase Dashboard → Integrations → GitHub**, as migrações de `supabase/migrations/` são aplicadas sozinhas a cada push na branch de produção configurada lá.
+
+Para funcionar, confira no dashboard:
+
+- **Supabase directory** apontando para `supabase` (é onde ficam `config.toml` e `migrations/`)
+- **Production branch** apontando para a branch que você usa de fato (`main` neste repo)
+
+Depois do push, confirme em **Table Editor** que apareceram as 5 tabelas: `calendar_items`, `content_previews`, `media_assets`, `tags` e `calendar_item_tags`.
+
+> Se a migração `20260914000200_storage_media_bucket.sql` falhar com erro de permissão (`must be owner of table objects`), rode **só esse arquivo** no SQL Editor. Criar policy em `storage.objects` exige privilégio que nem todo pipeline tem.
+
+#### Caminho B — SQL Editor (manual)
+
 1. Crie um projeto em [supabase.com](https://supabase.com).
 2. No **SQL Editor**, rode em ordem:
    - `supabase/migrations/20260914000100_init_schema.sql` — tabelas, índices, triggers e RLS
    - `supabase/migrations/20260914000200_storage_media_bucket.sql` — bucket `media` e políticas de Storage
-3. Em **Project Settings → API**, copie a URL e a chave `anon`.
+
+#### Nos dois casos
+
+Em **Project Settings → API**, copie a URL e a chave `anon` — elas vão no `.env` local e nas variáveis de ambiente da Vercel.
+
+> A integração com o GitHub aplica o **banco**, mas não entrega as chaves para o frontend. `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` continuam sendo configuração da Vercel.
+
+E em **Authentication → URL Configuration**, coloque a URL da Vercel em *Site URL*, senão o link de confirmação de e-mail aponta para `localhost`.
 
 ### 3. Configurar o ambiente
 
@@ -170,7 +194,18 @@ Já configurado para deploy padrão em ambos:
 
 O rewrite é obrigatório: sem ele, abrir `/preview/:id` direto (ou dar F5) devolve 404.
 
-Lembre de cadastrar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` nas variáveis de ambiente do serviço.
+### Vercel, passo a passo
+
+1. Abra **[vercel.com/new](https://vercel.com/new)** e importe `designerswisz3-byte/calendario`.
+2. A Vercel detecta Vite sozinha — build `npm run build`, output `dist`. Não mexa.
+3. Em **Environment Variables**, antes de clicar em Deploy, adicione as duas:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. Deploy.
+
+São variáveis de **build**: o Vite injeta os valores no bundle na hora do build. Se você adicionar depois, precisa fazer **Redeploy** para elas valerem.
+
+Sem essas duas variáveis o build passa, o link abre — e mostra a tela "Configure o Supabase". Não é bug.
 
 ---
 
