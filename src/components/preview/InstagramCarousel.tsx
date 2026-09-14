@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { VideoPlayer } from '@/components/preview/VideoPlayer'
 import { cn } from '@/lib/utils'
 import type { MediaType } from '@/types/database'
 
@@ -21,8 +22,11 @@ interface Props {
 export function InstagramCarousel({ slides, alt }: Props) {
   const [index, setIndex] = React.useState(0)
   const [proporcao, setProporcao] = React.useState<number | null>(null)
+  // A escolha de som vale para o carrossel inteiro: quem tirou o mudo no
+  // slide 2 não quer tirar de novo no slide 3.
+  const [mudo, setMudo] = React.useState(true)
+  const [volume, setVolume] = React.useState(1)
   const touchStartX = React.useRef<number | null>(null)
-  const videoRefs = React.useRef<Array<HTMLVideoElement | null>>([])
 
   const total = slides.length
 
@@ -49,21 +53,6 @@ export function InstagramCarousel({ slides, alt }: Props) {
       }),
     [total],
   )
-
-  // Toca só o slide ativo; os demais voltam ao início e pausam.
-  React.useEffect(() => {
-    videoRefs.current.forEach((video, i) => {
-      if (!video) return
-      if (i === index) {
-        void video.play().catch(() => {
-          /* autoplay bloqueado pelo navegador: o pôster continua visível */
-        })
-      } else {
-        video.pause()
-        video.currentTime = 0
-      }
-    })
-  }, [index, total])
 
   function handleTouchStart(event: React.TouchEvent) {
     touchStartX.current = event.touches[0]?.clientX ?? null
@@ -100,24 +89,19 @@ export function InstagramCarousel({ slides, alt }: Props) {
         >
           {slides.map((slide, i) =>
             slide.tipo === 'video' ? (
-              <video
-                key={`${slide.url}-${i}`}
-                ref={(el) => {
-                  videoRefs.current[i] = el
-                }}
-                src={slide.url}
-                className="h-full w-full shrink-0 object-cover"
-                loop
-                muted
-                playsInline
-                preload="metadata"
-                controls={false}
-                onLoadedMetadata={(event) => {
-                  if (i !== 0) return
-                  const el = event.currentTarget
-                  registrarProporcao(el.videoWidth, el.videoHeight)
-                }}
-              />
+              <div key={`${slide.url}-${i}`} className="h-full w-full shrink-0">
+                <VideoPlayer
+                  src={slide.url}
+                  ativo={i === index}
+                  mudo={mudo}
+                  volume={volume}
+                  onMudoChange={setMudo}
+                  onVolumeChange={setVolume}
+                  onMetadata={(largura, altura) => {
+                    if (i === 0) registrarProporcao(largura, altura)
+                  }}
+                />
+              </div>
             ) : (
               <img
                 key={`${slide.url}-${i}`}

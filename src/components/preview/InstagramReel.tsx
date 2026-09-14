@@ -1,5 +1,8 @@
+import * as React from 'react'
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Music2, Send } from 'lucide-react'
 import { InstagramAvatar } from '@/components/preview/InstagramAvatar'
+import { VideoPlayer } from '@/components/preview/VideoPlayer'
+import { cn } from '@/lib/utils'
 import { InstagramCaption } from '@/components/preview/InstagramCaption'
 
 interface Props {
@@ -13,19 +16,20 @@ interface Props {
 /** Formato vertical 9:16, vídeo em loop e legenda em overlay. */
 export function InstagramReel({ expert, legenda, midia, variant }: Props) {
   const isStory = variant === 'story'
+  const [mudo, setMudo] = React.useState(true)
+  const [volume, setVolume] = React.useState(1)
 
   return (
     <div className="w-full max-w-[380px]">
       <div className="relative aspect-[9/16] w-full overflow-hidden bg-black sm:rounded-xl">
         {midia?.tipo === 'video' ? (
-          <video
+          <VideoPlayer
             src={midia.url}
-            className="h-full w-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
-            controls={false}
+            ativo
+            mudo={mudo}
+            volume={volume}
+            onMudoChange={setMudo}
+            onVolumeChange={setVolume}
           />
         ) : midia ? (
           // object-contain: reels/story são 9:16, e uma arte 4:5 aqui perderia
@@ -67,8 +71,14 @@ export function InstagramReel({ expert, legenda, midia, variant }: Props) {
         )}
 
         {/* Rodapé com autor + legenda em overlay */}
-        <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 p-3 text-white">
-          <div className="min-w-0 flex-1 space-y-2">
+        {/* pb maior quando há vídeo: a barra de controle ocupa o rodapé */}
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-x-0 bottom-0 flex items-end gap-3 p-3 text-white',
+            midia?.tipo === 'video' && !isStory && 'pb-16',
+          )}
+        >
+          <div className="pointer-events-auto min-w-0 flex-1 space-y-2">
             {!isStory && (
               <div className="flex items-center gap-2">
                 <InstagramAvatar name={expert} size={30} ring={false} />
@@ -107,7 +117,13 @@ export function InstagramReel({ expert, legenda, midia, variant }: Props) {
         </div>
 
         {isStory && (
-          <div className="absolute inset-x-3 bottom-3 flex items-center gap-3 text-white" aria-hidden>
+          <div
+            className={cn(
+              'pointer-events-none absolute inset-x-3 flex items-center gap-3 text-white',
+              midia?.tipo === 'video' ? 'bottom-16' : 'bottom-3',
+            )}
+            aria-hidden
+          >
             <span className="flex-1 rounded-full border border-white/60 px-4 py-2 text-xs text-white/80">
               Envie uma mensagem
             </span>

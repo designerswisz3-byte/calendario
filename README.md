@@ -208,6 +208,8 @@ As classes utilitárias `.glass`, `.glass-strong` e `.glass-panel` estão em `sr
 
 O upload sempre aceita as 20; quem decide quantas aparecem é o formato. Carrossel exibe todos os slides (imagem e vídeo, só o slide visível toca); Post único, Reels e Story usam a primeira mídia e avisam na tela quando há outras guardadas. Assim trocar de formato não descarta upload nenhum.
 
+**Vídeo no preview.** Tem som, linha do tempo arrastável e controle de volume. Começa mudo por imposição do navegador — todos bloqueiam autoplay com áudio, e sem o mudo o vídeo simplesmente não tocaria; o som fica a um clique. A escolha de som e volume vale para o carrossel inteiro, então quem tirou o mudo no slide 2 não precisa tirar de novo no slide 3. Só o slide visível toca; os outros pausam e rebobinam, para 20 vídeos não disputarem rede e CPU.
+
 **Proporção do preview.** A moldura do carrossel assume a proporção real da primeira mídia, como o Instagram faz — e não um quadrado fixo. Sem isso, uma arte 4:5 (o formato mais comum de carrossel) perdia topo e base, justamente onde costuma ficar a chamada final. O intervalo é o que o Instagram aceita de fato, de 1.91:1 a 4:5; arte mais alta que isso ele corta mesmo, e o preview mostra o corte em vez de mentir que cabe.
 
 **Limite de upload.** Imagem até 10 MB, vídeo até 300 MB. O número vive em três lugares que precisam concordar: o app (`MAX_VIDEO_SIZE_MB`), o bucket (migração `20260914000400`) e o teto do plano do Supabase. Esse último não se resolve por SQL — no plano Free o limite por arquivo é de 50 MB, e nenhuma configuração de bucket passa por cima.
