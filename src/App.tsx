@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { SupabaseSetupNotice } from '@/components/layout/SupabaseSetupNotice'
-import { SessionGate } from '@/components/auth/SessionGate'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { isSupabaseConfigured } from '@/lib/supabase'
 
 /**
@@ -12,6 +12,7 @@ import { isSupabaseConfigured } from '@/lib/supabase'
  */
 const CalendarPage = React.lazy(() => import('@/pages/CalendarPage'))
 const CreatePage = React.lazy(() => import('@/pages/CreatePage'))
+const LoginPage = React.lazy(() => import('@/pages/LoginPage'))
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'))
 const PublicPreviewPage = React.lazy(() => import('@/pages/PublicPreviewPage'))
 
@@ -31,31 +32,29 @@ export default function App() {
     <React.Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Navigate to="/calendario" replace />} />
+        <Route path="/login" element={<LoginPage />} />
 
-        {/*
-          Link compartilhável: não passa pelo SessionGate de propósito. O
-          cliente abre sem sessão nenhuma — é o ponto do produto.
-        */}
+        {/* Link compartilhável: sem login, sem edição. */}
         <Route path="/preview/:id" element={<PublicPreviewPage />} />
 
         <Route
           path="/criar"
           element={
-            <SessionGate>
+            <ProtectedRoute>
               <AppShell>
                 <CreatePage />
               </AppShell>
-            </SessionGate>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/calendario"
           element={
-            <SessionGate>
+            <ProtectedRoute>
               <AppShell>
                 <CalendarPage />
               </AppShell>
-            </SessionGate>
+            </ProtectedRoute>
           }
         />
 

@@ -32,10 +32,6 @@ file_size_limit = "100MiB"
 
 [auth]
 enabled = true
-# Sem tela de login: o app abre uma sessão anônima sozinho no primeiro acesso.
-# O usuário anônimo recebe role `authenticated` no JWT, então todas as
-# políticas de RLS (auth.uid() = user_id) continuam valendo sem alteração.
-enable_anonymous_sign_ins = true
 # Em produção, troque para a URL da Vercel e adicione-a também em
 # Authentication > URL Configuration no dashboard do Supabase.
 site_url = "https://calendario-rapha20.vercel.app"
@@ -47,8 +43,9 @@ enable_signup = true
 
 [auth.email]
 enable_signup = true
-# Deixe true em produção. Em false, o cadastro já entra logado — útil para
-# testar o fluxo antes de configurar o provedor de e-mail.
+# false = o cadastro já entra logado, sem passar por e-mail de confirmação.
+# É o que faz sentido para uma ferramenta de uso próprio; ligue quando abrir
+# cadastro para outras pessoas.
 enable_confirmations = false
 
 [inbucket]

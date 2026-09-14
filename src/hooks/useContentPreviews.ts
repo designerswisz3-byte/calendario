@@ -92,7 +92,7 @@ export function useSavePreview() {
 
   return useMutation({
     mutationFn: async (input: SavePreviewInput): Promise<ContentPreviewWithMedia> => {
-      if (!user) throw new Error('Sessão ainda não aberta. Recarregue a página.')
+      if (!user) throw new Error('Sessão expirada. Faça login novamente.')
 
       const payload = {
         nome_expert: input.nomeExpert.trim(),
