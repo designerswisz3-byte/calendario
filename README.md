@@ -151,6 +151,14 @@ Resultado, validado contra um Postgres real: anônimo lista `0` linhas nas tabel
 
 ---
 
+## Ajustes: o retorno do cliente
+
+O link público tem um botão **AJUSTES**. O cliente escreve o que precisa mudar — sem limite de caracteres, sem contador — assina se quiser, e envia. O pedido aparece para você em dois lugares: um selo no painel do dia e um card na tela de edição, ao lado do preview.
+
+A parte delicada é que quem abre o link é anônimo e o RLS bloqueia escrita anônima. Em vez de liberar `INSERT` para `anon` na tabela — o que deixaria qualquer um escrever em qualquer lugar — a escrita passa por `enviar_ajuste()`, uma função `SECURITY DEFINER` que só sabe fazer uma coisa: anexar um texto a um preview que existe. A tabela `ajustes` continua fechada para `anon`, inclusive para leitura.
+
+Há um teto de 100 mil caracteres no banco. Não é para restringir o cliente — nenhum retorno humano chega perto disso — é para um endpoint anônimo não virar porta de despejo.
+
 ## Fluxo de integração entre as partes
 
 1. No painel do dia, cada item de planejamento tem um botão **"Criar conteúdo"**.

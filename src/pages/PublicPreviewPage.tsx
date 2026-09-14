@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useParams } from 'react-router-dom'
 import { Loader2, SearchX } from 'lucide-react'
+import { AjustesPanel } from '@/components/preview/AjustesPanel'
 import { InstagramPreview } from '@/components/preview/InstagramPreview'
 import { usePublicPreview } from '@/hooks/useContentPreviews'
 
@@ -60,8 +61,12 @@ export default function PublicPreviewPage() {
         />
       </div>
 
+      <div className="w-full max-w-[470px] px-4 pt-4 sm:px-0">
+        <AjustesPanel previewId={data.id} ajustes={data.ajustes ?? []} />
+      </div>
+
       <p className="px-6 py-6 text-center text-[0.7rem] text-neutral-400">
-        Pré-visualização de conteúdo · somente leitura
+        Pré-visualização de conteúdo · o post é somente leitura
       </p>
     </div>
   )

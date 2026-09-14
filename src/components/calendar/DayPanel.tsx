@@ -5,6 +5,7 @@ import {
   Clock,
   ExternalLink,
   ImageIcon,
+  MessageSquareText,
   Pencil,
   PenSquare,
   Plus,
@@ -34,6 +35,7 @@ import {
   useUpdateCalendarItem,
   type CalendarItemInput,
 } from '@/hooks/useCalendarItems'
+import { useAjustes } from '@/hooks/useAjustes'
 import type { CalendarItemWithRelations } from '@/types/database'
 
 interface Props {
@@ -48,6 +50,19 @@ interface Props {
  * Contém APENAS planejamento. A criação do conteúdo em si sai daqui para
  * /criar?calendar_item_id=<id> — nunca duplicamos legenda/upload/expert.
  */
+/** Marca, na lista do dia, que há retorno do cliente esperando. */
+function BadgeAjustes({ previewId }: { previewId: string }) {
+  const { data: ajustes = [] } = useAjustes(previewId)
+  if (ajustes.length === 0) return null
+
+  return (
+    <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-700 dark:text-amber-300">
+      <MessageSquareText className="h-3 w-3" />
+      {ajustes.length} {ajustes.length === 1 ? 'ajuste pedido' : 'ajustes pedidos'}
+    </span>
+  )
+}
+
 export function DayPanel({ dateKey, items, onOpenChange }: Props) {
   const navigate = useNavigate()
   const createItem = useCreateCalendarItem()
@@ -224,6 +239,7 @@ export function DayPanel({ dateKey, items, onOpenChange }: Props) {
                           {item.preview.media_assets.length}{' '}
                           {item.preview.media_assets.length === 1 ? 'mídia' : 'mídias'}
                         </p>
+                        <BadgeAjustes previewId={item.preview.id} />
                       </div>
                       <Button variant="outline" size="icon-sm" asChild aria-label="Abrir preview público">
                         <a href={`/preview/${item.preview.id}`} target="_blank" rel="noreferrer">

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { AjustesDoCliente } from '@/components/calendar/AjustesDoCliente'
 import { MediaUploader, type MediaItem } from '@/components/preview/MediaUploader'
 import { InstagramPreview } from '@/components/preview/InstagramPreview'
 import { toast } from '@/components/ui/use-toast'
@@ -315,8 +316,9 @@ export default function CreatePage() {
           </CardContent>
         </Card>
 
-        {/* ---------- Preview ao vivo ---------- */}
-        <div className="space-y-3 lg:sticky lg:top-24 lg:self-start">
+        {/* ---------- Preview ao vivo + retorno do cliente ---------- */}
+        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          {previewId && <AjustesDoCliente previewId={previewId} />}
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Preview ao vivo

@@ -62,6 +62,23 @@ export interface ContentPreviewWithMedia extends ContentPreviewRow {
   media_assets: MediaAssetRow[]
 }
 
+/** Retorno do cliente, escrito pelo link público via enviar_ajuste(). */
+export type AjusteRow = {
+  id: string
+  content_preview_id: string
+  autor: string | null
+  texto: string
+  criado_em: string
+}
+
+/** O ajuste como ele volta no payload público (sem o id do preview). */
+export interface AjustePublico {
+  id: string
+  autor: string | null
+  texto: string
+  criado_em: string
+}
+
 /**
  * Payload devolvido por get_public_preview(uuid) para o link compartilhável.
  * Propositalmente sem user_id e sem calendar_item_id: quem recebe o link não
@@ -74,6 +91,7 @@ export interface PublicPreview {
   tipo: ContentType
   criado_em: string
   media_assets: MediaAssetRow[]
+  ajustes: AjustePublico[]
 }
 
 /** Item de planejamento + tags + conteúdo vinculado (se houver). */
@@ -117,6 +135,12 @@ export interface Database {
         Update: Partial<Omit<TagRow, 'id' | 'user_id'>>
         Relationships: []
       }
+      ajustes: {
+        Row: AjusteRow
+        Insert: Omit<AjusteRow, 'id' | 'criado_em'> & { id?: string; criado_em?: string }
+        Update: Partial<Omit<AjusteRow, 'id'>>
+        Relationships: []
+      }
       calendar_item_tags: {
         Row: CalendarItemTagRow
         Insert: CalendarItemTagRow
@@ -129,6 +153,10 @@ export interface Database {
       get_public_preview: {
         Args: { preview_id: string }
         Returns: PublicPreview | null
+      }
+      enviar_ajuste: {
+        Args: { preview_id: string; texto: string; autor?: string | null }
+        Returns: AjustePublico
       }
     }
     Enums: { [_ in never]: never }
