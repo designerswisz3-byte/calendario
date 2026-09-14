@@ -78,6 +78,7 @@ Depois do push, confirme em **Table Editor** que apareceram as 5 tabelas: `calen
 2. No **SQL Editor**, rode em ordem:
    - `supabase/migrations/20260914000100_init_schema.sql` — tabelas, índices, triggers e RLS
    - `supabase/migrations/20260914000200_storage_media_bucket.sql` — bucket `media` e políticas de Storage
+   - `supabase/migrations/20260914000300_preview_publico_apenas_por_id.sql` — fecha a leitura anônima das tabelas e expõe o preview por função
 
 #### Nos dois casos
 
@@ -129,8 +130,20 @@ Todas as tabelas têm RLS ligado.
 
 - Tabelas com `user_id`: `SELECT/INSERT/UPDATE/DELETE` só para `auth.uid() = user_id`.
 - `calendar_item_tags` não tem `user_id` — herda o dono via `EXISTS` no `calendar_items`.
-- **`content_previews` e `media_assets` têm `SELECT` público** (`anon`). É o que permite o link `/preview/:id` abrir sem login. Escrita continua restrita ao dono. `media_assets` precisa da mesma liberação, senão o visitante anônimo abriria o preview sem as mídias.
+- **Nenhuma tabela tem leitura anônima.** O link público passa pela função `get_public_preview(uuid)` (veja abaixo).
 - Storage: bucket `media` com leitura pública e escrita só do usuário autenticado, dentro da pasta `<user_id>/`.
+
+### Por que o link público usa uma função, e não a tabela
+
+A primeira versão dava `SELECT` público (`using (true)`) em `content_previews` e `media_assets`. O link funcionava — mas RLS é por **linha**, não por formato de consulta. Com a chave `anon`, que vai no bundle JavaScript público, qualquer pessoa podia fazer `GET /rest/v1/content_previews` e **listar o conteúdo não publicado de todos os clientes**, sem saber id nenhum.
+
+A especificação pede leitura pública "apenas via id" — e isso não se expressa numa policy. A migração `20260914000300` corrige:
+
+1. Remove o `SELECT` anônimo das duas tabelas (passa a ser só do dono).
+2. Cria `public.get_public_preview(preview_id uuid)` como `SECURITY DEFINER`, com `search_path` fixado, retornando **uma** linha e só os campos que o cliente precisa ver — sem `user_id`, sem `calendar_item_id`.
+3. Concede `EXECUTE` a `anon`.
+
+Resultado, validado contra um Postgres real: anônimo lista `0` linhas nas tabelas, mas recebe o post completo ao chamar a função com o id certo, e `null` com um id inexistente.
 
 ---
 

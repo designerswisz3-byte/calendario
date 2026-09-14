@@ -62,6 +62,20 @@ export interface ContentPreviewWithMedia extends ContentPreviewRow {
   media_assets: MediaAssetRow[]
 }
 
+/**
+ * Payload devolvido por get_public_preview(uuid) para o link compartilhável.
+ * Propositalmente sem user_id e sem calendar_item_id: quem recebe o link não
+ * precisa conhecer a estrutura interna do planejamento.
+ */
+export interface PublicPreview {
+  id: string
+  nome_expert: string
+  legenda: string | null
+  tipo: ContentType
+  criado_em: string
+  media_assets: MediaAssetRow[]
+}
+
 /** Item de planejamento + tags + conteúdo vinculado (se houver). */
 export interface CalendarItemWithRelations extends CalendarItemRow {
   tags: TagRow[]
@@ -111,7 +125,12 @@ export interface Database {
       }
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      get_public_preview: {
+        Args: { preview_id: string }
+        Returns: PublicPreview | null
+      }
+    }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
   }

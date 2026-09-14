@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/hooks/queryKeys'
 import { useAuth } from '@/components/auth/AuthProvider'
-import type { ContentPreviewWithMedia, ContentType, MediaType } from '@/types/database'
+import type {
+  ContentPreviewWithMedia,
+  ContentType,
+  MediaType,
+  PublicPreview,
+} from '@/types/database'
 
 const SELECT_WITH_MEDIA = '*, media_assets ( * )'
 
@@ -14,23 +19,30 @@ function sortMedia(preview: ContentPreviewWithMedia): ContentPreviewWithMedia {
 }
 
 /**
- * Leitura de um preview pelo id. NÃO exige login: a política de RLS
- * `content_previews_select_public` permite SELECT anônimo, que é o que faz o
- * link compartilhável funcionar.
+ * Leitura de um preview pelo id, sem login.
+ *
+ * Usa a função get_public_preview(uuid) em vez de ler a tabela direto. A
+ * diferença não é cosmética: RLS é por linha, então um SELECT anônimo na
+ * tabela deixaria qualquer um LISTAR todos os previews de todos os clientes
+ * com a chave anon (que vai no bundle público). A função exige o id.
  */
 export function usePublicPreview(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.preview(id ?? 'none'),
     enabled: Boolean(id),
     retry: false,
-    queryFn: async (): Promise<ContentPreviewWithMedia | null> => {
-      const { data, error } = await supabase
-        .from('content_previews')
-        .select(SELECT_WITH_MEDIA)
-        .eq('id', id as string)
-        .maybeSingle()
+    queryFn: async (): Promise<PublicPreview | null> => {
+      const { data, error } = await supabase.rpc('get_public_preview', {
+        preview_id: id as string,
+      })
       if (error) throw error
-      return data ? sortMedia(data as unknown as ContentPreviewWithMedia) : null
+      if (!data) return null
+
+      const preview = data as PublicPreview
+      return {
+        ...preview,
+        media_assets: [...(preview.media_assets ?? [])].sort((a, b) => a.ordem - b.ordem),
+      }
     },
   })
 }
