@@ -20,7 +20,10 @@ export type CalendarItemRow = {
   horario: string | null
   tipo: PlanningType
   status: CalendarStatus
+  /** Briefing: ângulo, gancho, referências. */
   notas: string | null
+  /** Roteiro de gravação — é o texto que alimenta o teleprompter. */
+  roteiro: string | null
   criado_em: string
   atualizado_em: string
 }

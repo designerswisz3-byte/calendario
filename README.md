@@ -151,6 +151,32 @@ Resultado, validado contra um Postgres real: anônimo lista `0` linhas nas tabel
 
 ---
 
+## Briefing, roteiro e teleprompter
+
+O item de planejamento tem dois textos, em abas:
+
+- **Briefing** — ângulo, gancho, referências. É o campo `notas`, o mesmo que sempre existiu: nada foi movido, e tudo que já estava escrito continua ali.
+- **Roteiro** — o texto falado, na coluna nova `roteiro`. É ele que alimenta o teleprompter.
+
+A separação existe porque são textos com funções diferentes: o briefing é para pensar, o roteiro é para gravar. Misturar os dois num campo só significa caçar a fala no meio da estratégia, na hora da gravação.
+
+No painel do dia, a aba Roteiro traz o botão **Abrir teleprompter**: tela cheia, texto grande e centralizado, rolando sozinho. Contagem regressiva de 3 segundos ao abrir, para posicionar a câmera.
+
+Tudo que muda o ritmo pode ser mexido **durante** a gravação, porque ninguém acerta a velocidade de primeira e parar para reconfigurar significa regravar:
+
+| Controle | Atalho |
+| --- | --- |
+| Pausar / retomar | `espaço` ou `K` |
+| Velocidade | `↑` `↓` |
+| Tamanho da fonte | `+` `−` |
+| Voltar ao início | `R` |
+| Espelhar (rigs com vidro) | `M` |
+| Fechar | `Esc` |
+
+Velocidade, fonte e espelhamento ficam guardados no navegador. Os controles somem sozinhos enquanto o texto rola, para não aparecerem na gravação — mexer o mouse os traz de volta. Uma linha fina marca a altura de leitura, e o texto começa e termina no centro da tela, que é onde a câmera fica.
+
+O teleprompter **substitui** o painel do dia em vez de conviver com ele: o overlay modal do Sheet bloquearia os cliques dos controles. Ao fechar, o painel volta no mesmo dia.
+
 ## Ajustes: o retorno do cliente
 
 O link público tem um botão **AJUSTES**. O cliente escreve o que precisa mudar — sem limite de caracteres, sem contador — assina se quiser, e envia. O pedido aparece para você em dois lugares: um selo no painel do dia e um card na tela de edição, ao lado do preview.

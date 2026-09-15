@@ -90,9 +90,15 @@ export interface CalendarItemInput {
   horario: string | null
   tipo: PlanningType
   status: CalendarStatus
+  /** Briefing. */
   notas: string | null
+  /** Roteiro de gravação. */
+  roteiro: string | null
   tagIds: string[]
 }
+
+/** Texto vazio vira null: evita guardar strings de espaços no banco. */
+const limpar = (texto: string | null | undefined) => (texto?.trim() ? texto.trim() : null)
 
 /** Reescreve os vínculos de tags do item (remove os que saíram, insere os novos). */
 async function syncTags(calendarItemId: string, tagIds: string[]) {
@@ -140,7 +146,8 @@ export function useCreateCalendarItem() {
           horario: toDbTime(input.horario),
           tipo: input.tipo,
           status: input.status,
-          notas: input.notas?.trim() ? input.notas.trim() : null,
+          notas: limpar(input.notas),
+          roteiro: limpar(input.roteiro),
         })
         .select()
         .single()
@@ -171,7 +178,8 @@ export function useUpdateCalendarItem() {
       if (input.horario !== undefined) patch.horario = toDbTime(input.horario)
       if (input.tipo !== undefined) patch.tipo = input.tipo
       if (input.status !== undefined) patch.status = input.status
-      if (input.notas !== undefined) patch.notas = input.notas?.trim() ? input.notas.trim() : null
+      if (input.notas !== undefined) patch.notas = limpar(input.notas)
+      if (input.roteiro !== undefined) patch.roteiro = limpar(input.roteiro)
 
       const { data, error } = await supabase
         .from('calendar_items')

@@ -6,6 +6,7 @@ import {
   ExternalLink,
   ImageIcon,
   MessageSquareText,
+  MonitorPlay,
   Pencil,
   PenSquare,
   Plus,
@@ -37,6 +38,7 @@ import {
   type CalendarItemInput,
 } from '@/hooks/useCalendarItems'
 import { useAjustes } from '@/hooks/useAjustes'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLarguraPainel } from '@/hooks/useLarguraPainel'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { CalendarItemWithRelations } from '@/types/database'
@@ -45,6 +47,11 @@ interface Props {
   dateKey: string | null
   items: CalendarItemWithRelations[]
   onOpenChange: (open: boolean) => void
+  /**
+   * Sobe para a página. O teleprompter é tela cheia e não pode conviver com o
+   * painel: o overlay modal do Sheet bloquearia os cliques dos controles.
+   */
+  onAbrirTeleprompter: (item: CalendarItemWithRelations) => void
 }
 
 /**
@@ -53,6 +60,56 @@ interface Props {
  * Contém APENAS planejamento. A criação do conteúdo em si sai daqui para
  * /criar?calendar_item_id=<id> — nunca duplicamos legenda/upload/expert.
  */
+/**
+ * Briefing e roteiro em abas. O briefing é o texto que já existia — nada foi
+ * movido. O roteiro é o que alimenta o teleprompter.
+ */
+function TextosDoItem({
+  item,
+  onAbrirPrompter,
+}: {
+  item: CalendarItemWithRelations
+  onAbrirPrompter: () => void
+}) {
+  const temBriefing = Boolean(item.notas?.trim())
+  const temRoteiro = Boolean(item.roteiro?.trim())
+  if (!temBriefing && !temRoteiro) return null
+
+  const palavras = item.roteiro?.trim() ? item.roteiro.trim().split(/\s+/).length : 0
+
+  return (
+    <Tabs defaultValue={temBriefing ? 'briefing' : 'roteiro'} className="w-full">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="briefing" disabled={!temBriefing}>
+          Briefing
+        </TabsTrigger>
+        <TabsTrigger value="roteiro" disabled={!temRoteiro}>
+          Roteiro
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="briefing" className="mt-2">
+        <p className="whitespace-pre-wrap text-sm text-muted-foreground">{item.notas}</p>
+      </TabsContent>
+
+      <TabsContent value="roteiro" className="mt-2 space-y-2">
+        <p className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-foreground/[0.04] p-3 font-mono text-[0.8rem] leading-relaxed scrollbar-thin">
+          {item.roteiro}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" className="flex-1" onClick={onAbrirPrompter}>
+            <MonitorPlay className="h-4 w-4" />
+            Abrir teleprompter
+          </Button>
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            {palavras} palavras · ~{Math.max(1, Math.round(palavras / 150))} min
+          </span>
+        </div>
+      </TabsContent>
+    </Tabs>
+  )
+}
+
 /** Marca, na lista do dia, que há retorno do cliente esperando. */
 function BadgeAjustes({ previewId }: { previewId: string }) {
   const { data: ajustes = [] } = useAjustes(previewId)
@@ -66,7 +123,7 @@ function BadgeAjustes({ previewId }: { previewId: string }) {
   )
 }
 
-export function DayPanel({ dateKey, items, onOpenChange }: Props) {
+export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: Props) {
   const navigate = useNavigate()
   const createItem = useCreateCalendarItem()
   const updateItem = useUpdateCalendarItem()
@@ -240,9 +297,7 @@ export function DayPanel({ dateKey, items, onOpenChange }: Props) {
                   </div>
                 )}
 
-                {item.notas?.trim() && (
-                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">{item.notas}</p>
-                )}
+                <TextosDoItem item={item} onAbrirPrompter={() => onAbrirTeleprompter(item)} />
 
                 <Separator />
 
@@ -309,6 +364,7 @@ export function DayPanel({ dateKey, items, onOpenChange }: Props) {
           )}
         </div>
       </SheetContent>
+
     </Sheet>
   )
 }

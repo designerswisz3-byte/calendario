@@ -20,17 +20,20 @@ import { EMPTY_FILTERS, FiltersBar, type CalendarFilters } from '@/components/ca
 import { ListView } from '@/components/calendar/ListView'
 import { MonthGrid } from '@/components/calendar/MonthGrid'
 import { MonthProgress } from '@/components/calendar/MonthProgress'
+import { Teleprompter } from '@/components/calendar/Teleprompter'
 import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
 import {
   addMonths,
   endOfMonth,
   formatMonthTitle,
+  formatShortDate,
   startOfMonth,
   toDateKey,
   todayKey,
 } from '@/lib/date'
 import { useCalendarItems, useMoveCalendarItem } from '@/hooks/useCalendarItems'
+import { TYPE_LABEL } from '@/lib/constants'
 import { useTags } from '@/hooks/useTags'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { CalendarItemWithRelations } from '@/types/database'
@@ -43,6 +46,9 @@ export default function CalendarPage() {
   const [filters, setFilters] = React.useState<CalendarFilters>(EMPTY_FILTERS)
   const [openDayKey, setOpenDayKey] = React.useState<string | null>(null)
   const [dragging, setDragging] = React.useState<CalendarItemWithRelations | null>(null)
+  const [prompter, setPrompter] = React.useState<CalendarItemWithRelations | null>(null)
+  // De onde o teleprompter foi aberto, para devolver o painel ao fechar.
+  const diaAntesDoPrompter = React.useRef<string | null>(null)
 
   const { data: items = [], isLoading, isError, error } = useCalendarItems(reference)
   const { data: tags = [] } = useTags()
@@ -78,7 +84,9 @@ export default function CalendarPage() {
         return false
       }
       if (term) {
-        const haystack = [item.preview?.nome_expert ?? '', item.notas ?? ''].join(' ').toLowerCase()
+        const haystack = [item.preview?.nome_expert ?? '', item.notas ?? '', item.roteiro ?? '']
+          .join(' ')
+          .toLowerCase()
         if (!haystack.includes(term)) return false
       }
       return true
@@ -244,6 +252,30 @@ export default function CalendarPage() {
         onOpenChange={(open) => {
           if (!open) setOpenDayKey(null)
         }}
+        onAbrirTeleprompter={(item) => {
+          // Fecha o painel: o teleprompter é tela cheia, e o overlay modal do
+          // Sheet bloquearia os cliques nos controles dele.
+          diaAntesDoPrompter.current = openDayKey
+          setOpenDayKey(null)
+          setPrompter(item)
+        }}
+      />
+
+      <Teleprompter
+        aberto={Boolean(prompter)}
+        onOpenChange={(aberto) => {
+          if (aberto) return
+          setPrompter(null)
+          // Devolve o painel do dia de onde o roteiro veio.
+          setOpenDayKey(diaAntesDoPrompter.current)
+          diaAntesDoPrompter.current = null
+        }}
+        roteiro={prompter?.roteiro ?? ''}
+        titulo={
+          prompter
+            ? `${TYPE_LABEL[prompter.tipo]} · ${formatShortDate(prompter.data)}`
+            : undefined
+        }
       />
     </div>
   )

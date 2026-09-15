@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { TagPicker } from '@/components/calendar/TagPicker'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PLANNING_TYPES, STATUSES, STATUS_LABEL, TYPE_LABEL } from '@/lib/constants'
 import { formatTime } from '@/lib/date'
 import type { CalendarItemInput } from '@/hooks/useCalendarItems'
@@ -35,6 +36,7 @@ export function CalendarItemForm({ dateKey, item, onSubmit, onCancel, saving }: 
   const [status, setStatus] = React.useState<CalendarStatus>(item?.status ?? 'ideia')
   const [horario, setHorario] = React.useState(formatTime(item?.horario))
   const [notas, setNotas] = React.useState(item?.notas ?? '')
+  const [roteiro, setRoteiro] = React.useState(item?.roteiro ?? '')
   const [tagIds, setTagIds] = React.useState<string[]>(item?.tags.map((tag) => tag.id) ?? [])
   const [error, setError] = React.useState<string | null>(null)
 
@@ -54,6 +56,7 @@ export function CalendarItemForm({ dateKey, item, onSubmit, onCancel, saving }: 
       tipo,
       status,
       notas,
+      roteiro,
       tagIds,
     })
   }
@@ -112,16 +115,56 @@ export function CalendarItemForm({ dateKey, item, onSubmit, onCancel, saving }: 
         <TagPicker value={tagIds} onChange={setTagIds} />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="item-notas">Notas / ideias</Label>
-        <Textarea
-          id="item-notas"
-          value={notas}
-          onChange={(event) => setNotas(event.target.value)}
-          placeholder="Ângulo, gancho, referência, o que não pode faltar…"
-          className="min-h-[90px]"
-        />
-      </div>
+      {/*
+        Dois textos com funções diferentes: o briefing é para pensar, o roteiro
+        é para gravar — e é o roteiro que alimenta o teleprompter.
+      */}
+      <Tabs defaultValue="briefing">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="briefing">
+            Briefing
+            {notas.trim() && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-current opacity-60" />}
+          </TabsTrigger>
+          <TabsTrigger value="roteiro">
+            Roteiro
+            {roteiro.trim() && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-current opacity-60" />}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="briefing" className="mt-3 space-y-1.5">
+          <Label htmlFor="item-notas" className="text-xs text-muted-foreground">
+            Ângulo, gancho, referência — o que não pode faltar
+          </Label>
+          <Textarea
+            id="item-notas"
+            value={notas}
+            onChange={(event) => setNotas(event.target.value)}
+            placeholder="Por que este conteúdo existe? Qual o gancho? Que prova entra?"
+            className="min-h-[140px]"
+          />
+        </TabsContent>
+
+        <TabsContent value="roteiro" className="mt-3 space-y-1.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <Label htmlFor="item-roteiro" className="text-xs text-muted-foreground">
+              O texto falado, como ele sai no teleprompter
+            </Label>
+            {roteiro.trim() && (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {roteiro.trim().split(/\s+/).length} palavras · ~
+                {Math.max(1, Math.round(roteiro.trim().split(/\s+/).length / 150))} min
+              </span>
+            )}
+          </div>
+          <Textarea
+            id="item-roteiro"
+            value={roteiro}
+            onChange={(event) => setRoteiro(event.target.value)}
+            placeholder={'GANCHO:\n\nExiste um número exato que separa…\n\n8s a 18s. A cena\n\n…'}
+            className="min-h-[140px] font-mono text-[0.82rem] leading-relaxed"
+          />
+        </TabsContent>
+      </Tabs>
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}
 

@@ -9,6 +9,7 @@
 --   3. 20260914000300 — fecha a leitura anônima e cria get_public_preview()
 --   4. 20260914000400 — sobe o limite de upload do bucket para 300 MB
 --   5. 20260914000500 — ajustes do cliente e a função enviar_ajuste()
+--   6. 20260914000600 — separa briefing (notas) de roteiro
 --
 -- Se a parte 2 falhar com "must be owner of table objects", rode as demais
 -- por aqui e crie o bucket `media` pela interface (Storage > New bucket >
@@ -576,4 +577,24 @@ $$;
 comment on function public.enviar_ajuste(uuid, text, text) is
   'Única porta de escrita do visitante anônimo: anexa um ajuste a um preview '
   'existente. A tabela `ajustes` continua fechada para anon.';
+
+
+-- >>>>>>>>>>>>>>>>>>>> 20260914000600_roteiro.sql <<<<<<<<<<<<<<<<<<<<
+
+-- ============================================================================
+-- Separa o texto do item de planejamento em dois: briefing e roteiro.
+-- ============================================================================
+-- `notas` continua sendo o BRIEFING — é onde já está tudo que foi escrito até
+-- aqui, e nada é movido ou reescrito. O roteiro entra como coluna nova, vazia.
+--
+-- São textos com funções diferentes: o briefing é para pensar (ângulo, gancho,
+-- referência), o roteiro é para gravar — e é ele que alimenta o teleprompter.
+-- ============================================================================
+
+alter table calendar_items add column if not exists roteiro text;
+
+comment on column calendar_items.notas is
+  'Briefing: ângulo, gancho, referências. Texto livre de planejamento.';
+comment on column calendar_items.roteiro is
+  'Roteiro de gravação, exibido no teleprompter.';
 
