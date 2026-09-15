@@ -78,6 +78,8 @@ export interface SavePreviewInput {
   nomeExpert: string
   legenda: string
   tipo: ContentType
+  /** Link do projeto no Canva. Vazio remove o botão do preview público. */
+  canvaUrl: string
   media: MediaInput[]
 }
 
@@ -98,6 +100,7 @@ export function useSavePreview() {
         nome_expert: input.nomeExpert.trim(),
         legenda: input.legenda.trim() ? input.legenda : null,
         tipo: input.tipo,
+        canva_url: input.canvaUrl.trim() || null,
         calendar_item_id: input.calendarItemId ?? null,
       }
 

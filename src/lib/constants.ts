@@ -60,6 +60,13 @@ export const STATUS_DOT: Record<CalendarStatus, string> = {
   publicado: 'bg-primary',
 }
 
+/**
+ * Domínios aceitos no link do Canva. A mesma restrição existe como CHECK no
+ * banco: esse endereço aparece num link público, e um erro de colagem viraria
+ * um link para qualquer lugar na cara do cliente.
+ */
+export const CANVA_URL_REGEX = /^https:\/\/([a-z0-9-]+\.)?canva\.(com|cn|me|site)(\/|$)/i
+
 /** Limite real de caracteres da legenda no Instagram. */
 export const CAPTION_MAX_LENGTH = 2200
 

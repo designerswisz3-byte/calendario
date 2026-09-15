@@ -35,6 +35,11 @@ export type ContentPreviewRow = {
   nome_expert: string
   legenda: string | null
   tipo: ContentType
+  /** Link do projeto no Canva, aberto pelo expert no preview público. */
+  canva_url: string | null
+  /** Marcado quando o expert abre a arte. Ele também pode desmarcar. */
+  canva_visto: boolean
+  canva_visto_em: string | null
   criado_em: string
   atualizado_em: string
 }
@@ -93,6 +98,9 @@ export interface PublicPreview {
   legenda: string | null
   tipo: ContentType
   criado_em: string
+  canva_url: string | null
+  canva_visto: boolean
+  canva_visto_em: string | null
   media_assets: MediaAssetRow[]
   ajustes: AjustePublico[]
 }
@@ -118,10 +126,16 @@ export interface Database {
       }
       content_previews: {
         Row: ContentPreviewRow
-        Insert: Omit<ContentPreviewRow, 'id' | 'criado_em' | 'atualizado_em'> & {
+        Insert: Omit<
+          ContentPreviewRow,
+          'id' | 'criado_em' | 'atualizado_em' | 'canva_visto' | 'canva_visto_em'
+        > & {
           id?: string
           criado_em?: string
           atualizado_em?: string
+          // Têm default no banco: o insert não precisa informar.
+          canva_visto?: boolean
+          canva_visto_em?: string | null
         }
         Update: Partial<Omit<ContentPreviewRow, 'id' | 'user_id'>>
         Relationships: []
@@ -160,6 +174,10 @@ export interface Database {
       enviar_ajuste: {
         Args: { preview_id: string; texto: string; autor?: string | null }
         Returns: AjustePublico
+      }
+      marcar_canva_visto: {
+        Args: { preview_id: string; visto: boolean }
+        Returns: { canva_visto: boolean; canva_visto_em: string | null }
       }
     }
     Enums: { [_ in never]: never }

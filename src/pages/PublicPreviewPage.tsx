@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useParams } from 'react-router-dom'
 import { Loader2, SearchX } from 'lucide-react'
 import { AjustesPanel } from '@/components/preview/AjustesPanel'
+import { CanvaPanel } from '@/components/preview/CanvaPanel'
 import { InstagramPreview } from '@/components/preview/InstagramPreview'
 import { usePublicPreview } from '@/hooks/useContentPreviews'
 
@@ -61,7 +62,15 @@ export default function PublicPreviewPage() {
         />
       </div>
 
-      <div className="w-full max-w-[470px] px-4 pt-4 sm:px-0">
+      <div className="w-full max-w-[470px] space-y-3 px-4 pt-4 sm:px-0">
+        {data.canva_url && (
+          <CanvaPanel
+            previewId={data.id}
+            canvaUrl={data.canva_url}
+            visto={Boolean(data.canva_visto)}
+            vistoEm={data.canva_visto_em}
+          />
+        )}
         <AjustesPanel previewId={data.id} ajustes={data.ajustes ?? []} />
       </div>
 

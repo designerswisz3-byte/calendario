@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, Copy, ExternalLink, Link2, Loader2 } from 'lucide-react'
+import { ArrowLeft, Check, Copy, ExternalLink, Link2, Loader2, Palette } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,7 @@ import { InstagramPreview } from '@/components/preview/InstagramPreview'
 import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
 import {
+  CANVA_URL_REGEX,
   CAPTION_MAX_LENGTH,
   CONTENT_TYPES,
   MAX_MEDIA_ITEMS,
@@ -52,6 +53,7 @@ export default function CreatePage() {
   const [previewId, setPreviewId] = React.useState<string | null>(previewIdParam)
   const [nomeExpert, setNomeExpert] = React.useState('')
   const [legenda, setLegenda] = React.useState('')
+  const [canvaUrl, setCanvaUrl] = React.useState('')
   const [tipo, setTipo] = React.useState<ContentType>('carrossel')
   const [media, setMedia] = React.useState<MediaItem[]>([])
   const [generatedUrl, setGeneratedUrl] = React.useState<string | null>(null)
@@ -65,6 +67,7 @@ export default function CreatePage() {
     setPreviewId(linkedPreview.id)
     setNomeExpert(linkedPreview.nome_expert)
     setLegenda(linkedPreview.legenda ?? '')
+    setCanvaUrl(linkedPreview.canva_url ?? '')
     setTipo(linkedPreview.tipo)
     setMedia(
       linkedPreview.media_assets.map((asset) => ({
@@ -130,6 +133,15 @@ export default function CreatePage() {
       })
       return
     }
+    if (canvaUrl.trim() && !CANVA_URL_REGEX.test(canvaUrl.trim())) {
+      toast({
+        variant: 'destructive',
+        title: 'Link do Canva inválido',
+        description: 'Cole o endereço do projeto no Canva (canva.com). Esse link aparece para o cliente.',
+      })
+      return
+    }
+
     if (legenda.length > CAPTION_MAX_LENGTH) {
       toast({
         variant: 'destructive',
@@ -146,6 +158,7 @@ export default function CreatePage() {
         nomeExpert,
         legenda,
         tipo,
+        canvaUrl,
         media: media.map((item) => ({ url_arquivo: item.url, tipo: item.tipo })),
       })
 
@@ -274,6 +287,24 @@ export default function CreatePage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="canva">
+                  Link da arte no Canva{' '}
+                  <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="canva"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://www.canva.com/design/..."
+                  value={canvaUrl}
+                  onChange={(event) => setCanvaUrl(event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Aparece como botão no link do cliente, para ele abrir a arte e ajustar o texto.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Mídias</Label>
                 <MediaUploader
                   items={media}
@@ -318,6 +349,27 @@ export default function CreatePage() {
 
         {/* ---------- Preview ao vivo + retorno do cliente ---------- */}
         <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          {previewId && linkedPreview?.canva_url && (
+            <div
+              className={cn(
+                'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm',
+                linkedPreview.canva_visto
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                  : 'border-border bg-foreground/[0.04] text-muted-foreground',
+              )}
+            >
+              <Palette className="h-4 w-4 shrink-0" />
+              {linkedPreview.canva_visto ? (
+                <span>
+                  O expert abriu a arte no Canva
+                  {linkedPreview.canva_visto_em &&
+                    ` em ${new Date(linkedPreview.canva_visto_em).toLocaleString('pt-BR')}`}
+                </span>
+              ) : (
+                <span>O expert ainda não abriu a arte no Canva.</span>
+              )}
+            </div>
+          )}
           {previewId && <AjustesDoCliente previewId={previewId} />}
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

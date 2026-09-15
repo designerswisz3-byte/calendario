@@ -7,6 +7,7 @@ import {
   ImageIcon,
   MessageSquareText,
   MonitorPlay,
+  Palette,
   Pencil,
   PenSquare,
   Plus,
@@ -369,6 +370,24 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                           {item.preview.media_assets.length === 1 ? 'mídia' : 'mídias'}
                         </p>
                         <BadgeAjustes previewId={item.preview.id} />
+                        {item.preview.canva_url && (
+                          <span
+                            className={cn(
+                              'mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.65rem] font-semibold',
+                              item.preview.canva_visto
+                                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-foreground/[0.07] text-muted-foreground',
+                            )}
+                            title={
+                              item.preview.canva_visto_em
+                                ? `Aberta em ${new Date(item.preview.canva_visto_em).toLocaleString('pt-BR')}`
+                                : 'O expert ainda não abriu a arte'
+                            }
+                          >
+                            <Palette className="h-3 w-3" />
+                            {item.preview.canva_visto ? 'Arte vista' : 'Arte não vista'}
+                          </span>
+                        )}
                       </div>
                       <Button variant="outline" size="icon-sm" asChild aria-label="Abrir preview público">
                         <a href={`/preview/${item.preview.id}`} target="_blank" rel="noreferrer">

@@ -68,3 +68,28 @@ export function useApagarAjuste(previewId: string | undefined) {
     },
   })
 }
+
+/**
+ * Visto do expert na arte do Canva, marcado do link público.
+ *
+ * Passa por marcar_canva_visto() porque quem clica é anônimo e não tem —
+ * nem deve ter — escrita na tabela content_previews.
+ */
+export function useMarcarCanvaVisto(previewId: string | undefined) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (visto: boolean) => {
+      if (!previewId) throw new Error('Preview não identificado.')
+      const { data, error } = await supabase.rpc('marcar_canva_visto', {
+        preview_id: previewId,
+        visto,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      if (previewId) queryClient.invalidateQueries({ queryKey: queryKeys.preview(previewId) })
+    },
+  })
+}

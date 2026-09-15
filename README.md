@@ -177,6 +177,18 @@ Velocidade, fonte e espelhamento ficam guardados no navegador. Os controles some
 
 O teleprompter **substitui** o painel do dia em vez de conviver com ele: o overlay modal do Sheet bloquearia os cliques dos controles. Ao fechar, o painel volta no mesmo dia.
 
+## Arte no Canva e o visto do expert
+
+O conteúdo pode guardar o link do projeto no Canva (`content_previews.canva_url`). Quando existe, o link público mostra um botão **Abrir arte no Canva** — o expert entra e ajusta o texto da arte sem você intermediar.
+
+Abrir a arte já marca o visto: quem clicou viu, e pedir confirmação depois seria um passo a mais para dizer o que a ação já disse. O check continua clicável, para desmarcar quando ele quiser revisitar. Você enxerga o estado num selo no painel do dia e num aviso na tela de edição, com data e hora.
+
+A escrita segue o mesmo padrão dos ajustes: quem clica é anônimo, então passa por `marcar_canva_visto()`, uma função `SECURITY DEFINER`. A tabela `content_previews` continua fechada para `anon`.
+
+A URL é restrita aos domínios do Canva, por CHECK no banco e validação na tela. O endereço aparece num link público: um erro de colagem viraria um link para qualquer lugar na cara do cliente.
+
+> **Sobre importar as artes automaticamente:** a Connect API do Canva devolve uma imagem por página (verificado: um carrossel de 9 páginas exportou em PNG 1080x1350, 4:5). Mas integração privada exige plano **Canva Enterprise**, e a alternativa é publicar uma integração pública e passar pela revisão do Canva. Por isso o upload segue manual.
+
 ## Ajustes: o retorno do cliente
 
 O link público tem um botão **AJUSTES**. O cliente escreve o que precisa mudar — sem limite de caracteres, sem contador — assina se quiser, e envia. O pedido aparece para você em dois lugares: um selo no painel do dia e um card na tela de edição, ao lado do preview.
