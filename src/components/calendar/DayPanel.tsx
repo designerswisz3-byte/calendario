@@ -27,6 +27,7 @@ import { StatusBadge } from '@/components/calendar/StatusBadge'
 import { TypeIcon } from '@/components/calendar/TypeIcon'
 import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/constants'
 import { formatFullDay, formatTime, parseDateKey } from '@/lib/date'
 import {
@@ -36,6 +37,8 @@ import {
   type CalendarItemInput,
 } from '@/hooks/useCalendarItems'
 import { useAjustes } from '@/hooks/useAjustes'
+import { useLarguraPainel } from '@/hooks/useLarguraPainel'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { CalendarItemWithRelations } from '@/types/database'
 
 interface Props {
@@ -71,6 +74,9 @@ export function DayPanel({ dateKey, items, onOpenChange }: Props) {
 
   const [adding, setAdding] = React.useState(false)
   const [editingId, setEditingId] = React.useState<string | null>(null)
+  const { largura, arrastando, iniciarArrasto, redefinir } = useLarguraPainel()
+  // Em telas pequenas o painel já ocupa tudo: não há o que arrastar.
+  const podeRedimensionar = useMediaQuery('(min-width: 640px)')
 
   // Ao trocar de dia, fecha qualquer formulário aberto.
   React.useEffect(() => {
@@ -123,7 +129,30 @@ export function DayPanel({ dateKey, items, onOpenChange }: Props) {
 
   return (
     <Sheet open={Boolean(dateKey)} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg">
+      <SheetContent
+        side="right"
+        className={cn('w-full sm:max-w-none', arrastando && 'transition-none')}
+        style={podeRedimensionar ? { width: largura, maxWidth: '100vw' } : undefined}
+      >
+        {/* Alça de redimensionamento, na borda que encosta no calendário */}
+        {podeRedimensionar && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Arraste para mudar a largura do painel"
+            title="Arraste para alargar · duplo clique para restaurar"
+            onPointerDown={iniciarArrasto}
+            onDoubleClick={redefinir}
+            className={cn(
+              'group absolute inset-y-0 left-0 z-20 w-2 cursor-col-resize touch-none',
+              'before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-border/70 before:transition-colors',
+              'hover:before:w-0.5 hover:before:bg-primary',
+              arrastando && 'before:w-0.5 before:bg-primary',
+            )}
+          >
+            <span className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border opacity-0 transition-opacity group-hover:opacity-100" />
+          </div>
+        )}
         <SheetHeader>
           <SheetTitle>{date ? formatFullDay(date) : ''}</SheetTitle>
           <SheetDescription>

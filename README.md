@@ -208,6 +208,10 @@ As classes utilitárias `.glass`, `.glass-strong` e `.glass-panel` estão em `sr
 
 O upload sempre aceita as 20; quem decide quantas aparecem é o formato. Carrossel exibe todos os slides (imagem e vídeo, só o slide visível toca); Post único, Reels e Story usam a primeira mídia e avisam na tela quando há outras guardadas. Assim trocar de formato não descarta upload nenhum.
 
+**Painel do dia arrastável.** A borda esquerda do painel é uma alça: arraste para alargar, duplo clique para restaurar. Um briefing de reels tem dezenas de linhas, e lê-lo numa coluna de 512px é desconfortável. A largura fica guardada no navegador, entre 380px e a janela menos 120px — sempre sobra uma faixa do calendário à vista, para o painel não virar tela cheia sem querer.
+
+**Legenda do formato vertical.** Reels e Story usam a mesma casca do carrossel: cabeçalho, mídia 9:16, barra de interação e a legenda ABAIXO da mídia. A legenda já ficou em overlay sobre o vídeo, como no app, mas um roteiro de reels cobria o vídeo inteiro — justamente o que o cliente precisa ver para aprovar. Dentro da mídia ficaram só os elementos que identificam o formato.
+
 **Vídeo no preview.** Tem som, linha do tempo arrastável e controle de volume. Começa mudo por imposição do navegador — todos bloqueiam autoplay com áudio, e sem o mudo o vídeo simplesmente não tocaria; o som fica a um clique. A escolha de som e volume vale para o carrossel inteiro, então quem tirou o mudo no slide 2 não precisa tirar de novo no slide 3. Só o slide visível toca; os outros pausam e rebobinam, para 20 vídeos não disputarem rede e CPU.
 
 **Proporção do preview.** A moldura do carrossel assume a proporção real da primeira mídia, como o Instagram faz — e não um quadrado fixo. Sem isso, uma arte 4:5 (o formato mais comum de carrossel) perdia topo e base, justamente onde costuma ficar a chamada final. O intervalo é o que o Instagram aceita de fato, de 1.91:1 a 4:5; arte mais alta que isso ele corta mesmo, e o preview mostra o corte em vez de mentir que cabe.
