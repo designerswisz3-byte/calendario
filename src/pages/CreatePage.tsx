@@ -48,7 +48,7 @@ export default function CreatePage() {
     calendarItemId ?? undefined,
   )
   const savePreview = useSavePreview()
-  const { uploadMany, uploading } = useMediaUpload()
+  const { uploadMany, uploading, progresso } = useMediaUpload()
 
   const [previewId, setPreviewId] = React.useState<string | null>(previewIdParam)
   const [nomeExpert, setNomeExpert] = React.useState('')
@@ -104,16 +104,28 @@ export default function CreatePage() {
       tipos.push(resultado.tipo)
     }
 
-    try {
-      const urls = await uploadMany(files)
-      const enviados: MediaItem[] = urls.map((url, index) => ({
-        id: crypto.randomUUID(),
-        url,
-        tipo: tipos[index],
-      }))
+    const resultados = await uploadMany(files)
+
+    const enviados: MediaItem[] = []
+    const falhas: string[] = []
+    resultados.forEach((resultado, index) => {
+      if (resultado.ok) {
+        enviados.push({ id: crypto.randomUUID(), url: resultado.url, tipo: tipos[index] })
+      } else {
+        falhas.push(`${files[index].name}: ${errorMessage(resultado.erro)}`)
+      }
+    })
+
+    // O que subiu fica, mesmo que parte do lote tenha falhado.
+    if (enviados.length) {
       setMedia((current) => [...current, ...enviados].slice(0, MAX_MEDIA_ITEMS))
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Falha no upload', description: errorMessage(error) })
+    }
+    if (falhas.length) {
+      toast({
+        variant: 'destructive',
+        title: falhas.length === 1 ? 'Falha no upload' : `${falhas.length} arquivos falharam`,
+        description: falhas.join(' · '),
+      })
     }
   }
 
@@ -311,6 +323,7 @@ export default function CreatePage() {
                   onChange={setMedia}
                   onFilesSelected={handleFiles}
                   uploading={uploading}
+                  progresso={progresso}
                 />
                 {midiasIgnoradas > 0 && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">

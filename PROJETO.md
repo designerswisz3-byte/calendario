@@ -288,6 +288,23 @@ contra uma dependência inteira no bundle de uma página pública.
 Validado em duas camadas: no Node (`unzip -t` OK, com acentos e subpasta) e no
 browser (WebM extraído **byte a byte idêntico**, 82.789 bytes, reproduzível).
 
+**Upload resumável (TUS) escrito à mão, acima de 6 MB.**
+`supabase.storage.upload()` manda o arquivo inteiro num POST só. Para um vídeo
+de 178 MB isso é: nenhum progresso na tela por minutos (a aba parece travada,
+e as pessoas fecham), nenhuma retomada se a conexão oscilar, e um timeout que
+joga fora tudo que já subiu. `src/lib/tusUpload.ts` fala o protocolo direto —
+POST para criar, PATCH de 6 MB por pedaço. Sem `tus-js-client`, que traz 21
+pacotes e dependências de Node (`proper-lockfile`, `is-stream`) para um upload
+de navegador; a versão à mão custou **~1 KB** no bundle de `/criar`.
+Verificado em browser real contra um servidor TUS mock: 15 MB viraram 3 pedaços
+(6 + 6 + 3 MB) e o arquivo remontado bateu **SHA-256 idêntico** ao original.
+
+**Upload em série, não em `Promise.all`.**
+A versão anterior subia os 20 arquivos em paralelo. Com vídeos grandes isso é
+20 conexões disputando a mesma banda: todas ficam lentas, nenhuma termina, e o
+navegador começa a derrubar. Em série cada arquivo termina antes e o progresso
+é honesto. E um arquivo recusado não invalida o lote: o que subiu, fica.
+
 **`?download=` na URL do Storage em vez de `<a download>`.**
 O atributo `download` é **ignorado** pelo browser em link cross-origin — o arquivo
 abre na aba em vez de baixar. O Supabase Storage aceita `?download=<nome>` e
@@ -353,6 +370,22 @@ Outros limites que valem antes de qualquer decisão:
 - Publicar em conta **de cliente**: Advanced Access + App Review + verificação do negócio
 - Carrossel pela API: **máximo 10 itens** (a interface aceita 20)
 - A mídia precisa estar em **URL pública** — que o bucket `media` já fornece
+
+### Supabase — o limite de upload que vale é o do projeto
+O tamanho máximo mora em três camadas e vale **sempre a menor**: o app (300 MB),
+o bucket (300 MB) e o **limite global do projeto**, que só muda no painel em
+*Storage → Settings → Global file size limit* e vem com **50 MB** de padrão.
+
+Confirmado na documentação: *"you can specify the maximum file size on a per
+bucket level but it can't be higher than this global limit"*.
+
+| Plano | Teto por arquivo |
+| --- | --- |
+| Free | **50 MB** |
+| Pro / Team | 500 GB |
+
+Consequência prática: **no plano Free um Reels de 178 MB não sobe**, com qualquer
+configuração. Não é limitação do app — é teto de plano.
 
 ### Vercel
 - `VITE_*` é variável de **build**. Mudar o valor sem redeploy não muda nada no site.

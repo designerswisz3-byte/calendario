@@ -21,6 +21,7 @@ import { GripVertical, ImagePlus, Loader2, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MAX_IMAGE_SIZE_MB, MAX_MEDIA_ITEMS, MAX_VIDEO_SIZE_MB } from '@/lib/constants'
+import type { ProgressoUpload } from '@/hooks/useMediaUpload'
 import type { MediaType } from '@/types/database'
 
 export interface MediaItem {
@@ -35,6 +36,7 @@ interface Props {
   onChange: (items: MediaItem[]) => void
   onFilesSelected: (files: File[]) => void | Promise<void>
   uploading?: boolean
+  progresso?: ProgressoUpload | null
 }
 
 function SortableMedia({
@@ -111,7 +113,13 @@ function SortableMedia({
  * Upload de mídia: imagens e vídeos no mesmo conjunto, até MAX_MEDIA_ITEMS,
  * reordenáveis por drag-and-drop. A ordem daqui é a ordem dos slides.
  */
-export function MediaUploader({ items, onChange, onFilesSelected, uploading }: Props) {
+export function MediaUploader({
+  items,
+  onChange,
+  onFilesSelected,
+  uploading,
+  progresso,
+}: Props) {
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = React.useState(false)
 
@@ -164,16 +172,45 @@ export function MediaUploader({ items, onChange, onFilesSelected, uploading }: P
           <ImagePlus className="h-5 w-5 text-muted-foreground" />
         )}
 
-        <div className="space-y-1">
-          <p className="text-sm font-medium">
-            {noLimite ? `Limite de ${MAX_MEDIA_ITEMS} mídias atingido` : 'Arraste imagens e vídeos'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {noLimite
-              ? 'Remova alguma para adicionar outra.'
-              : `${items.length}/${MAX_MEDIA_ITEMS} · imagem até ${MAX_IMAGE_SIZE_MB} MB, vídeo até ${MAX_VIDEO_SIZE_MB} MB`}
-          </p>
-        </div>
+        {progresso ? (
+          /* Vídeo grande leva minutos. Sem número na tela, a aba parece travada
+             e as pessoas fecham no meio — perdendo o upload inteiro. */
+          <div className="w-full max-w-sm space-y-1.5">
+            <p className="truncate text-sm font-medium" title={progresso.nome}>
+              {progresso.nome}
+            </p>
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progresso.fracao * 100)}
+              aria-label={`Enviando ${progresso.nome}`}
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-200"
+                style={{ width: `${Math.max(2, progresso.fracao * 100)}%` }}
+              />
+            </div>
+            <p className="text-xs tabular-nums text-muted-foreground">
+              {progresso.total > 1 && `${progresso.indice} de ${progresso.total} · `}
+              {Math.round(progresso.fracao * 100)}%
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-sm font-medium">
+              {noLimite
+                ? `Limite de ${MAX_MEDIA_ITEMS} mídias atingido`
+                : 'Arraste imagens e vídeos'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {noLimite
+                ? 'Remova alguma para adicionar outra.'
+                : `${items.length}/${MAX_MEDIA_ITEMS} · imagem até ${MAX_IMAGE_SIZE_MB} MB, vídeo até ${MAX_VIDEO_SIZE_MB} MB`}
+            </p>
+          </div>
+        )}
 
         <Button
           type="button"

@@ -96,6 +96,10 @@ Em **Project Settings → API**, copie a URL e a chave `anon` — elas vão no `
 
 E em **Authentication → URL Configuration**, coloque a URL da Vercel em *Site URL*, senão o link de confirmação de e-mail aponta para `localhost`.
 
+E em **Storage → Settings**, suba o *Global file size limit* para **300 MB**. Esse é o limite que realmente vale: o do bucket não consegue passar dele, e o padrão é 50 MB — o suficiente para recusar qualquer vídeo de Reels um pouco mais longo.
+
+> **No plano Free o teto é 50 MB por arquivo** e nenhuma configuração passa por cima disso. Vídeo acima disso exige plano pago (no Pro o teto é 500 GB). Ver [Limites de upload](#limites-de-upload).
+
 ### 3. Configurar o ambiente
 
 ```bash
@@ -180,6 +184,27 @@ Tudo que muda o ritmo pode ser mexido **durante** a gravação, porque ninguém 
 Velocidade, fonte e espelhamento ficam guardados no navegador. Os controles somem sozinhos enquanto o texto rola, para não aparecerem na gravação — mexer o mouse os traz de volta. Uma linha fina marca a altura de leitura, e o texto começa e termina no centro da tela, que é onde a câmera fica.
 
 O teleprompter **substitui** o painel do dia em vez de conviver com ele: o overlay modal do Sheet bloquearia os cliques dos controles. Ao fechar, o painel volta no mesmo dia.
+
+## Limites de upload
+
+O limite de tamanho existe em **três lugares**, e vale sempre o menor deles:
+
+| Camada | Onde | Valor | Muda como |
+| --- | --- | --- | --- |
+| App | `MAX_VIDEO_SIZE_MB` em `src/lib/constants.ts` | 300 MB | editando o código |
+| Bucket | `storage.buckets.file_size_limit` | 300 MB | migração `...000400` |
+| **Projeto** | **Storage → Settings → Global file size limit** | **padrão 50 MB** | **só no painel** |
+
+Os dois primeiros já estão em 300 MB. **Quem recusa um vídeo de 178 MB é o terceiro** — e ele não se resolve por SQL nem por deploy.
+
+| Plano | Teto por arquivo |
+| --- | --- |
+| Free | **50 MB** |
+| Pro / Team | 500 GB |
+
+Acima de 6 MB o app usa **upload resumável (TUS)** em vez do POST único: envia em pedaços de 6 MB, mostra progresso e não perde o que já subiu se a conexão oscilar. Isso não contorna o teto do projeto — arquivo grande demais continua sendo recusado, só que agora com uma mensagem que diz onde mexer.
+
+---
 
 ## Download das mídias
 
