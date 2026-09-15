@@ -23,6 +23,8 @@ interface Props {
   onSubmit: (input: CalendarItemInput) => Promise<void> | void
   onCancel: () => void
   saving?: boolean
+  /** Em qual aba abrir. Quem clicou em "Escrever" no roteiro quer o roteiro. */
+  abaInicial?: 'briefing' | 'roteiro'
 }
 
 /**
@@ -31,7 +33,14 @@ interface Props {
  * Por definição do produto, aqui não existe legenda, upload de mídia nem nome
  * do expert — esses campos pertencem só à tela de criação (/criar).
  */
-export function CalendarItemForm({ dateKey, item, onSubmit, onCancel, saving }: Props) {
+export function CalendarItemForm({
+  dateKey,
+  item,
+  onSubmit,
+  onCancel,
+  saving,
+  abaInicial = 'briefing',
+}: Props) {
   const [tipo, setTipo] = React.useState<PlanningType | ''>(item?.tipo ?? '')
   const [status, setStatus] = React.useState<CalendarStatus>(item?.status ?? 'ideia')
   const [horario, setHorario] = React.useState(formatTime(item?.horario))
@@ -119,7 +128,7 @@ export function CalendarItemForm({ dateKey, item, onSubmit, onCancel, saving }: 
         Dois textos com funções diferentes: o briefing é para pensar, o roteiro
         é para gravar — e é o roteiro que alimenta o teleprompter.
       */}
-      <Tabs defaultValue="briefing">
+      <Tabs defaultValue={abaInicial}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="briefing">
             Briefing

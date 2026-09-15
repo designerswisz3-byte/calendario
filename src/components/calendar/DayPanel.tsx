@@ -63,50 +63,82 @@ interface Props {
 /**
  * Briefing e roteiro em abas. O briefing é o texto que já existia — nada foi
  * movido. O roteiro é o que alimenta o teleprompter.
+ *
+ * As duas abas ficam SEMPRE acessíveis, mesmo vazias. Desabilitar a aba vazia
+ * parecia lógico e era um beco sem saída: sem roteiro, não havia como chegar
+ * na aba, e o botão do teleprompter (que vive nela) nunca aparecia.
  */
 function TextosDoItem({
   item,
   onAbrirPrompter,
+  onEditar,
 }: {
   item: CalendarItemWithRelations
   onAbrirPrompter: () => void
+  onEditar: (aba: 'briefing' | 'roteiro') => void
 }) {
-  const temBriefing = Boolean(item.notas?.trim())
-  const temRoteiro = Boolean(item.roteiro?.trim())
-  if (!temBriefing && !temRoteiro) return null
-
-  const palavras = item.roteiro?.trim() ? item.roteiro.trim().split(/\s+/).length : 0
+  const briefing = item.notas?.trim() ?? ''
+  const roteiro = item.roteiro?.trim() ?? ''
+  const palavras = roteiro ? roteiro.split(/\s+/).length : 0
 
   return (
-    <Tabs defaultValue={temBriefing ? 'briefing' : 'roteiro'} className="w-full">
+    <Tabs defaultValue={!briefing && roteiro ? 'roteiro' : 'briefing'} className="w-full">
       <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="briefing" disabled={!temBriefing}>
+        <TabsTrigger value="briefing">
           Briefing
+          {briefing && <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-current opacity-60" />}
         </TabsTrigger>
-        <TabsTrigger value="roteiro" disabled={!temRoteiro}>
+        <TabsTrigger value="roteiro">
           Roteiro
+          {roteiro && <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-current opacity-60" />}
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="briefing" className="mt-2">
-        <p className="whitespace-pre-wrap text-sm text-muted-foreground">{item.notas}</p>
+        {briefing ? (
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{item.notas}</p>
+        ) : (
+          <VazioComAtalho texto="Sem briefing ainda." onEditar={() => onEditar('briefing')} />
+        )}
       </TabsContent>
 
       <TabsContent value="roteiro" className="mt-2 space-y-2">
-        <p className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-foreground/[0.04] p-3 font-mono text-[0.8rem] leading-relaxed scrollbar-thin">
-          {item.roteiro}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button size="sm" className="flex-1" onClick={onAbrirPrompter}>
-            <MonitorPlay className="h-4 w-4" />
-            Abrir teleprompter
-          </Button>
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {palavras} palavras · ~{Math.max(1, Math.round(palavras / 150))} min
-          </span>
-        </div>
+        {roteiro ? (
+          <>
+            <p className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-foreground/[0.04] p-3 font-mono text-[0.8rem] leading-relaxed scrollbar-thin">
+              {item.roteiro}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button size="sm" className="flex-1" onClick={onAbrirPrompter}>
+                <MonitorPlay className="h-4 w-4" />
+                Abrir teleprompter
+              </Button>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {palavras} palavras · ~{Math.max(1, Math.round(palavras / 150))} min
+              </span>
+            </div>
+          </>
+        ) : (
+          <VazioComAtalho
+            texto="Sem roteiro ainda. Escreva o texto falado para liberar o teleprompter."
+            onEditar={() => onEditar('roteiro')}
+          />
+        )}
       </TabsContent>
     </Tabs>
+  )
+}
+
+/** Estado vazio que já oferece a saída, em vez de só informar a falta. */
+function VazioComAtalho({ texto, onEditar }: { texto: string; onEditar: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-2 rounded-lg border border-dashed border-border/70 px-3 py-4">
+      <p className="text-sm text-muted-foreground">{texto}</p>
+      <Button variant="outline" size="sm" onClick={onEditar}>
+        <Pencil className="h-3.5 w-3.5" />
+        Escrever
+      </Button>
+    </div>
   )
 }
 
@@ -131,6 +163,7 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
 
   const [adding, setAdding] = React.useState(false)
   const [editingId, setEditingId] = React.useState<string | null>(null)
+  const [abaDaEdicao, setAbaDaEdicao] = React.useState<'briefing' | 'roteiro'>('briefing')
   const { largura, arrastando, iniciarArrasto, redefinir } = useLarguraPainel()
   // Em telas pequenas o painel já ocupa tudo: não há o que arrastar.
   const podeRedimensionar = useMediaQuery('(min-width: 640px)')
@@ -139,6 +172,7 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
   React.useEffect(() => {
     setAdding(false)
     setEditingId(null)
+    setAbaDaEdicao('briefing')
   }, [dateKey])
 
   const date = dateKey ? parseDateKey(dateKey) : null
@@ -245,6 +279,7 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                 dateKey={item.data}
                 item={item}
                 saving={updateItem.isPending}
+                abaInicial={abaDaEdicao}
                 onCancel={() => setEditingId(null)}
                 onSubmit={(input) => handleUpdate(item.id, input)}
               />
@@ -266,7 +301,10 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => setEditingId(item.id)}
+                      onClick={() => {
+                        setAbaDaEdicao('briefing')
+                        setEditingId(item.id)
+                      }}
                       aria-label="Editar planejamento"
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -297,7 +335,14 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                   </div>
                 )}
 
-                <TextosDoItem item={item} onAbrirPrompter={() => onAbrirTeleprompter(item)} />
+                <TextosDoItem
+                  item={item}
+                  onAbrirPrompter={() => onAbrirTeleprompter(item)}
+                  onEditar={(aba) => {
+                    setAbaDaEdicao(aba)
+                    setEditingId(item.id)
+                  }}
+                />
 
                 <Separator />
 
