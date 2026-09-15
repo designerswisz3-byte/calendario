@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Loader2, SearchX } from 'lucide-react'
 import { AjustesPanel } from '@/components/preview/AjustesPanel'
 import { CanvaPanel } from '@/components/preview/CanvaPanel'
+import { DownloadPanel } from '@/components/preview/DownloadPanel'
 import { InstagramPreview } from '@/components/preview/InstagramPreview'
 import { usePublicPreview } from '@/hooks/useContentPreviews'
 
@@ -63,6 +64,14 @@ export default function PublicPreviewPage() {
       </div>
 
       <div className="w-full max-w-[470px] space-y-3 px-4 pt-4 sm:px-0">
+        <DownloadPanel
+          expert={data.nome_expert}
+          midias={(data.media_assets ?? []).map((asset) => ({
+            url: asset.url_arquivo,
+            tipo: asset.tipo,
+          }))}
+        />
+
         {data.canva_url && (
           <CanvaPanel
             previewId={data.id}

@@ -177,6 +177,16 @@ Velocidade, fonte e espelhamento ficam guardados no navegador. Os controles some
 
 O teleprompter **substitui** o painel do dia em vez de conviver com ele: o overlay modal do Sheet bloquearia os cliques dos controles. Ao fechar, o painel volta no mesmo dia.
 
+## Download das mídias
+
+O link público tem um botão **Baixar mídias**. Uma mídia baixa direto; várias viram um ZIP, porque disparar N downloads seguidos faz o navegador bloquear do segundo em diante. Vale para qualquer formato — o que estiver no conteúdo é o que sai no pacote.
+
+O ZIP é escrito à mão em `src/lib/zip.ts`, sem compressão (método *store*), em vez de importar uma biblioteca. JPEG, PNG e MP4 já são formatos comprimidos: passar deflate neles rende perto de zero e custa CPU. O ZIP aqui é só o recipiente, e a página que o cliente carrega não engorda ~30 KB por um recurso secundário.
+
+Abaixo do botão há a lista arquivo por arquivo. Não é redundância: é a rota de fuga. Se empacotar falhar — rede, CORS, memória — os links individuais continuam funcionando, porque não dependem de JavaScript: usam o parâmetro `?download` do Storage, que faz o próprio Supabase mandar `Content-Disposition: attachment`. O atributo `download` do `<a>` sozinho não resolveria: ele é ignorado quando o arquivo está em outra origem, e o Storage é outra origem.
+
+Os arquivos saem nomeados por expert e posição (`swiss-boutique-01.jpg`), não com o UUID do Storage.
+
 ## Arte no Canva e o visto do expert
 
 O conteúdo pode guardar o link do projeto no Canva (`content_previews.canva_url`). Quando existe, o link público mostra um botão **Abrir arte no Canva** — o expert entra e ajusta o texto da arte sem você intermediar.
