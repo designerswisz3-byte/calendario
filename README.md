@@ -5,6 +5,10 @@ Ferramenta de planejamento e criação de conteúdo para Instagram, com duas par
 1. **Ferramenta de preview** — você monta o post (expert, legenda, mídia) e gera um **link público** onde o cliente vê uma simulação fiel do feed do Instagram, sem poder editar nada.
 2. **Calendário editorial** — planejamento mensal por dia (tipo, status, tags, horário, notas), de onde você dispara a criação do conteúdo da Parte 1 — sem nunca duplicar os campos de legenda/upload.
 
+> **[`PROJETO.md`](PROJETO.md)** — o registro completo: decisões, modelo de segurança,
+> limites reais do Canva e do Instagram que testamos, custos e histórico. Este README
+> é o passo a passo para rodar; aquele é o documento de handover.
+
 ---
 
 ## Stack
