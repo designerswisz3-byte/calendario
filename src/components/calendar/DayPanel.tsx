@@ -31,6 +31,7 @@ import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/constants'
+import { resumoDoRoteiro } from '@/lib/texto'
 import { formatFullDay, formatTime, parseDateKey } from '@/lib/date'
 import {
   useCreateCalendarItem,
@@ -80,7 +81,7 @@ function TextosDoItem({
 }) {
   const briefing = item.notas?.trim() ?? ''
   const roteiro = item.roteiro?.trim() ?? ''
-  const palavras = roteiro ? roteiro.split(/\s+/).length : 0
+  const resumo = resumoDoRoteiro(roteiro)
 
   return (
     <Tabs defaultValue={!briefing && roteiro ? 'roteiro' : 'briefing'} className="w-full">
@@ -115,7 +116,7 @@ function TextosDoItem({
                 Abrir teleprompter
               </Button>
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {palavras} palavras · ~{Math.max(1, Math.round(palavras / 150))} min
+                {resumo}
               </span>
             </div>
           </>
@@ -168,6 +169,11 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
   const { largura, arrastando, iniciarArrasto, redefinir } = useLarguraPainel()
   // Em telas pequenas o painel já ocupa tudo: não há o que arrastar.
   const podeRedimensionar = useMediaQuery('(min-width: 640px)')
+  // Abaixo disso não existe "ao lado": o bloco de notas cobre o painel.
+  const ladoALado = useMediaQuery('(min-width: 1024px)')
+  // Elemento onde o bloco de notas é montado. Precisa ser filho DIRETO do
+  // SheetContent: a coluna de conteúdo tem overflow e recortaria o bloco.
+  const [hospedeiroBloco, setHospedeiroBloco] = React.useState<HTMLDivElement | null>(null)
 
   // Ao trocar de dia, fecha qualquer formulário aberto.
   React.useEffect(() => {
@@ -177,6 +183,19 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
   }, [dateKey])
 
   const date = dateKey ? parseDateKey(dateKey) : null
+  const formAberto = adding || editingId !== null
+
+  /** Só um formulário aberto por vez: dois blocos de notas se sobreporiam. */
+  function abrirEdicao(id: string, aba: 'briefing' | 'roteiro') {
+    setAdding(false)
+    setAbaDaEdicao(aba)
+    setEditingId(id)
+  }
+
+  function abrirAdicao() {
+    setEditingId(null)
+    setAdding(true)
+  }
 
   async function handleCreate(input: CalendarItemInput) {
     try {
@@ -225,6 +244,18 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
         side="right"
         className={cn('w-full sm:max-w-none', arrastando && 'transition-none')}
         style={podeRedimensionar ? { width: largura, maxWidth: '100vw' } : undefined}
+        /*
+         * Com um formulário aberto, Esc e clique fora deixam de fechar o painel.
+         * Os dois são gestos acidentais, e aqui o custo do acidente é um
+         * briefing inteiro perdido. Para sair, existe Cancelar — que é
+         * explícito e está à vista, dentro do bloco de notas.
+         */
+        onEscapeKeyDown={(evento) => {
+          if (formAberto) evento.preventDefault()
+        }}
+        onPointerDownOutside={(evento) => {
+          if (formAberto) evento.preventDefault()
+        }}
       >
         {/* Alça de redimensionamento, na borda que encosta no calendário */}
         {podeRedimensionar && (
@@ -245,6 +276,8 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
             <span className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
         )}
+        <div ref={setHospedeiroBloco} className="contents" />
+
         <SheetHeader>
           <SheetTitle>{date ? formatFullDay(date) : ''}</SheetTitle>
           <SheetDescription>
@@ -266,7 +299,7 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                   Comece pelo planejamento: tipo, status e a ideia central.
                 </p>
               </div>
-              <Button size="sm" onClick={() => setAdding(true)}>
+              <Button size="sm" onClick={abrirAdicao}>
                 <Plus className="h-4 w-4" />
                 Adicionar item
               </Button>
@@ -281,6 +314,10 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                 item={item}
                 saving={updateItem.isPending}
                 abaInicial={abaDaEdicao}
+                hospedeiroBloco={hospedeiroBloco}
+                larguraDoPainel={largura}
+                ladoALado={ladoALado}
+                titulo={`${TYPE_LABEL[item.tipo]} · ${date ? formatFullDay(date) : ''}`}
                 onCancel={() => setEditingId(null)}
                 onSubmit={(input) => handleUpdate(item.id, input)}
               />
@@ -302,10 +339,7 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => {
-                        setAbaDaEdicao('briefing')
-                        setEditingId(item.id)
-                      }}
+                      onClick={() => abrirEdicao(item.id, 'briefing')}
                       aria-label="Editar planejamento"
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -339,10 +373,7 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
                 <TextosDoItem
                   item={item}
                   onAbrirPrompter={() => onAbrirTeleprompter(item)}
-                  onEditar={(aba) => {
-                    setAbaDaEdicao(aba)
-                    setEditingId(item.id)
-                  }}
+                  onEditar={(aba) => abrirEdicao(item.id, aba)}
                 />
 
                 <Separator />
@@ -415,13 +446,17 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
             <CalendarItemForm
               dateKey={dateKey}
               saving={createItem.isPending}
+              hospedeiroBloco={hospedeiroBloco}
+              larguraDoPainel={largura}
+              ladoALado={ladoALado}
+              titulo={`Novo item · ${date ? formatFullDay(date) : ''}`}
               onCancel={() => setAdding(false)}
               onSubmit={handleCreate}
             />
           )}
 
           {!adding && items.length > 0 && (
-            <Button variant="outline" size="sm" className="w-full" onClick={() => setAdding(true)}>
+            <Button variant="outline" size="sm" className="w-full" onClick={abrirAdicao}>
               <Plus className="h-4 w-4" />
               Adicionar item
             </Button>

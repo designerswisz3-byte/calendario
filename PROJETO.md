@@ -227,6 +227,20 @@ Duas abas:
 - **Briefing** — o contexto. Todo texto que já existia continua aqui.
 - **Roteiro** — o que vai ser falado. É o que o teleprompter lê.
 
+### Bloco de notas
+Clicar em **editar** abre o bloco de notas **ao lado** do painel: os campos
+curtos (tipo, status, horário, tags) ficam na coluna estreita, e os textos
+longos ganham a tela toda. A área de escrita passou de **140 px para ~630 px**
+de altura — de seis linhas visíveis para quase trinta.
+
+É **um formulário só**: o botão Salvar do bloco submete o mesmo `<form>` que
+vive no painel (via atributo `form=`), então não existe caminho em que metade
+do item salva e a outra metade não. `Ctrl/Cmd+S` também salva.
+
+Com o bloco aberto, **Esc e clique fora deixam de fechar o painel**. Os dois
+são gestos acidentais, e aqui o custo do acidente é um briefing inteiro
+perdido. A saída é o Cancelar, que é explícito e está à vista.
+
 As duas abas ficam **sempre habilitadas**, mesmo vazias. A primeira versão
 desabilitava a aba Roteiro quando não havia texto — e isso criava um beco sem
 saída: não dava para escrever o roteiro porque a aba estava desabilitada, e ela
@@ -304,6 +318,18 @@ A versão anterior subia os 20 arquivos em paralelo. Com vídeos grandes isso é
 20 conexões disputando a mesma banda: todas ficam lentas, nenhuma termina, e o
 navegador começa a derrubar. Em série cada arquivo termina antes e o progresso
 é honesto. E um arquivo recusado não invalida o lote: o que subiu, fica.
+
+**Bloco de notas ancorado no painel com `absolute`, não `fixed`.**
+Duas armadilhas já conhecidas deste projeto decidiram a escolha. `fixed` não
+serve porque o painel anima com `transform`, e um ancestral com transform vira
+bloco de contenção — foi o bug do teleprompter. Nascer dentro da coluna do
+painel também não serve: ela tem `overflow-y-auto` e recortaria o bloco. A
+solução é montá-lo como filho direto do `SheetContent` (que é `fixed`, logo
+posicionado) e ancorá-lo com `right: 100%`. De quebra, o bloco acompanha a
+largura do painel de graça — que é exatamente o comportamento desejado.
+Medido em browser real: bloco terminando em x=917 com o painel começando em
+x=928, altura 866 px, cliques chegando no textarea e o Salvar submetendo o
+formulário do painel.
 
 **`?download=` na URL do Storage em vez de `<a download>`.**
 O atributo `download` é **ignorado** pelo browser em link cross-origin — o arquivo
