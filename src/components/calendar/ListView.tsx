@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/calendar/StatusBadge'
 import { TypeIcon } from '@/components/calendar/TypeIcon'
+import { tituloDoItem } from '@/lib/texto'
+import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/constants'
 import { formatShortDate, formatTime } from '@/lib/date'
 import type { CalendarItemWithRelations } from '@/types/database'
@@ -64,22 +66,23 @@ export function ListView({ items, onOpenDay }: Props) {
                   </span>
                 </td>
                 <td className="max-w-[18rem] px-4 py-3">
-                  {item.preview ? (
-                    <span className="flex items-center gap-2">
-                      {item.preview.media_assets[0]?.tipo === 'imagem' && (
-                        <img
-                          src={item.preview.media_assets[0].url_arquivo}
-                          alt=""
-                          className="h-7 w-7 shrink-0 rounded object-cover"
-                        />
+                  <span className="flex items-center gap-2">
+                    {item.preview?.media_assets[0]?.tipo === 'imagem' && (
+                      <img
+                        src={item.preview.media_assets[0].url_arquivo}
+                        alt=""
+                        className="h-7 w-7 shrink-0 rounded object-cover"
+                      />
+                    )}
+                    <span
+                      className={cn(
+                        'truncate',
+                        item.notas?.trim() ? 'font-medium' : 'text-muted-foreground',
                       )}
-                      <span className="truncate font-medium">{item.preview.nome_expert}</span>
+                    >
+                      {tituloDoItem(item, 'Sem briefing')}
                     </span>
-                  ) : (
-                    <span className="truncate text-muted-foreground">
-                      {item.notas?.trim() || 'Sem conteúdo criado'}
-                    </span>
-                  )}
+                  </span>
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={item.status} />

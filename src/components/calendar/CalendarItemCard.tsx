@@ -3,6 +3,7 @@ import { Clock, ImageIcon } from 'lucide-react'
 import { TypeIcon } from '@/components/calendar/TypeIcon'
 import { STATUS_DOT, TYPE_LABEL } from '@/lib/constants'
 import { formatTime } from '@/lib/date'
+import { tituloDoItem } from '@/lib/texto'
 import { cn } from '@/lib/utils'
 import type { CalendarItemWithRelations } from '@/types/database'
 
@@ -24,10 +25,10 @@ export function CalendarItemCard({ item, onClick, compact = true, draggable = tr
   const thumb = item.preview?.media_assets.find((asset) => asset.tipo === 'imagem')?.url_arquivo
   const time = formatTime(item.horario)
 
-  // O ícone e a linha de meta já mostram o tipo — o título prioriza o que
-  // identifica o item: o expert do conteúdo criado ou a ideia anotada.
-  const title =
-    item.preview?.nome_expert ?? item.notas?.trim().split('\n')[0] ?? TYPE_LABEL[item.tipo]
+  // O ícone e a linha de meta já mostram o tipo — o título fica com o que
+  // identifica o item: o nome que a pessoa deu a ele na primeira linha do
+  // briefing. Ver tituloDoItem para o porquê de isso valer mesmo com preview.
+  const title = tituloDoItem(item, TYPE_LABEL[item.tipo])
 
   return (
     <div
@@ -69,7 +70,12 @@ export function CalendarItemCard({ item, onClick, compact = true, draggable = tr
           <TypeIcon tipo={item.tipo} className="shrink-0 text-muted-foreground" />
         )}
 
-        <span className={cn('min-w-0 flex-1 truncate font-medium', compact ? 'text-[0.7rem]' : 'text-sm')}>
+        {/* O título agora é uma frase, e na célula do dia ele corta. O hover
+            devolve o nome inteiro sem precisar abrir o painel. */}
+        <span
+          title={title}
+          className={cn('min-w-0 flex-1 truncate font-medium', compact ? 'text-[0.7rem]' : 'text-sm')}
+        >
           {title}
         </span>
 

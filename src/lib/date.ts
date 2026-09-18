@@ -101,6 +101,15 @@ export function isToday(date: Date) {
   return toDateKey(date) === todayKey()
 }
 
+/**
+ * Dia anterior a hoje. A comparação é de STRING "YYYY-MM-DD", não de Date:
+ * o formato é ordenável lexicograficamente e a conta não passa por fuso
+ * nenhum — que é a regra deste arquivo.
+ */
+export function isPast(date: Date) {
+  return toDateKey(date) < todayKey()
+}
+
 export function isSameMonth(date: Date, reference: Date) {
   return date.getMonth() === reference.getMonth() && date.getFullYear() === reference.getFullYear()
 }
