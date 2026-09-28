@@ -141,6 +141,18 @@ create unique index content_previews_calendar_item_id_key
 `ordem` é o que o drag-and-drop escreve. `tipo` distingue imagem de vídeo —
 sem isso o carrossel misto não saberia o que renderizar em cada slide.
 
+### `canvas_boards` — o quadro infinito
+`id`, `user_id`, `nome`, `dados` (jsonb), `criado_em`, `atualizado_em`
+
+`dados` guarda `elements`, `appState` e `imagens`. Índice único em
+`(user_id, nome)`: é ele que torna o "abre ou cria" seguro contra corrida —
+duas abas abrindo o app ao mesmo tempo não criam dois quadros.
+
+Do `appState` sobrevivem **seis campos** (fundo, grade, scroll e zoom). O objeto
+inteiro tem ~90 chaves e carrega um `Map` de colaboradores e referências a
+elementos em edição — jogar tudo no jsonb gravaria `{}` no lugar do Map e
+ressuscitaria estado de UI que não deveria sobreviver a um F5.
+
 ### `tags` e `calendar_item_tags`
 `tags`: `id`, `user_id`, `nome`, `cor` · `calendar_item_tags`: chave composta `(calendar_item_id, tag_id)`
 
@@ -254,6 +266,17 @@ pausar e continuar (espaço ou K), voltar ao início (R), espelhar o texto (M) e
 velocidade de primeira, e parar para reconfigurar no meio da gravação é perder
 a tomada. Fecha e devolve o painel do dia exatamente como estava.
 
+### `/canvas`
+Quadro infinito para a etapa que vinha antes do calendário: pensar. Notas com
+título e conteúdo, desenho à mão livre, formas, setas, texto e imagem, com pan
+e zoom livres. Salva sozinho.
+
+A nota é **duas caixas empilhadas** (título em cima, conteúdo embaixo), cada uma
+com texto *vinculado* ao seu retângulo. Não é enfeite: texto solto no Excalidraw
+cresce para a direita e vaza para fora do cartão no primeiro parágrafo. Texto
+vinculado quebra na largura do container — é o comportamento nativo, e o único
+que sobrevive a alguém colar um briefing dentro da nota.
+
 ### `/criar`
 Nome do expert, legenda com contador de **2.200 caracteres** (o limite real do
 Instagram), tipo do conteúdo e upload de mídia:
@@ -330,6 +353,23 @@ largura do painel de graça — que é exatamente o comportamento desejado.
 Medido em browser real: bloco terminando em x=917 com o painel começando em
 x=928, altura 866 px, cliques chegando no textarea e o Salvar submetendo o
 formulário do painel.
+
+**Excalidraw para o canvas, em vez de escrever um.**
+É a exceção à regra do ZIP e do TUS. Aqueles eram ~110 e ~180 linhas trocando
+uma função estreita. Um canvas infinito é pan, zoom, hit-testing, seleção,
+alças de redimensionamento, suavização de traço, agrupamento e undo/redo —
+escrever isso à mão daria um produto pior por muito mais esforço. A biblioteca
+é MIT e a rota é lazy: quem nunca abre a aba não baixa nada dela.
+Medido no build de produção: **1,74 MB** ao abrir a aba, **zero** requisições
+externas e **zero** erros de console. Os chunks de mermaid/cytoscape/katex que
+aparecem no build (mais de 4 MB) só baixam se a pessoa usar o "texto para
+diagrama" — não entram na abertura.
+
+**Fontes do Excalidraw servidas por nós, menos a CJK.**
+Sem `EXCALIDRAW_ASSET_PATH` apontando para a nossa origem, o canvas busca fonte
+num CDN de terceiro — o app passa a depender de outro domínio para desenhar
+texto. O pacote traz 14 MB de fontes, e **13 MB são a Xiaolai** (chinesa). O
+script copia as outras oito: 516 KB em vez de 14 MB por deploy.
 
 **`?download=` na URL do Storage em vez de `<a download>`.**
 O atributo `download` é **ignorado** pelo browser em link cross-origin — o arquivo

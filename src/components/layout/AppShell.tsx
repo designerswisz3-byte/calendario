@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { CalendarDays, LogOut, Sparkles } from 'lucide-react'
+import { CalendarDays, LayoutDashboard, LogOut, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useAuth } from '@/components/auth/AuthProvider'
@@ -15,7 +15,17 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground',
   )
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+interface Props {
+  children: React.ReactNode
+  /**
+   * Ocupa a janela inteira, sem a coluna central nem o respiro das outras
+   * telas. O canvas é um espaço infinito: enquadrá-lo em 7xl com padding
+   * seria desenhar dentro de uma caixa.
+   */
+  telaCheia?: boolean
+}
+
+export function AppShell({ children, telaCheia = false }: Props) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
 
@@ -48,6 +58,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Criar conteúdo</span>
             </NavLink>
+            <NavLink to="/canvas" className={navLinkClass}>
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden sm:inline">Canvas</span>
+            </NavLink>
           </nav>
 
           <div className="ml-auto flex items-center gap-1">
@@ -62,7 +76,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main
+        className={cn(
+          telaCheia
+            ? // 4rem = a altura do cabeçalho grudento acima.
+              'h-[calc(100vh-4rem)] w-full'
+            : 'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8',
+        )}
+      >
+        {children}
+      </main>
     </div>
   )
 }

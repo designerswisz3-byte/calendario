@@ -70,6 +70,30 @@ export interface ContentPreviewWithMedia extends ContentPreviewRow {
   media_assets: MediaAssetRow[]
 }
 
+/**
+ * Mapa `fileId do Excalidraw -> caminho no bucket `canvas``.
+ *
+ * É o que mantém a linha do quadro pequena: a imagem em si fica no storage, e
+ * o jsonb guarda só onde ela está. Sem isso, cada autosave reescreveria todas
+ * as imagens em base64.
+ */
+export type CanvasImagens = Record<string, string>
+
+export type CanvasDados = {
+  elements?: unknown[]
+  appState?: Record<string, unknown>
+  imagens?: CanvasImagens
+}
+
+export type CanvasBoardRow = {
+  id: string
+  user_id: string
+  nome: string
+  dados: CanvasDados
+  criado_em: string
+  atualizado_em: string
+}
+
 /** Retorno do cliente, escrito pelo link público via enviar_ajuste(). */
 export type AjusteRow = {
   id: string
@@ -162,6 +186,18 @@ export interface Database {
         Row: CalendarItemTagRow
         Insert: CalendarItemTagRow
         Update: Partial<CalendarItemTagRow>
+        Relationships: []
+      }
+      canvas_boards: {
+        Row: CanvasBoardRow
+        Insert: Omit<CanvasBoardRow, 'id' | 'criado_em' | 'atualizado_em' | 'nome' | 'dados'> & {
+          id?: string
+          nome?: string
+          dados?: CanvasDados
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<CanvasBoardRow, 'id' | 'user_id'>>
         Relationships: []
       }
     }

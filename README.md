@@ -185,6 +185,23 @@ Velocidade, fonte e espelhamento ficam guardados no navegador. Os controles some
 
 O teleprompter **substitui** o painel do dia em vez de conviver com ele: o overlay modal do Sheet bloquearia os cliques dos controles. Ao fechar, o painel volta no mesmo dia.
 
+## Canvas
+
+Aba `/canvas`: um quadro infinito (estilo Miro) para pensar antes de planejar. Notas com título e conteúdo, desenho à mão, formas, setas, texto e upload de imagem — tudo com pan e zoom livres.
+
+| Onde mora | O quê |
+| --- | --- |
+| `canvas_boards.dados` (jsonb) | elementos da cena + posição/zoom da câmera |
+| bucket `canvas` (**privado**) | as imagens, uma por arquivo |
+
+A separação é o que mantém o autosave barato: imagem colada vira base64, e base64 dentro do jsonb faria cada gravação reescrever megabytes. O jsonb guarda só o caminho.
+
+O bucket é **privado**, ao contrário do `media`: o canvas é material interno (referência de concorrente, print de conversa), e não deveria ser legível por quem tiver a URL.
+
+As fontes do Excalidraw são servidas por nós — `npm run fontes` copia para `public/fonts`, e `predev`/`prebuild` chamam sozinhos. Sem isso o canvas buscaria fontes num CDN de terceiro.
+
+---
+
 ## Limites de upload
 
 O limite de tamanho existe em **três lugares**, e vale sempre o menor deles:

@@ -11,6 +11,8 @@ import { isSupabaseConfigured } from '@/lib/supabase'
  * então ele não deve baixar o bundle do calendário para renderizar um post.
  */
 const CalendarPage = React.lazy(() => import('@/pages/CalendarPage'))
+/** O bundle do Excalidraw é grande; só carrega para quem abre a aba Canvas. */
+const CanvasPage = React.lazy(() => import('@/pages/CanvasPage'))
 const CreatePage = React.lazy(() => import('@/pages/CreatePage'))
 const LoginPage = React.lazy(() => import('@/pages/LoginPage'))
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'))
@@ -53,6 +55,17 @@ export default function App() {
             <ProtectedRoute>
               <AppShell>
                 <CalendarPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/canvas"
+          element={
+            <ProtectedRoute>
+              <AppShell telaCheia>
+                <CanvasPage />
               </AppShell>
             </ProtectedRoute>
           }

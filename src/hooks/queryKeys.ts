@@ -6,4 +6,5 @@ export const queryKeys = {
     ['content-preview', 'by-calendar-item', calendarItemId] as const,
   ajustes: (previewId: string) => ['ajustes', previewId] as const,
   tags: () => ['tags'] as const,
+  canvas: (nome: string) => ['canvas', nome] as const,
 }
