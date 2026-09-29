@@ -70,14 +70,37 @@ function useTemaDoDocumento() {
  * VINCULADO a um container quebra na largura dele e empurra a altura — é o
  * comportamento nativo, e o único que sobrevive a alguém digitar um parágrafo.
  */
+/**
+ * A altura nasce do TEXTO, não de um número escolhido a dedo.
+ *
+ * A versão anterior fixava 160 px para o corpo. Com duas linhas de texto (37 px)
+ * sobravam 120 px de amarelo vazio em toda nota nova. Agora cada caixa começa
+ * com a altura exata das linhas que ela tem, e o container do Excalidraw cresce
+ * sozinho conforme a pessoa escreve.
+ */
+const FONTE_TITULO = 20
+const FONTE_CORPO = 16
+/** Entrelinha do Excalidraw para a Helvetica. */
+const ENTRELINHA = 1.25
+/** Respiro que o Excalidraw reserva em volta do texto vinculado (5 px por lado). */
+const RESPIRO = 10
+
+const alturaPara = (fonte: number, linhas: number) =>
+  Math.round(fonte * ENTRELINHA * linhas) + RESPIRO
+
+const TEXTO_TITULO = 'Título da nota'
+const TEXTO_CORPO = 'Clique duas vezes para escrever.'
+
 const NOTA = {
   fundoTitulo: '#ffe8a3',
   fundoCorpo: '#fff9db',
   borda: '#e6a817',
   texto: '#1f2933',
   largura: 300,
-  alturaTitulo: 46,
-  alturaCorpo: 160,
+  alturaTitulo: alturaPara(FONTE_TITULO, 1),
+  // Duas linhas de folga: cabe o texto inicial e a primeira frase digitada
+  // sem a caixa pular de tamanho no meio da escrita.
+  alturaCorpo: alturaPara(FONTE_CORPO, 2),
 }
 
 export default function CanvasPage() {
@@ -248,8 +271,8 @@ export default function CanvasPage() {
         strokeWidth: 1,
         groupIds: [grupo],
         label: {
-          text: 'Título da nota',
-          fontSize: 20,
+          text: TEXTO_TITULO,
+          fontSize: FONTE_TITULO,
           fontFamily: FONT_FAMILY.Helvetica,
           strokeColor: NOTA.texto,
           textAlign: 'left',
@@ -268,8 +291,8 @@ export default function CanvasPage() {
         strokeWidth: 1,
         groupIds: [grupo],
         label: {
-          text: 'Conteúdo — clique duas vezes para editar.',
-          fontSize: 16,
+          text: TEXTO_CORPO,
+          fontSize: FONTE_CORPO,
           fontFamily: FONT_FAMILY.Helvetica,
           strokeColor: NOTA.texto,
           textAlign: 'left',

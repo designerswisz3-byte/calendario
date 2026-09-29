@@ -158,11 +158,27 @@ export function useSalvarCanvas() {
         imagens,
       }
 
-      const { error } = await supabase
+      /*
+       * O `.select('id')` no fim não é enfeite: sem ele, um UPDATE que não
+       * acerta NENHUMA linha volta sem erro, e o app mostra "Salvo" enquanto
+       * nada foi gravado. Acontece em dois casos reais — o quadro sumiu do
+       * banco, ou a RLS barrou a escrita — e os dois passariam despercebidos.
+       * Confirmado em Postgres: `update ... where id = <inexistente>` responde
+       * UPDATE 0, sem erro.
+       */
+      const { data, error } = await supabase
         .from('canvas_boards')
         .update({ dados })
         .eq('id', boardId)
+        .select('id')
       if (error) throw error
+      if (!data || data.length === 0) {
+        throw new Error(
+          'O banco aceitou a gravação mas não alterou nenhuma linha. O quadro ' +
+            `(${boardId}) não existe ou a permissão de escrita foi negada. ` +
+            'Confirme que supabase/setup-completo.sql rodou por inteiro.',
+        )
+      }
 
       // Só depois de a cena nova estar gravada: se apagássemos antes e o
       // update falhasse, o quadro salvo apontaria para arquivos inexistentes.
