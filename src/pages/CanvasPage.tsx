@@ -105,7 +105,7 @@ const NOTA = {
 
 export default function CanvasPage() {
   const tema = useTemaDoDocumento()
-  const { data: cena, isLoading, error } = useCanvasBoard()
+  const { data: cena, isFetching, error } = useCanvasBoard()
   // Só `mutateAsync`, e não o objeto da mutation: o objeto é recriado a cada
   // mudança de estado dela, e qualquer callback que dependa dele muda de
   // identidade junto. `mutateAsync` é estável.
@@ -238,8 +238,12 @@ export default function CanvasPage() {
    */
   const dadosIniciais = React.useMemo(
     () => (cena ? montarDadosIniciais(cena, tema) : undefined),
+    // Depende da CENA, não do id do quadro. O id não muda quando o conteúdo
+    // muda — e era por isso que voltar para a tela remontava o Excalidraw com
+    // a cena antiga. O React Query mantém a identidade estável enquanto o dado
+    // não muda, então isto continua não re-renderizando à toa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cena?.boardId],
+    [cena],
   )
 
   /** Nota com título e conteúdo, no centro do que está à vista. */
@@ -316,7 +320,10 @@ export default function CanvasPage() {
     )
   }
 
-  if (isLoading || !cena) {
+  // `isFetching`, e não `isLoading`: ao voltar para a tela o React Query
+  // entrega o cache e revalida em seguida. Montar o Excalidraw com o cache
+  // seria montar com a cena velha — o loader espera o banco responder.
+  if (isFetching || !cena) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

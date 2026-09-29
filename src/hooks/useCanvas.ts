@@ -44,10 +44,20 @@ export function useCanvasBoard(nome = CANVAS_PADRAO) {
   return useQuery({
     queryKey: queryKeys.canvas(nome),
     enabled: Boolean(user),
-    // O quadro é uma superfície de edição: refetch no foco sobrescreveria o
-    // que está na tela com uma versão do servidor possivelmente mais velha.
+    // Refetch no FOCO continua desligado: voltar para a aba do navegador não
+    // pode trocar o que está na tela por baixo de quem está desenhando.
     refetchOnWindowFocus: false,
-    staleTime: Infinity,
+    /*
+     * Mas na MONTAGEM o quadro é sempre relido do banco.
+     *
+     * Com `staleTime: Infinity` o cache virava a verdade: quem desenhava, saía
+     * para o Calendário e voltava, remontava a tela com a cena do primeiro
+     * carregamento — vazia. Pior, o autosave seguinte gravava essa cena vazia
+     * por cima do trabalho que estava salvo. O banco é a fonte da verdade a
+     * cada entrada na tela.
+     */
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async (): Promise<CenaDoCanvas> => {
       const userId = user!.id
 
