@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
 import { SupabaseSetupNotice } from '@/components/layout/SupabaseSetupNotice'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { isSupabaseConfigured } from '@/lib/supabase'
@@ -27,6 +28,32 @@ function RouteFallback() {
   )
 }
 
+/**
+ * Rota privada com o app em volta.
+ *
+ * O ErrorBoundary fica DENTRO do AppShell de propósito: se uma tela quebrar, o
+ * cabeçalho e a navegação continuam de pé e dá para sair dali sem recarregar.
+ * Fora do AppShell, o erro levaria o menu junto — que é como o canvas
+ * conseguiu deixar a tela preta.
+ */
+function RotaPrivada({
+  children,
+  telaCheia,
+}: {
+  children: React.ReactNode
+  telaCheia?: boolean
+}) {
+  const { pathname } = useLocation()
+  return (
+    <ProtectedRoute>
+      <AppShell telaCheia={telaCheia}>
+        {/* Trocar de rota limpa o erro: a tela nova merece uma chance. */}
+        <ErrorBoundary chaveDeReset={pathname}>{children}</ErrorBoundary>
+      </AppShell>
+    </ProtectedRoute>
+  )
+}
+
 export default function App() {
   if (!isSupabaseConfigured) return <SupabaseSetupNotice />
 
@@ -37,37 +64,37 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
 
         {/* Link compartilhável: sem login, sem edição. */}
-        <Route path="/preview/:id" element={<PublicPreviewPage />} />
+        <Route
+          path="/preview/:id"
+          element={
+            <ErrorBoundary>
+              <PublicPreviewPage />
+            </ErrorBoundary>
+          }
+        />
 
         <Route
           path="/criar"
           element={
-            <ProtectedRoute>
-              <AppShell>
-                <CreatePage />
-              </AppShell>
-            </ProtectedRoute>
+            <RotaPrivada>
+              <CreatePage />
+            </RotaPrivada>
           }
         />
         <Route
           path="/calendario"
           element={
-            <ProtectedRoute>
-              <AppShell>
-                <CalendarPage />
-              </AppShell>
-            </ProtectedRoute>
+            <RotaPrivada>
+              <CalendarPage />
+            </RotaPrivada>
           }
         />
-
         <Route
           path="/canvas"
           element={
-            <ProtectedRoute>
-              <AppShell telaCheia>
-                <CanvasPage />
-              </AppShell>
-            </ProtectedRoute>
+            <RotaPrivada telaCheia>
+              <CanvasPage />
+            </RotaPrivada>
           }
         />
 

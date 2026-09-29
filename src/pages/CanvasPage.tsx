@@ -36,6 +36,9 @@ if (typeof window !== 'undefined') window.EXCALIDRAW_ASSET_PATH = '/'
 
 type Estado = 'ocioso' | 'salvando' | 'salvo' | 'erro'
 
+/** Fora do componente para a identidade não mudar a cada render. */
+const UI_OPTIONS = { canvasActions: { loadScene: false } } as const
+
 /**
  * Tema atual lido do <html>.
  *
@@ -80,16 +83,27 @@ const NOTA = {
 export default function CanvasPage() {
   const tema = useTemaDoDocumento()
   const { data: cena, isLoading, error } = useCanvasBoard()
-  const salvar = useSalvarCanvas()
+  // Só `mutateAsync`, e não o objeto da mutation: o objeto é recriado a cada
+  // mudança de estado dela, e qualquer callback que dependa dele muda de
+  // identidade junto. `mutateAsync` é estável.
+  const { mutateAsync } = useSalvarCanvas()
 
   const [api, setApi] = React.useState<ExcalidrawImperativeAPI | null>(null)
   const [estado, setEstado] = React.useState<Estado>('ocioso')
+
+  // Declarado ANTES do efeito de saída: as limpezas rodam na ordem em que os
+  // efeitos foram definidos, então este marca "desmontado" antes de o último
+  // salvamento acontecer — e o salvamento não tenta mexer no estado.
+  const montadoRef = React.useRef(true)
+  React.useEffect(() => () => void (montadoRef.current = false), [])
 
   // Refs, e não estado: o onChange do Excalidraw dispara a cada movimento de
   // ponteiro, e re-renderizar a página inteira a cada traço travaria o
   // desenho. Nada aqui precisa aparecer na tela.
   const imagensRef = React.useRef<CanvasImagens>({})
   const versaoSalvaRef = React.useRef<number | null>(null)
+  const salvandoRef = React.useRef(false)
+  const versaoQueFalhouRef = React.useRef<number | null>(null)
   const cenaRef = React.useRef<{
     elements: readonly OrderedExcalidrawElement[]
     appState: AppState
@@ -109,9 +123,19 @@ export default function CanvasPage() {
     const versao = getSceneVersion(atual.elements)
     if (versao === versaoSalvaRef.current) return
 
-    setEstado('salvando')
+    // Dois travões contra laço de salvamento. Eles são o cinto de segurança:
+    // mesmo que algum render volte a disparar onChange sozinho, o save não
+    // repete — e foi exatamente assim que a tela preta nasceu.
+    //   1. um salvamento por vez;
+    //   2. a MESMA versão que já falhou não tenta de novo. Só quando a pessoa
+    //      mexer no quadro de verdade (versão nova) é que vale outra tentativa.
+    if (salvandoRef.current) return
+    if (versao === versaoQueFalhouRef.current) return
+
+    salvandoRef.current = true
+    if (montadoRef.current) setEstado('salvando')
     try {
-      const imagens = await salvar.mutateAsync({
+      const imagens = await mutateAsync({
         boardId: cena.boardId,
         // Elemento apagado continua na cena marcado como isDeleted para o
         // undo funcionar. No banco ele é só peso morto que nunca encolhe.
@@ -122,30 +146,49 @@ export default function CanvasPage() {
       })
       imagensRef.current = imagens
       versaoSalvaRef.current = versao
-      setEstado('salvo')
+      versaoQueFalhouRef.current = null
+      if (montadoRef.current) setEstado('salvo')
     } catch (erro) {
-      setEstado('erro')
+      // A versão salva NÃO avança: ainda há mudança pendente. O que avança é a
+      // marca de falha, para esta mesma versão não ser tentada em loop.
+      versaoQueFalhouRef.current = versao
+      if (montadoRef.current) setEstado('erro')
       toast({
         variant: 'destructive',
         title: 'Não consegui salvar o canvas',
         description: errorMessage(erro),
       })
+    } finally {
+      salvandoRef.current = false
     }
-  }, [cena, salvar])
+  }, [cena, mutateAsync])
 
   const { agendar, agoraMesmo } = useSalvamentoAdiado(() => void gravar())
 
-  // Fechar a aba no meio de um autosave pendente perderia o último trecho.
+  // `gravar` muda quando a cena carrega; o efeito abaixo precisa da versão mais
+  // nova sem se remontar por isso.
+  const gravarRef = React.useRef(gravar)
+  gravarRef.current = gravar
+
+  /*
+   * Salva uma última vez ao fechar a aba ou ao sair da tela.
+   *
+   * Sem dependências, de propósito. A versão anterior dependia de `gravar`, e
+   * a limpeza do efeito chamava o salvamento — então cada troca de identidade
+   * de `gravar` disparava uma gravação, que mudava o estado da mutation, que
+   * mudava `gravar` de novo. Com o banco respondendo OK isso convergia; com o
+   * save falhando (tabela do canvas ainda não criada), virava laço infinito
+   * até o React estourar "Maximum update depth exceeded" e desmontar o app
+   * inteiro — a tela preta.
+   */
   React.useEffect(() => {
-    const aoSair = () => {
-      if (versaoSalvaRef.current !== null && cenaRef.current) void gravar()
-    }
+    const aoSair = () => void gravarRef.current()
     window.addEventListener('pagehide', aoSair)
     return () => {
       window.removeEventListener('pagehide', aoSair)
       aoSair()
     }
-  }, [gravar])
+  }, [])
 
   const aoMudar = React.useCallback(
     (
@@ -160,6 +203,20 @@ export default function CanvasPage() {
       }
     },
     [agendar],
+  )
+
+  const aoSoltarPonteiro = React.useCallback(() => agoraMesmo(), [agoraMesmo])
+
+  /*
+   * A cena inicial é lida UMA vez, na montagem — o Excalidraw ignora mudanças
+   * posteriores em initialData. Memoizar pelo id do quadro mantém a identidade
+   * estável entre renders; `tema` entra só como valor inicial, porque o tema ao
+   * vivo já chega pela prop `theme`.
+   */
+  const dadosIniciais = React.useMemo(
+    () => (cena ? montarDadosIniciais(cena, tema) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cena?.boardId],
   )
 
   /** Nota com título e conteúdo, no centro do que está à vista. */
@@ -262,14 +319,21 @@ export default function CanvasPage() {
         </Button>
       </div>
 
+      {/*
+        TODAS as props precisam ter identidade estável. O Excalidraw é
+        memoizado: qualquer objeto ou função recriada no render o re-renderiza,
+        ele emite onChange, o onChange agenda um salvamento, o salvamento muda
+        o estado — e volta ao começo. Era esse ciclo que continuava rodando com
+        a tela parada.
+      */}
       <Excalidraw
         excalidrawAPI={setApi}
         theme={tema}
         langCode="pt-BR"
         onChange={aoMudar}
-        onPointerUp={() => agoraMesmo()}
-        initialData={montarDadosIniciais(cena, tema)}
-        UIOptions={{ canvasActions: { loadScene: false } }}
+        onPointerUp={aoSoltarPonteiro}
+        initialData={dadosIniciais}
+        UIOptions={UI_OPTIONS}
       />
     </div>
   )
