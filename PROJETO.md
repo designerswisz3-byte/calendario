@@ -123,11 +123,12 @@ Sete tabelas em uso.
 
 ### `notas` — o caderno
 `id`, `user_id`, `titulo`, `conteudo`, `desenho` (jsonb), `imagens` (jsonb),
-`criado_em`, `atualizado_em`
+`fixada`, `fixada_em`, `criado_em`, `atualizado_em`
 
 - `titulo` é a **primeira linha do conteúdo**, como no Notas da Apple. Fica em coluna própria para a lista carregar sem puxar o corpo de cada nota.
 - `conteudo` é o HTML do editor. Imagem **nunca** entra embutida: fica `src="anexo:<caminho>"`.
 - `desenho` guarda a cena do Excalidraw daquela nota.
+- `fixada` responde "está no topo?"; `fixada_em` responde "em que ordem?". São duas colunas porque sem a segunda todas as fixadas empatariam e cairiam na ordem de edição — abrir uma nota fixada só para reler mudaria a posição dela no ranking.
 
 ### `calendar_items` — o planejamento do dia
 `id`, `user_id`, `data`, `horario`, `tipo`, `status`, `notas`, `roteiro`,
@@ -230,6 +231,7 @@ Caderno no estilo do Notas da Apple, com ligações no estilo do Obsidian.
 - **Editor**: títulos, negrito, itálico, riscado, listas e lista de tarefas.
 - **Imagens** por botão, arrastar ou **colar um print**.
 - **Desenho por nota** (Excalidraw), numa seção que só carrega quando aberta.
+- **Fixar no topo** pelo pino, com seção própria e filtro "Só fixadas".
 - **Redimensionar imagem** arrastando as alças; `Tamanho original` desfaz.
 - **Exportar em PDF** pelo botão no topo da nota.
 - **`[[Título da outra nota]]`** liga notas, nas duas direções: *esta nota cita* e **quem cita esta nota**. A retroligação aparece sozinha, sem ninguém criar o caminho de volta. Citar uma nota que ainda não existe oferece criá-la num clique.
@@ -333,6 +335,14 @@ aba. O Supabase aceita `?download=<nome>` e responde com
 Base64 dentro do HTML faria cada autosave reescrever megabytes; URL assinada
 expiraria dentro do texto salvo. O HTML guarda `src="anexo:<caminho>"` e a URL
 assinada é gerada na hora de exibir, com `data-anexo` segurando a ida e volta.
+
+**Fixar não é editar: gatilho próprio para `notas`.**
+O gatilho genérico `set_atualizado_em()` carimba a data em qualquer update.
+Com ele, fixar ou soltar tornava a nota "a mais recente": ela pulava para o
+topo da seção das soltas e a data na lista mudava sem ninguém ter escrito nada.
+Medido: uma nota de 3 minutos atrás virou a mais nova da lista só por ter sido
+fixada e solta. O gatilho de `notas` só carimba quando título, conteúdo,
+desenho ou imagens mudam.
 
 **PDF pela impressão do navegador, não por `jsPDF` + `html2canvas`.**
 Aquele caminho tira uma FOTO da tela: texto que não dá para selecionar nem
@@ -552,6 +562,7 @@ da nota), o bucket privado e as três lições de cache que a seção 8 registra
 | Grafo visual das notas | **não** | a navegação real acontece pelos dois painéis de ligação; o grafo é a parte cara e menos usada |
 | Importar carrossel do Canva automaticamente | **não** | exige Canva Enterprise ou revisão da Canva |
 | Agendar post no Instagram | **não** | a API não agenda; exige servidor + App Review para contas de cliente |
+| Arrastar para reordenar as fixadas | não | refixar sobe a nota, o que cobre o caso com poucas fixadas |
 | Exportar várias notas num PDF só | não | o botão exporta a nota aberta |
 | Imagens dentro do desenho | não | o desenho salva as formas, não os arquivos colados nele |
 | Renomear nota sem quebrar ligações | não | a ligação é por título — é o preço da escrita sem fricção |

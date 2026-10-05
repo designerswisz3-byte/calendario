@@ -19,9 +19,19 @@ export function useNotas() {
     queryKey: queryKeys.notas(),
     enabled: Boolean(user),
     queryFn: async (): Promise<NotaResumo[]> => {
+      /*
+       * Três critérios, nesta ordem: fixadas primeiro; entre as fixadas, a
+       * mais recentemente fixada na frente; o resto por última edição.
+       *
+       * O segundo critério é o que faz o "ranking" existir — sem ele as
+       * fixadas empatariam e cairiam na ordem de edição, de modo que só abrir
+       * uma nota para reler já mudaria a posição dela.
+       */
       const { data, error } = await supabase
         .from('notas')
-        .select('id, titulo, atualizado_em')
+        .select('id, titulo, atualizado_em, fixada, fixada_em')
+        .order('fixada', { ascending: false })
+        .order('fixada_em', { ascending: false, nullsFirst: false })
         .order('atualizado_em', { ascending: false })
       if (error) throw error
       return (data ?? []) as NotaResumo[]
@@ -149,6 +159,34 @@ export function useSalvarNota() {
       // invalidá-la remontaria o editor embaixo de quem está escrevendo.
       void queryClient.invalidateQueries({ queryKey: queryKeys.notas() })
       void queryClient.invalidateQueries({ queryKey: queryKeys.notasLigacoes() })
+    },
+  })
+}
+
+/**
+ * Fixa ou solta a nota.
+ *
+ * Fixar de novo uma nota já fixada renova o `fixada_em` e manda ela para o
+ * topo das fixadas — é o jeito de reordenar sem precisar de arrastar.
+ */
+export function useFixarNota() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, fixada }: { id: string; fixada: boolean }) => {
+      const { data, error } = await supabase
+        .from('notas')
+        .update({ fixada, fixada_em: fixada ? new Date().toISOString() : null })
+        .eq('id', id)
+        .select('id')
+      if (error) throw error
+      // Mesmo motivo de sempre: UPDATE que não acerta linha volta sem erro.
+      if (!data || data.length === 0) {
+        throw new Error(`A nota (${id}) não foi encontrada para fixar.`)
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notas() })
     },
   })
 }

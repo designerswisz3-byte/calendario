@@ -95,12 +95,19 @@ export type NotaRow = {
   /** Cena do Excalidraw do desenho desta nota. */
   desenho: CanvasDados | null
   imagens: CanvasImagens
+  /** Fixada no topo da lista. */
+  fixada: boolean
+  /** Quando foi fixada — define a ordem entre as fixadas. */
+  fixada_em: string | null
   criado_em: string
   atualizado_em: string
 }
 
 /** O que a lista precisa — sem puxar o corpo de cada nota. */
-export type NotaResumo = Pick<NotaRow, 'id' | 'titulo' | 'atualizado_em'>
+export type NotaResumo = Pick<
+  NotaRow,
+  'id' | 'titulo' | 'atualizado_em' | 'fixada' | 'fixada_em'
+>
 
 export type CanvasBoardRow = {
   id: string
@@ -209,13 +216,23 @@ export interface Database {
         Row: NotaRow
         Insert: Omit<
           NotaRow,
-          'id' | 'criado_em' | 'atualizado_em' | 'titulo' | 'conteudo' | 'desenho' | 'imagens'
+          | 'id'
+          | 'criado_em'
+          | 'atualizado_em'
+          | 'titulo'
+          | 'conteudo'
+          | 'desenho'
+          | 'imagens'
+          | 'fixada'
+          | 'fixada_em'
         > & {
           id?: string
           titulo?: string
           conteudo?: string
           desenho?: CanvasDados | null
           imagens?: CanvasImagens
+          fixada?: boolean
+          fixada_em?: string | null
           criado_em?: string
           atualizado_em?: string
         }

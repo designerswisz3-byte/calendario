@@ -4,6 +4,8 @@ import {
   FileDown,
   FileText,
   Loader2,
+  Pin,
+  PinOff,
   Plus,
   Search,
   Trash2,
@@ -26,6 +28,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import {
   useCriarNota,
   useExcluirNota,
+  useFixarNota,
   useLigacoesDoCaderno,
   useNota,
   useNotas,
@@ -71,11 +74,13 @@ export default function NotasPage() {
   const { data: notas = [], isLoading: carregandoLista, error: erroLista } = useNotas()
   const { data: caderno = [] } = useLigacoesDoCaderno()
   const criar = useCriarNota()
+  const fixar = useFixarNota()
   const excluir = useExcluirNota()
   const salvar = useSalvarNota()
 
   const [selecionada, setSelecionada] = React.useState<string | null>(null)
   const [busca, setBusca] = React.useState('')
+  const [soFixadas, setSoFixadas] = React.useState(false)
   const [estado, setEstado] = React.useState<Estado>('ocioso')
   const [seletorAberto, setSeletorAberto] = React.useState(false)
   const [paraImprimir, setParaImprimir] = React.useState<ConteudoParaImprimir | null>(null)
@@ -286,6 +291,18 @@ export default function NotasPage() {
     }
   }
 
+  async function alternarFixada(item: { id: string; fixada: boolean; titulo: string }) {
+    try {
+      await fixar.mutateAsync({ id: item.id, fixada: !item.fixada })
+    } catch (erro) {
+      toast({
+        variant: 'destructive',
+        title: 'Não consegui fixar a nota',
+        description: errorMessage(erro),
+      })
+    }
+  }
+
   async function removerNota(id: string, titulo: string) {
     if (!window.confirm(`Excluir “${titulo || 'Nota sem título'}”? Não dá para desfazer.`)) return
     try {
@@ -298,9 +315,14 @@ export default function NotasPage() {
   }
 
   const chave = chaveDoTitulo(busca)
-  const visiveis = chave
-    ? notas.filter((n) => chaveDoTitulo(n.titulo || 'Nota sem título').includes(chave))
-    : notas
+  const visiveis = notas
+    .filter((n) => !soFixadas || n.fixada)
+    .filter((n) => !chave || chaveDoTitulo(n.titulo || 'Nota sem título').includes(chave))
+
+  const quantidadeFixada = notas.filter((n) => n.fixada).length
+  // A lista já vem ordenada do banco: fixadas primeiro. O índice da primeira
+  // não-fixada é onde entra o separador das seções.
+  const inicioDasOutras = visiveis.findIndex((n) => !n.fixada)
 
   if (erroLista) {
     return (
@@ -341,6 +363,20 @@ export default function NotasPage() {
                 className="h-8 pl-8 text-sm"
               />
             </div>
+
+            {/* O filtro só aparece quando existe algo para filtrar. */}
+            {quantidadeFixada > 0 && (
+              <Button
+                variant={soFixadas ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 w-full justify-center text-xs"
+                aria-pressed={soFixadas}
+                onClick={() => setSoFixadas((v) => !v)}
+              >
+                <Pin className={cn('h-3.5 w-3.5', soFixadas && 'fill-current')} />
+                {soFixadas ? 'Mostrando só fixadas' : `Só fixadas (${quantidadeFixada})`}
+              </Button>
+            )}
           </div>
 
           <ul className="min-h-0 flex-1 overflow-y-auto p-2 scrollbar-thin">
@@ -354,13 +390,29 @@ export default function NotasPage() {
               <li className="flex flex-col items-center gap-2 px-3 py-10 text-center">
                 <FileText className="h-5 w-5 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  {busca ? 'Nenhuma nota com esse título.' : 'Nenhuma nota ainda.'}
+                  {soFixadas
+                    ? 'Nenhuma nota fixada com esse filtro.'
+                    : busca
+                      ? 'Nenhuma nota com esse título.'
+                      : 'Nenhuma nota ainda.'}
                 </p>
               </li>
             )}
 
-            {visiveis.map((item) => (
-              <li key={item.id}>
+            {visiveis.map((item, indice) => (
+              <React.Fragment key={item.id}>
+                {/* Cabeçalho da seção fixada, só quando as duas seções convivem. */}
+                {indice === 0 && item.fixada && (
+                  <li className="px-2 pb-1 pt-1 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Fixadas
+                  </li>
+                )}
+                {indice === inicioDasOutras && inicioDasOutras > 0 && (
+                  <li className="mt-2 border-t border-border/60 px-2 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Outras notas
+                  </li>
+                )}
+              <li>
                 <div
                   className={cn(
                     'group flex items-center gap-1 rounded-lg px-2 py-2 transition-colors',
@@ -388,6 +440,31 @@ export default function NotasPage() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    aria-label={
+                      item.fixada
+                        ? `Soltar ${item.titulo || 'nota sem título'}`
+                        : `Fixar ${item.titulo || 'nota sem título'} no topo`
+                    }
+                    title={item.fixada ? 'Soltar do topo' : 'Fixar no topo'}
+                    onClick={() => void alternarFixada(item)}
+                    className={cn(
+                      'transition-opacity',
+                      // Fixada: o pino fica sempre à vista, é o estado dela.
+                      // Solta: aparece no hover, para não poluir a lista.
+                      item.fixada
+                        ? 'text-primary'
+                        : 'opacity-0 focus:opacity-100 group-hover:opacity-100',
+                    )}
+                  >
+                    {item.fixada ? (
+                      <Pin className="h-3.5 w-3.5 fill-current" />
+                    ) : (
+                      <Pin className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     aria-label={`Excluir ${item.titulo || 'nota sem título'}`}
                     onClick={() => void removerNota(item.id, item.titulo)}
                     className="opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 hover:text-destructive"
@@ -396,6 +473,7 @@ export default function NotasPage() {
                   </Button>
                 </div>
               </li>
+              </React.Fragment>
             ))}
           </ul>
         </aside>
@@ -426,10 +504,32 @@ export default function NotasPage() {
                     Voltar
                   </Button>
                 )}
+                {/* Fixar sem precisar voltar para a lista: quem acabou de
+                    escrever algo importante decide isso aqui. */}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="ml-auto"
+                  onClick={() =>
+                    void alternarFixada({
+                      id: nota.id,
+                      fixada: nota.fixada,
+                      titulo: nota.titulo,
+                    })
+                  }
+                  title={nota.fixada ? 'Soltar do topo' : 'Fixar no topo'}
+                >
+                  {nota.fixada ? (
+                    <PinOff className="h-4 w-4" />
+                  ) : (
+                    <Pin className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">{nota.fixada ? 'Soltar' : 'Fixar'}</span>
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => void exportarPdf()}
                   loading={preparandoPdf}
                   title="Exportar esta nota em PDF"

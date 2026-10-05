@@ -193,6 +193,8 @@ Aba `/notas`: caderno no estilo do Notas da Apple, com ligações no estilo do O
 - Editor com negrito, itálico, riscado, títulos, listas e **lista de tarefas**.
 - **Imagens** por botão, arrastar ou colar (Ctrl+V de um print).
 - **Desenho** por nota, numa seção que abre só quando usada.
+- **Fixar no topo**: o pino na linha da lista (ou no cabeçalho da nota) manda a nota para a seção **Fixadas**. Fixar de novo uma nota já fixada sobe ela entre as fixadas — é assim que se reordena.
+- **Filtro "Só fixadas"**: aparece quando há pelo menos uma, com a contagem.
 - **Redimensionar imagem**: clique nela e arraste as alças. A largura vai no atributo `width` do HTML, então sobrevive ao salvar, ao reabrir e ao PDF.
 - **Exportar em PDF**: botão `PDF` no topo da nota. Usa o motor de impressão do navegador — texto selecionável, imagem em resolução cheia, desenho em vetor.
 - **`[[Título da outra nota]]`** cria a ligação. O painel mostra as duas direções: o que esta nota cita e **quem cita esta nota** — a retroligação aparece sozinha, sem ninguém criar o caminho de volta.
