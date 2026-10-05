@@ -230,6 +230,8 @@ Caderno no estilo do Notas da Apple, com ligações no estilo do Obsidian.
 - **Editor**: títulos, negrito, itálico, riscado, listas e lista de tarefas.
 - **Imagens** por botão, arrastar ou **colar um print**.
 - **Desenho por nota** (Excalidraw), numa seção que só carrega quando aberta.
+- **Redimensionar imagem** arrastando as alças; `Tamanho original` desfaz.
+- **Exportar em PDF** pelo botão no topo da nota.
 - **`[[Título da outra nota]]`** liga notas, nas duas direções: *esta nota cita* e **quem cita esta nota**. A retroligação aparece sozinha, sem ninguém criar o caminho de volta. Citar uma nota que ainda não existe oferece criá-la num clique.
 
 A ligação é **por título, não por id**: dá para citar um tema antes de a nota
@@ -331,6 +333,23 @@ aba. O Supabase aceita `?download=<nome>` e responde com
 Base64 dentro do HTML faria cada autosave reescrever megabytes; URL assinada
 expiraria dentro do texto salvo. O HTML guarda `src="anexo:<caminho>"` e a URL
 assinada é gerada na hora de exibir, com `data-anexo` segurando a ida e volta.
+
+**PDF pela impressão do navegador, não por `jsPDF` + `html2canvas`.**
+Aquele caminho tira uma FOTO da tela: texto que não dá para selecionar nem
+buscar, imagem reamostrada e quebra de página no meio do parágrafo. O motor do
+navegador já resolve paginação, fonte e imagem em resolução cheia, e não custa
+dependência nenhuma. O preço é um clique: a pessoa escolhe "Salvar como PDF".
+Verificado gerando o PDF de verdade: **1 página**, texto extraível por
+`pdftotext`, imagem embarcada a 400×300 e **sem** o cabeçalho nem a lista do app.
+
+**`display: none` no app ao imprimir, não `visibility: hidden`.**
+`visibility` esconde mas MANTÉM a altura: uma nota de três linhas saía em duas
+páginas, a segunda em branco, ocupada pelo app invisível.
+
+**Largura da imagem no atributo `width`, não em style inline.**
+É o atributo que atravessa o salvar, o reabrir e a impressão sem depender do
+CSS do app. Só a largura é guardada — a altura fica `auto`, o que mantém a
+proporção sem precisar guardá-la.
 
 **O editor da nota remonta pela `key`, não pelas deps do TipTap.**
 `useEditor` cria o gerenciador da instância uma vez só, num `useState`. Trocar
@@ -533,6 +552,7 @@ da nota), o bucket privado e as três lições de cache que a seção 8 registra
 | Grafo visual das notas | **não** | a navegação real acontece pelos dois painéis de ligação; o grafo é a parte cara e menos usada |
 | Importar carrossel do Canva automaticamente | **não** | exige Canva Enterprise ou revisão da Canva |
 | Agendar post no Instagram | **não** | a API não agenda; exige servidor + App Review para contas de cliente |
+| Exportar várias notas num PDF só | não | o botão exporta a nota aberta |
 | Imagens dentro do desenho | não | o desenho salva as formas, não os arquivos colados nele |
 | Renomear nota sem quebrar ligações | não | a ligação é por título — é o preço da escrita sem fricção |
 | Aprovar/reprovar com um clique no link público | não | hoje o retorno é texto livre em AJUSTES |

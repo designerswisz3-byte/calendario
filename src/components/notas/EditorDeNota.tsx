@@ -1,5 +1,10 @@
 import * as React from 'react'
-import { EditorContent, useEditor, type Editor } from '@tiptap/react'
+import {
+  EditorContent,
+  ReactNodeViewRenderer,
+  useEditor,
+  type Editor,
+} from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
@@ -20,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { TIPOS_DE_IMAGEM } from '@/lib/notasAnexos'
+import { ImagemRedimensionavel } from '@/components/notas/ImagemRedimensionavel'
 
 /**
  * Imagem com o caminho do anexo preservado.
@@ -38,7 +44,26 @@ const ImagemAnexada = Image.extend({
         renderHTML: (atributos: Record<string, unknown>) =>
           atributos.anexo ? { 'data-anexo': String(atributos.anexo) } : {},
       },
+      /*
+       * Largura escolhida por quem escreve. Vai para o atributo `width` do
+       * HTML, e não para um style inline: é ele que atravessa o salvar, o
+       * reabrir e a impressão em PDF sem depender de CSS do app.
+       */
+      largura: {
+        default: null,
+        parseHTML: (elemento: HTMLElement) => {
+          const bruto = elemento.getAttribute('width')
+          const numero = bruto ? Number.parseInt(bruto, 10) : NaN
+          return Number.isFinite(numero) ? numero : null
+        },
+        renderHTML: (atributos: Record<string, unknown>) =>
+          atributos.largura ? { width: String(atributos.largura) } : {},
+      },
     }
+  },
+  // A imagem vira um componente React para ganhar as alças de redimensionar.
+  addNodeView() {
+    return ReactNodeViewRenderer(ImagemRedimensionavel)
   },
 })
 

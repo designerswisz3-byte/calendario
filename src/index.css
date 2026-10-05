@@ -336,3 +336,133 @@
     @apply pointer-events-none float-left h-0 text-muted-foreground;
   }
 }
+
+/* ============================================================================
+   Exportar a nota em PDF (impressão do navegador)
+   ----------------------------------------------------------------------------
+   Na tela, a área de impressão fica fora do campo de visão — e não com
+   `display: none`, que em alguns navegadores adia o carregamento das imagens e
+   faria o PDF sair com buracos.
+   ========================================================================== */
+.impressao-da-nota {
+  position: fixed;
+  left: -200vw;
+  top: 0;
+  width: 170mm;
+  pointer-events: none;
+  color: #111;
+  background: #fff;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+@media print {
+  /*
+   * `display: none` no app, e não `visibility: hidden`.
+   *
+   * `visibility` esconde mas MANTÉM a altura: uma nota de três linhas saía em
+   * duas páginas, a segunda em branco, ocupada pelo app invisível. A área de
+   * impressão é montada por portal como filha direta de <body>, então basta
+   * esconder os irmãos dela.
+   */
+  body > *:not(.impressao-da-nota) {
+    display: none !important;
+  }
+
+  .impressao-da-nota {
+    position: static !important;
+    left: auto !important;
+    width: auto !important;
+  }
+
+  @page {
+    margin: 16mm;
+  }
+}
+
+.impressao-da-nota h1 {
+  margin: 0 0 0.25rem;
+  font-size: 22pt;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.impressao-da-nota .impressao-data {
+  margin: 0 0 1.25rem;
+  font-size: 9pt;
+  color: #666;
+}
+
+.impressao-da-nota .impressao-corpo > * + * {
+  margin-top: 0.6rem;
+}
+
+.impressao-da-nota h2 {
+  margin-top: 1.2rem;
+  font-size: 14pt;
+  font-weight: 600;
+}
+
+.impressao-da-nota h3 {
+  margin-top: 1rem;
+  font-size: 12pt;
+  font-weight: 600;
+}
+
+.impressao-da-nota ul,
+.impressao-da-nota ol {
+  padding-left: 1.2rem;
+}
+
+.impressao-da-nota ul {
+  list-style: disc;
+}
+
+.impressao-da-nota ol {
+  list-style: decimal;
+}
+
+.impressao-da-nota ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.impressao-da-nota ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.impressao-da-nota blockquote {
+  border-left: 2px solid #ccc;
+  padding-left: 0.7rem;
+  color: #555;
+}
+
+.impressao-da-nota code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+.impressao-da-nota pre {
+  background: #f4f4f5;
+  padding: 0.6rem;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+/* Imagem e desenho não podem ser partidos no meio por uma quebra de página. */
+.impressao-da-nota img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.impressao-da-nota .impressao-desenho {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}

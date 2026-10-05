@@ -1,5 +1,14 @@
 import * as React from 'react'
-import { Check, FileText, Loader2, Plus, Search, Trash2, TriangleAlert } from 'lucide-react'
+import {
+  Check,
+  FileDown,
+  FileText,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/use-toast'
@@ -8,6 +17,10 @@ import { cn } from '@/lib/utils'
 import { EditorDeNota, type EditorDeNotaRef } from '@/components/notas/EditorDeNota'
 import { DesenhoDaNota } from '@/components/notas/DesenhoDaNota'
 import { PainelDeLigacoes, SeletorDeLigacao } from '@/components/notas/PainelDeLigacoes'
+import {
+  ImpressaoDaNota,
+  type ConteudoParaImprimir,
+} from '@/components/notas/ImpressaoDaNota'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import {
@@ -65,6 +78,8 @@ export default function NotasPage() {
   const [busca, setBusca] = React.useState('')
   const [estado, setEstado] = React.useState<Estado>('ocioso')
   const [seletorAberto, setSeletorAberto] = React.useState(false)
+  const [paraImprimir, setParaImprimir] = React.useState<ConteudoParaImprimir | null>(null)
+  const [preparandoPdf, setPreparandoPdf] = React.useState(false)
 
   const { data: nota, isFetching: carregandoNota } = useNota(selecionada)
 
@@ -226,6 +241,51 @@ export default function NotasPage() {
     }
   }
 
+  /**
+   * Monta a nota para impressão e abre o diálogo do navegador.
+   *
+   * Usa o rascunho (o que está na tela agora), não o que está no banco: quem
+   * acabou de escrever um parágrafo espera vê-lo no PDF, sem ter que esperar
+   * o autosave. O desenho entra como SVG, em resolução de vetor.
+   */
+  async function exportarPdf() {
+    if (!nota) return
+    setPreparandoPdf(true)
+    try {
+      const elementos = (rascunhoRef.current.desenho?.elements ?? []) as unknown[]
+      let desenho: string | null = null
+
+      if (elementos.length > 0) {
+        // Import dinâmico: o Excalidraw é o bundle mais pesado do app e não
+        // pode ser baixado por quem só abriu uma nota de texto.
+        const { exportToSvg } = await import('@excalidraw/excalidraw')
+        const svg = await exportToSvg({
+          elements: elementos as never,
+          appState: { exportBackground: false, exportWithDarkMode: false },
+          files: null,
+        })
+        desenho = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+          new XMLSerializer().serializeToString(svg),
+        )}`
+      }
+
+      setParaImprimir({
+        titulo: tituloDoConteudo(rascunhoRef.current.conteudo, nota.titulo),
+        html: rascunhoRef.current.conteudo,
+        desenho,
+        atualizadoEm: nota.atualizado_em,
+      })
+    } catch (erro) {
+      toast({
+        variant: 'destructive',
+        title: 'Não consegui preparar o PDF',
+        description: errorMessage(erro),
+      })
+    } finally {
+      setPreparandoPdf(false)
+    }
+  }
+
   async function removerNota(id: string, titulo: string) {
     if (!window.confirm(`Excluir “${titulo || 'Nota sem título'}”? Não dá para desfazer.`)) return
     try {
@@ -366,7 +426,19 @@ export default function NotasPage() {
                     Voltar
                   </Button>
                 )}
-                <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => void exportarPdf()}
+                  loading={preparandoPdf}
+                  title="Exportar esta nota em PDF"
+                >
+                  <FileDown className="h-4 w-4" />
+                  <span className="hidden sm:inline">PDF</span>
+                </Button>
+
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   {estado === 'salvando' && <Loader2 className="h-3 w-3 animate-spin" />}
                   {estado === 'salvo' && <Check className="h-3 w-3" />}
                   {estado === 'erro' && <TriangleAlert className="h-3 w-3 text-destructive" />}
@@ -405,6 +477,8 @@ export default function NotasPage() {
           )}
         </section>
       )}
+
+      <ImpressaoDaNota conteudo={paraImprimir} onConcluido={() => setParaImprimir(null)} />
 
       <SeletorDeLigacao
         aberto={seletorAberto}
