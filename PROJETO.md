@@ -42,7 +42,7 @@ Funcionando e no ar:
 - Três estados visuais no mês: passado, hoje e futuro
 - Painel do dia redimensionável, com **Briefing** e **Roteiro** num bloco de notas lateral
 - **Teleprompter** em tela cheia, com velocidade, pausa e espelhamento
-- Criação de conteúdo com até **20 mídias** misturando foto e vídeo, com **upload resumável**
+- Criação de conteúdo com até **20 mídias** misturando foto e vídeo (até **500 MB** por vídeo), com **upload resumável**
 - Link público com simulação fiel do feed (carrossel, reels, story, post único)
 - Player de vídeo com **som, linha do tempo e volume**
 - Botão **AJUSTES** — o cliente escreve sem limite de caracteres
@@ -273,7 +273,7 @@ espelhamento ficam guardados.
 ### `/criar`
 Nome do expert, legenda com contador de **2.200 caracteres**, tipo do conteúdo
 e upload de até **20 mídias** misturando foto e vídeo (imagem até 10 MB, vídeo
-até 300 MB), com barra de progresso e reordenação por arrastar.
+até 500 MB), com barra de progresso e reordenação por arrastar.
 
 ### `/preview/:id` — a tela que vai para o cliente
 Sem login, sem edição. É a única parte do app que **não** usa glassmorphism —
@@ -406,8 +406,8 @@ assinatura de índice implícita e quebra a tipagem inteira.
 Não são estimativas: foram medidos ou lidos na documentação oficial.
 
 ### Supabase — o limite de upload que vale é o do projeto
-O tamanho máximo mora em três camadas e vale **sempre a menor**: o app (300 MB),
-o bucket (300 MB) e o **limite global do projeto**, que só muda no painel em
+O tamanho máximo mora em três camadas e vale **sempre a menor**: o app (500 MB),
+o bucket (500 MB) e o **limite global do projeto**, que só muda no painel em
 *Storage → Settings → Global file size limit* e vem com **50 MB** de padrão.
 
 | Plano | Teto por arquivo |

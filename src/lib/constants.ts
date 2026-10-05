@@ -89,7 +89,12 @@ export const TAG_COLORS = [
 ]
 
 export const MAX_IMAGE_SIZE_MB = 10
-export const MAX_VIDEO_SIZE_MB = 300
+/**
+ * Teto por vídeo. Precisa bater com `file_size_limit` do bucket `media` (ver
+ * a migração ...001100) E com o limite global do projeto no painel do
+ * Supabase. Vale sempre o MENOR dos três.
+ */
+export const MAX_VIDEO_SIZE_MB = 500
 
 /**
  * Teto de mídias por conteúdo. O carrossel do Instagram aceita até 20 slides,
