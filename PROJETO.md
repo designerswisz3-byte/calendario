@@ -1,4 +1,4 @@
-# Projeto: Calendário Editorial + Preview de Conteúdo
+# Projeto: Calendário Editorial + Preview + Notas
 
 Registro completo do que foi construído: o produto, as decisões, os limites
 reais que testamos e o que ficou de fora. O `README.md` responde *como rodar*.
@@ -6,29 +6,30 @@ Este documento responde *o que existe e por quê* — é o documento de handover
 
 - **Repositório:** `designerswisz3-byte/calendario`
 - **Branches:** `main` e `claude/criacao-pdf-q9fjoh` (mantidas idênticas)
-- **Commits:** 20
-- **Migrações SQL:** 7 (consolidadas em `supabase/setup-completo.sql`)
+- **Commits:** 29
+- **Migrações SQL:** 9 (consolidadas em `supabase/setup-completo.sql`)
 
 ---
 
 ## 1. O produto em uma frase
 
-Uma ferramenta onde **você planeja o mês, escreve o briefing e o roteiro, monta
-o post e manda um link** — e o cliente abre esse link sem login, vê o post
-exatamente como vai sair no Instagram, escreve os ajustes, abre a arte no Canva
-e baixa as mídias.
+Uma ferramenta onde **você pensa, planeja o mês, escreve o briefing e o
+roteiro, monta o post e manda um link** — e o cliente abre esse link sem login,
+vê o post exatamente como vai sair no Instagram, escreve os ajustes, abre a
+arte no Canva e baixa as mídias.
 
-A premissa que organiza tudo: **o campo existe em um lugar só.** Legenda, mídia
-e nome do expert vivem na ferramenta de criação. O calendário não duplica nada —
+A regra que organiza tudo: **o campo existe em um lugar só.** Legenda, mídia e
+nome do expert vivem na ferramenta de criação. O calendário não duplica nada —
 ele dispara a criação e depois mostra o resultado. Toda vez que uma decisão de
 produto apareceu, foi essa regra que decidiu.
 
-### As duas partes
+### As três partes
 
 | Parte | Onde | Quem usa | Login |
 | --- | --- | --- | --- |
-| **Criação + link público** | `/criar` → `/preview/:id` | você monta, o cliente vê | criar exige; ver, não |
+| **Notas** | `/notas` | você, antes de planejar | sim |
 | **Calendário editorial** | `/calendario` | você | sim |
+| **Criação + link público** | `/criar` → `/preview/:id` | você monta, o cliente vê | criar exige; ver, não |
 
 ---
 
@@ -36,41 +37,44 @@ produto apareceu, foi essa regra que decidiu.
 
 Funcionando e no ar:
 
+- **Notas** no estilo do Notas da Apple, com ligações `[[por título]]` no estilo do Obsidian
 - Calendário mensal com arrastar-e-soltar entre dias, filtros, visão de lista e agenda
-- Painel do dia redimensionável, com abas **Briefing** e **Roteiro**
+- Três estados visuais no mês: passado, hoje e futuro
+- Painel do dia redimensionável, com **Briefing** e **Roteiro** num bloco de notas lateral
 - **Teleprompter** em tela cheia, com velocidade, pausa e espelhamento
-- Criação de conteúdo com até **20 mídias** misturando foto e vídeo
+- Criação de conteúdo com até **20 mídias** misturando foto e vídeo, com **upload resumável**
 - Link público com simulação fiel do feed (carrossel, reels, story, post único)
 - Player de vídeo com **som, linha do tempo e volume**
 - Botão **AJUSTES** — o cliente escreve sem limite de caracteres
 - Botão do **Canva** com **visto** que o expert marca e desmarca
 - Botão **DOWNLOAD DE MÍDIA** — arquivo único ou tudo em `.zip`
+- **ErrorBoundary por rota**: uma tela quebrada não derruba o app inteiro
 
 Dependências de ambiente (fora do código):
 
 - `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` na Vercel, **tipo Config** (não Secret), com redeploy depois de salvar
-- `supabase/setup-completo.sql` rodado no SQL Editor do Supabase
+- `supabase/setup-completo.sql` rodado por inteiro no SQL Editor do Supabase
 - Deployment Protection **desligada** na Vercel — com ela ligada, `/preview/:id` pede login e o produto perde o sentido
 
 ---
 
 ## 3. Stack
 
-Definida na especificação, sem alternativas.
+| Camada | Escolha | Por quê |
+| --- | --- | --- |
+| Frontend | React 18 + TypeScript + Vite 5 | definido na especificação |
+| Estilo | Tailwind CSS 3.4 + shadcn/ui (Radix) | idem |
+| Rotas | React Router 6 | idem |
+| Backend | Supabase — Postgres + Auth + Storage | idem |
+| Estado remoto | React Query 5 | **única** camada de acesso a dados |
+| Drag-and-drop | `@dnd-kit/*` | reordenar mídias e mover itens entre dias |
+| Editor das notas | **TipTap 3** (MIT) | WYSIWYG sobre ProseMirror |
+| Desenho | **Excalidraw** (MIT) | canvas infinito dentro da nota |
+| Ícones | `lucide-react` | |
+| Deploy | Vercel (`vercel.json`) ou Netlify (`netlify.toml`) | |
 
-| Camada | Escolha |
-| --- | --- |
-| Frontend | React 18 + TypeScript + Vite 5 |
-| Estilo | Tailwind CSS 3.4 + shadcn/ui (Radix UI por baixo) |
-| Rotas | React Router 6 |
-| Backend | Supabase — Postgres + Auth + Storage |
-| Estado remoto | React Query 5 — **única** camada de acesso a dados |
-| Drag-and-drop | `@dnd-kit/core` + `/sortable` + `/modifiers` |
-| Ícones | `lucide-react` |
-| Deploy | Vercel (`vercel.json`) ou Netlify (`netlify.toml`) |
-
-Nenhuma dependência de UI pronta para Instagram, teleprompter, player ou ZIP.
-Tudo isso é código nosso — o motivo está na seção 8.
+Nenhuma dependência pronta para Instagram, teleprompter, player, ZIP ou upload
+resumável. Tudo isso é código nosso — o critério está na seção 8.
 
 ---
 
@@ -80,20 +84,24 @@ Tudo isso é código nosso — o motivo está na seção 8.
 Browser (React 18 + Vite + TS)
 │
 ├── React Router ── públicas: /login, /preview/:id
-│                └─ privadas:  /criar, /calendario   (ProtectedRoute + Supabase Auth)
+│                └─ privadas:  /notas, /calendario, /criar
+│                   (ProtectedRoute + AppShell + ErrorBoundary)
 │
 ├── React Query ── única camada de acesso a dados (src/hooks/*)
 │      └── @supabase/supabase-js ──> Supabase
 │                                     ├── Postgres + RLS (dono = auth.uid())
 │                                     │    └── anônimo entra só por 3 funções SECURITY DEFINER
 │                                     ├── Auth (e-mail + senha)
-│                                     └── Storage bucket `media` (leitura pública)
+│                                     ├── Storage `media`  (público — o cliente vê o preview)
+│                                     └── Storage `canvas` (privado — anexos das notas)
 │
-└── dnd-kit ── 2 usos: reordenar mídias do carrossel + mover item entre dias
+├── TipTap ── editor das notas
+├── Excalidraw ── desenho dentro da nota
+└── dnd-kit ── reordenar mídias + mover item entre dias
 ```
 
-`/preview/:id` é **lazy** e não carrega o bundle do calendário. É a rota que vai
-para o cliente; ela não deve pagar o custo do app inteiro para desenhar um post.
+Todas as rotas são **lazy**. `/preview/:id` é a que vai para o cliente: ela não
+baixa o bundle do calendário, do editor nem do desenho para desenhar um post.
 
 ### Rotas
 
@@ -102,16 +110,24 @@ para o cliente; ela não deve pagar o custo do app inteiro para desenhar um post
 | `/` | — | redireciona para `/calendario` |
 | `/login` | pública | e-mail + senha (entrar e cadastrar) |
 | `/preview/:id` | **pública** | simulação do Instagram + ajustes + Canva + download |
-| `/criar` | privada | monta o conteúdo e gera o link |
+| `/notas` | privada | caderno com texto, imagem, desenho e ligações |
 | `/calendario` | privada | mês, painel do dia, briefing, roteiro, teleprompter |
+| `/criar` | privada | monta o conteúdo e gera o link |
 | `*` | — | 404 |
 
 ---
 
 ## 5. Modelo de dados
 
-Seis tabelas. As cinco primeiras vieram da especificação; `ajustes` nasceu do
-pedido do botão AJUSTES.
+Sete tabelas em uso.
+
+### `notas` — o caderno
+`id`, `user_id`, `titulo`, `conteudo`, `desenho` (jsonb), `imagens` (jsonb),
+`criado_em`, `atualizado_em`
+
+- `titulo` é a **primeira linha do conteúdo**, como no Notas da Apple. Fica em coluna própria para a lista carregar sem puxar o corpo de cada nota.
+- `conteudo` é o HTML do editor. Imagem **nunca** entra embutida: fica `src="anexo:<caminho>"`.
+- `desenho` guarda a cena do Excalidraw daquela nota.
 
 ### `calendar_items` — o planejamento do dia
 `id`, `user_id`, `data`, `horario`, `tipo`, `status`, `notas`, `roteiro`,
@@ -119,7 +135,7 @@ pedido do botão AJUSTES.
 
 - `tipo`: `carrossel` · `reels` · `story` · `post` · **`ideia`**
 - `status`: `ideia` → `roteiro` → `design` → `em_aprovacao` → `aprovado` → `agendado` → `publicado`
-- `notas` é o **Briefing**. `roteiro` foi adicionado depois, e é o que alimenta o teleprompter.
+- `notas` é o **Briefing**. `roteiro` alimenta o teleprompter.
 
 ### `content_previews` — o conteúdo e o link
 `id`, `user_id`, `calendar_item_id`, `nome_expert`, `legenda`, `tipo`,
@@ -127,8 +143,8 @@ pedido do botão AJUSTES.
 
 O `id` **é** o link: `/preview/<id>`.
 
-Um índice único parcial garante **um conteúdo por item de planejamento** —
-é ele que impede o calendário de virar um segundo lugar para escrever legenda:
+Um índice único parcial garante **um conteúdo por item de planejamento** — é
+ele que impede o calendário de virar um segundo lugar para escrever legenda:
 
 ```sql
 create unique index content_previews_calendar_item_id_key
@@ -141,42 +157,26 @@ create unique index content_previews_calendar_item_id_key
 `ordem` é o que o drag-and-drop escreve. `tipo` distingue imagem de vídeo —
 sem isso o carrossel misto não saberia o que renderizar em cada slide.
 
-### `canvas_boards` — o quadro infinito
-`id`, `user_id`, `nome`, `dados` (jsonb), `criado_em`, `atualizado_em`
-
-`dados` guarda `elements`, `appState` e `imagens`. Índice único em
-`(user_id, nome)`: é ele que torna o "abre ou cria" seguro contra corrida —
-duas abas abrindo o app ao mesmo tempo não criam dois quadros.
-
-Do `appState` sobrevivem **seis campos** (fundo, grade, scroll e zoom). O objeto
-inteiro tem ~90 chaves e carrega um `Map` de colaboradores e referências a
-elementos em edição — jogar tudo no jsonb gravaria `{}` no lugar do Map e
-ressuscitaria estado de UI que não deveria sobreviver a um F5.
-
 ### `tags` e `calendar_item_tags`
-`tags`: `id`, `user_id`, `nome`, `cor` · `calendar_item_tags`: chave composta `(calendar_item_id, tag_id)`
+`tags`: `id`, `user_id`, `nome`, `cor` · `calendar_item_tags`: chave composta
 
 ### `ajustes` — o retorno do cliente
 `id`, `content_preview_id`, `texto`, `autor`, `criado_em`
 
-Sem limite de caracteres, por pedido explícito. **Não tem política de INSERT** —
-e isso é intencional; ver a seção seguinte.
+Sem limite de caracteres. **Não tem política de INSERT** — e isso é intencional
+(ver seção 6).
 
-### Colunas que nasceram depois da especificação
-
-| Coluna | Migração | Por quê |
-| --- | --- | --- |
-| `calendar_items.roteiro` | `...000600` | separar Briefing de Roteiro sem perder nenhum texto já salvo |
-| `content_previews.canva_url` | `...000700` | link da arte para o expert editar o texto |
-| `content_previews.canva_visto` | `...000700` | o check que o expert marca **e desmarca** |
-| `content_previews.canva_visto_em` | `...000700` | quando ele marcou |
+### `canvas_boards` — órfã, de propósito
+Sobrou da aba Canvas, que saiu do projeto. **Não foi apagada**: `drop table` é
+destrutivo e o conteúdo é de quem escreveu. Para limpar:
+`drop table canvas_boards;` — depois de conferir que não há nada lá.
 
 ---
 
 ## 6. Segurança
 
 ### A regra base
-RLS ligada nas seis tabelas. Toda política de dono é `auth.uid() = user_id`.
+RLS ligada em todas as tabelas. Toda política de dono é `auth.uid() = user_id`.
 Ninguém lê nem escreve o conteúdo de outro usuário.
 
 ### O problema que o link público cria
@@ -186,297 +186,232 @@ defeito que embarcamos e depois corrigimos.
 
 > **Defeito real, corrigido na migração `...000300`.** A política
 > `content_previews_select_public` liberava SELECT para `anon` sem exigir o `id`.
-> Isso significava que qualquer pessoa com a chave anônima — que é pública por
-> design — podia **listar todos os previews de todos os clientes** sem conhecer
-> link nenhum. Provado no Postgres: `anonimo lista 1 preview(s) SEM saber o id`.
+> Qualquer pessoa com a chave anônima — que é pública por design — podia
+> **listar todos os previews de todos os clientes** sem conhecer link nenhum.
+> Provado no Postgres: `anonimo lista 1 preview(s) SEM saber o id`.
 > Depois da correção: `0 linhas`.
 
 ### Como ficou
-Anônimo não tem acesso direto a tabela nenhuma. Ele passa por **três funções
+Anônimo não tem acesso direto a tabela nenhuma. Passa por **três funções
 `SECURITY DEFINER`**, todas com `search_path` fixado em `public, pg_temp`:
 
 | Função | O que faz | Por que é função, e não política |
 | --- | --- | --- |
-| `get_public_preview(preview_id uuid)` | devolve o preview + mídias + ajustes em JSON | obriga a **saber o id**; sem id, não há resultado |
+| `get_public_preview(uuid)` | devolve preview + mídias + ajustes em JSON | obriga a **saber o id** |
 | `enviar_ajuste(preview_id, texto, autor)` | grava um ajuste | permite escrever **um** ajuste sem abrir INSERT na tabela |
-| `marcar_canva_visto(preview_id, visto)` | marca/desmarca o visto | mesma lógica: uma ação específica, não acesso à tabela |
+| `marcar_canva_visto(preview_id, visto)` | marca/desmarca o visto | uma ação específica, não acesso à tabela |
 
 A diferença é o formato do acesso: uma política é uma **porta**, uma função é um
 **balcão**. Com porta, quem entra escolhe o que faz lá dentro. Com balcão, só dá
 para pedir o que está no cardápio — e o cardápio tem três itens.
 
-### Storage
-Bucket `media` com leitura pública (o cliente precisa ver a imagem) e escrita
-restrita à pasta do próprio usuário:
+### Dois buckets, dois níveis
+| Bucket | Leitura | Por quê |
+| --- | --- | --- |
+| `media` | **pública** | o link `/preview/:id` abre sem login e precisa carregar as mídias |
+| `canvas` | **privada** | anexos das notas são material interno: print de conversa, referência de concorrente |
 
-```sql
-(storage.foldername(name))[1] = auth.uid()::text
-```
-
-Limite de arquivo: **300 MB**.
+Escrita nos dois é restrita à pasta do próprio usuário:
+`(storage.foldername(name))[1] = auth.uid()::text`. O bucket privado não tem URL
+fixa — cada exibição gera uma **URL assinada de 1 hora**.
 
 ### Chaves
-- A chave **anônima** é pública por design — ela vai no bundle e é protegida pela RLS. Está certo ela estar lá.
-- A chave **`service_role` ignora RLS por completo.** Ela nunca deve ser colada em chat, commitada no repositório ou usada no frontend. Não existe caso de uso legítimo para ela nesse app.
+- A chave **anônima** é pública por design — vai no bundle e é protegida pela RLS.
+- A chave **`service_role` ignora RLS por completo.** Nunca deve ser colada em chat, commitada ou usada no frontend. Não existe caso de uso legítimo para ela neste app.
 
 ---
 
 ## 7. O que cada tela faz
 
-### `/calendario`
-Grade do mês com os itens em cada dia. Arrastar um card move o item de data
-(atualização otimista — o card muda na hora, o banco confirma depois). Filtros
-por tipo, status e tag. Visão de lista e visão de agenda. Barra de progresso do mês.
-
-### Painel do dia
-Abre ao clicar no dia. **Arrastável pela borda esquerda** para ficar mais largo —
-briefing longo em painel estreito é desconfortável de ler, e essa foi a razão do
-pedido. A largura escolhida fica salva no navegador, e acompanha se a janela
-encolher em vez de estourar a tela.
-
-Duas abas:
-
-- **Briefing** — o contexto. Todo texto que já existia continua aqui.
-- **Roteiro** — o que vai ser falado. É o que o teleprompter lê.
-
-### Bloco de notas
-Clicar em **editar** abre o bloco de notas **ao lado** do painel: os campos
-curtos (tipo, status, horário, tags) ficam na coluna estreita, e os textos
-longos ganham a tela toda. A área de escrita passou de **140 px para ~630 px**
-de altura — de seis linhas visíveis para quase trinta.
-
-É **um formulário só**: o botão Salvar do bloco submete o mesmo `<form>` que
-vive no painel (via atributo `form=`), então não existe caminho em que metade
-do item salva e a outra metade não. `Ctrl/Cmd+S` também salva.
-
-Com o bloco aberto, **Esc e clique fora deixam de fechar o painel**. Os dois
-são gestos acidentais, e aqui o custo do acidente é um briefing inteiro
-perdido. A saída é o Cancelar, que é explícito e está à vista.
-
-As duas abas ficam **sempre habilitadas**, mesmo vazias. A primeira versão
-desabilitava a aba Roteiro quando não havia texto — e isso criava um beco sem
-saída: não dava para escrever o roteiro porque a aba estava desabilitada, e ela
-estava desabilitada porque não havia roteiro. Hoje a aba vazia mostra um botão
-**Escrever** que abre o formulário **já na aba certa**.
-
-### Teleprompter
-Tela cheia, com atalhos de teclado: velocidade (↑ ↓), tamanho da fonte (+ −),
-pausar e continuar (espaço ou K), voltar ao início (R), espelhar o texto (M) e sair
-(Esc). Velocidade, fonte e espelhamento ficam guardados — ninguém acerta a
-velocidade de primeira, e parar para reconfigurar no meio da gravação é perder
-a tomada. Fecha e devolve o painel do dia exatamente como estava.
-
 ### `/notas`
 Caderno no estilo do Notas da Apple, com ligações no estilo do Obsidian.
-Substituiu a aba Canvas. Lista à esquerda só com títulos, editor rico à
-direita (TipTap), imagens por colar/arrastar, desenho por nota e ligações
-`[[por título]]` com retroligação automática.
+
+- **Lista à esquerda com apenas o título** — que é a primeira linha do texto.
+- **Editor**: títulos, negrito, itálico, riscado, listas e lista de tarefas.
+- **Imagens** por botão, arrastar ou **colar um print**.
+- **Desenho por nota** (Excalidraw), numa seção que só carrega quando aberta.
+- **`[[Título da outra nota]]`** liga notas, nas duas direções: *esta nota cita* e **quem cita esta nota**. A retroligação aparece sozinha, sem ninguém criar o caminho de volta. Citar uma nota que ainda não existe oferece criá-la num clique.
 
 A ligação é **por título, não por id**: dá para citar um tema antes de a nota
 existir — que é exatamente como o Obsidian é usado. O preço é que renomear
 quebra as ligações para aquela nota; em troca, escrever não exige parar para
 escolher um identificador.
 
+### `/calendario`
+Grade do mês com os itens em cada dia. Arrastar um card move o item de data
+(atualização otimista). Filtros por tipo, status e tag. Visão de lista e agenda.
+
+**Três estados visuais**: passado (fundo escurecido), hoje (borda e anel na cor
+primária) e futuro. O escurecido fica no **fundo da célula**, não nos cards —
+um item atrasado precisa continuar legível, senão a sinalização esconde
+justamente o que pede atenção.
+
+O card se chama pela **primeira linha do briefing**, sempre — inclusive depois
+de o conteúdo ser criado. O nome do expert é só reserva para item sem briefing.
+
+### Painel do dia
+Abre ao clicar no dia. **Arrastável pela borda esquerda**; a largura fica salva.
+
+Clicar em **editar** abre o **bloco de notas ao lado**: os campos curtos (tipo,
+status, horário, tags) ficam na coluna estreita, e os textos longos ganham o
+resto da tela — a área de escrita vai de 140 px para ~630 px de altura.
+
+É **um formulário só**: o Salvar do bloco submete o mesmo `<form>` do painel
+(via atributo `form=`), então não existe caminho em que metade do item salva.
+`Ctrl/Cmd+S` também salva. Com o bloco aberto, **Esc e clique fora deixam de
+fechar o painel** — são gestos acidentais, e aqui o custo é um briefing inteiro.
+
+### Teleprompter
+Tela cheia, com atalhos: velocidade (↑ ↓), fonte (+ −), pausar (espaço ou K),
+voltar ao início (R), espelhar (M), sair (Esc). Velocidade, fonte e
+espelhamento ficam guardados.
+
 ### `/criar`
-Nome do expert, legenda com contador de **2.200 caracteres** (o limite real do
-Instagram), tipo do conteúdo e upload de mídia:
-
-- Até **20 mídias**, misturando foto e vídeo — é o teto do carrossel do Instagram
-- Imagem até **10 MB**, vídeo até **300 MB**
-- O carrossel exibe todas; reels, story e post único usam a primeira
-- Arrastar para reordenar
-- Preview ao vivo do lado enquanto você monta
-
-Gera o link público ao salvar.
+Nome do expert, legenda com contador de **2.200 caracteres**, tipo do conteúdo
+e upload de até **20 mídias** misturando foto e vídeo (imagem até 10 MB, vídeo
+até 300 MB), com barra de progresso e reordenação por arrastar.
 
 ### `/preview/:id` — a tela que vai para o cliente
 Sem login, sem edição. É a única parte do app que **não** usa glassmorphism —
 ela imita o Instagram, e qualquer estilo nosso ali quebraria a ilusão.
 
 - **Carrossel** — proporção natural da arte, contador `n/n`, só o slide ativo toca
-- **Reels / Story** — vídeo 9:16, legenda **abaixo** do vídeo (nunca por cima)
-- **Post único** — imagem única
-- **Player** — som original, linha do tempo arrastável e controle de volume sempre visível
-- **AJUSTES** — texto sem limite; o retorno aparece para você no painel do dia
-- **Canva** — botão que abre a arte + check de visto que o expert marca e desmarca
-- **Download de mídia** — um arquivo por vez ou **tudo em `.zip`**, com progresso
+- **Reels / Story** — vídeo 9:16, legenda **abaixo** do vídeo
+- **Player** — som original, linha do tempo arrastável, volume sempre visível
+- **AJUSTES** — texto sem limite; o retorno aparece no painel do dia
+- **Canva** — abre a arte + check de visto que o expert marca e desmarca
+- **Download** — um arquivo ou **tudo em `.zip`**, com progresso
 
 ---
 
 ## 8. Decisões de engenharia que importam
 
-Cada uma dessas existe porque a alternativa óbvia falhou em um caso real.
+Cada uma existe porque a alternativa óbvia falhou em um caso real.
+
+**Quando escrever e quando usar biblioteca.**
+O critério: se o cliente nunca nota a diferença entre a nossa versão e a
+comprada, não é lugar de gastar tempo. ZIP (~110 linhas), upload resumável
+(~180) e o player trocam uma função estreita — foram escritos. Canvas infinito
+e editor WYSIWYG são pan, zoom, hit-testing, seleção, undo/redo, schema de
+documento: à mão dariam produto pior por muito mais esforço — vieram prontos
+(Excalidraw e TipTap, ambos MIT) e lazy.
 
 **Data no fuso local, nunca `new Date('YYYY-MM-DD')`.**
-Essa forma é interpretada como UTC pelo JavaScript. Em UTC−3, um item marcado
-para o dia 1º aparece no dia 31 do mês anterior. `src/lib/date.ts` faz toda
-conversão no fuso local.
+Essa forma é interpretada como UTC. Em UTC−3, um item marcado para o dia 1º
+aparece no dia 31 do mês anterior. `src/lib/date.ts` converte tudo no fuso local.
 
 **Proporção natural da arte, limitada à faixa do Instagram.**
-A primeira versão cortava as imagens em quadrado. O Instagram aceita de 1.91:1
-até 4:5 — então a moldura respeita a proporção original e só limita quando ela
-sai dessa faixa. Recortar arte de cliente sem avisar é destruir trabalho dos outros.
-
-**ZIP escrito à mão, sem biblioteca.**
-`src/lib/zip.ts` implementa o formato *store* (sem compressão): CRC32, cabeçalhos
-locais, diretório central, EOCD. Foto e vídeo já são formatos comprimidos —
-comprimir de novo gasta CPU do cliente para economizar quase nada. São ~110 linhas
-contra uma dependência inteira no bundle de uma página pública.
-Validado em duas camadas: no Node (`unzip -t` OK, com acentos e subpasta) e no
-browser (WebM extraído **byte a byte idêntico**, 82.789 bytes, reproduzível).
+A primeira versão cortava em quadrado. O Instagram aceita de 1.91:1 até 4:5 —
+a moldura respeita a proporção e só limita fora dessa faixa. Recortar arte de
+cliente sem avisar é destruir trabalho dos outros.
 
 **Upload resumável (TUS) escrito à mão, acima de 6 MB.**
-`supabase.storage.upload()` manda o arquivo inteiro num POST só. Para um vídeo
-de 178 MB isso é: nenhum progresso na tela por minutos (a aba parece travada,
-e as pessoas fecham), nenhuma retomada se a conexão oscilar, e um timeout que
-joga fora tudo que já subiu. `src/lib/tusUpload.ts` fala o protocolo direto —
-POST para criar, PATCH de 6 MB por pedaço. Sem `tus-js-client`, que traz 21
-pacotes e dependências de Node (`proper-lockfile`, `is-stream`) para um upload
-de navegador; a versão à mão custou **~1 KB** no bundle de `/criar`.
-Verificado em browser real contra um servidor TUS mock: 15 MB viraram 3 pedaços
-(6 + 6 + 3 MB) e o arquivo remontado bateu **SHA-256 idêntico** ao original.
+`supabase.storage.upload()` manda tudo num POST só: para 178 MB isso é nenhum
+progresso na tela, nenhuma retomada e um timeout que joga fora o que já subiu.
+`tus-js-client` traz 21 pacotes com dependências de Node para um upload de
+navegador; a versão própria custou **~1 KB**. Verificado em browser real: 15 MB
+viraram 3 pedaços (6+6+3) e o arquivo remontado bateu **SHA-256 idêntico**.
 
 **Upload em série, não em `Promise.all`.**
-A versão anterior subia os 20 arquivos em paralelo. Com vídeos grandes isso é
-20 conexões disputando a mesma banda: todas ficam lentas, nenhuma termina, e o
-navegador começa a derrubar. Em série cada arquivo termina antes e o progresso
-é honesto. E um arquivo recusado não invalida o lote: o que subiu, fica.
+20 arquivos em paralelo disputam a mesma banda: todas as conexões ficam lentas,
+nenhuma termina. E um arquivo recusado não invalida o lote: o que subiu, fica.
 
-**Bloco de notas ancorado no painel com `absolute`, não `fixed`.**
-Duas armadilhas já conhecidas deste projeto decidiram a escolha. `fixed` não
-serve porque o painel anima com `transform`, e um ancestral com transform vira
-bloco de contenção — foi o bug do teleprompter. Nascer dentro da coluna do
-painel também não serve: ela tem `overflow-y-auto` e recortaria o bloco. A
-solução é montá-lo como filho direto do `SheetContent` (que é `fixed`, logo
-posicionado) e ancorá-lo com `right: 100%`. De quebra, o bloco acompanha a
-largura do painel de graça — que é exatamente o comportamento desejado.
-Medido em browser real: bloco terminando em x=917 com o painel começando em
-x=928, altura 866 px, cliques chegando no textarea e o Salvar submetendo o
-formulário do painel.
+**ZIP escrito à mão, sem biblioteca.**
+`src/lib/zip.ts` implementa o formato *store*: CRC32, cabeçalhos locais,
+diretório central, EOCD. Foto e vídeo já são comprimidos — comprimir de novo
+gasta CPU do cliente para economizar quase nada. Validado em duas camadas: no
+Node (`unzip -t`) e no browser (WebM extraído **byte a byte idêntico**).
 
-**Excalidraw para o canvas, em vez de escrever um.**
-É a exceção à regra do ZIP e do TUS. Aqueles eram ~110 e ~180 linhas trocando
-uma função estreita. Um canvas infinito é pan, zoom, hit-testing, seleção,
-alças de redimensionamento, suavização de traço, agrupamento e undo/redo —
-escrever isso à mão daria um produto pior por muito mais esforço. A biblioteca
-é MIT e a rota é lazy: quem nunca abre a aba não baixa nada dela.
-Medido no build de produção: **1,74 MB** ao abrir a aba, **zero** requisições
-externas e **zero** erros de console. Os chunks de mermaid/cytoscape/katex que
-aparecem no build (mais de 4 MB) só baixam se a pessoa usar o "texto para
-diagrama" — não entram na abertura.
+**`?download=` na URL do Storage em vez de `<a download>`.**
+O atributo `download` é **ignorado** em link cross-origin — o arquivo abre na
+aba. O Supabase aceita `?download=<nome>` e responde com
+`Content-Disposition: attachment`.
 
-**Fontes do Excalidraw servidas por nós, menos a CJK.**
-Sem `EXCALIDRAW_ASSET_PATH` apontando para a nossa origem, o canvas busca fonte
-num CDN de terceiro — o app passa a depender de outro domínio para desenhar
-texto. O pacote traz 14 MB de fontes, e **13 MB são a Xiaolai** (chinesa). O
-script copia as outras oito: 516 KB em vez de 14 MB por deploy.
+**Imagem de nota nunca embutida no conteúdo.**
+Base64 dentro do HTML faria cada autosave reescrever megabytes; URL assinada
+expiraria dentro do texto salvo. O HTML guarda `src="anexo:<caminho>"` e a URL
+assinada é gerada na hora de exibir, com `data-anexo` segurando a ida e volta.
 
 **O editor da nota remonta pela `key`, não pelas deps do TipTap.**
 `useEditor` cria o gerenciador da instância uma vez só, num `useState`. Trocar
 o array de dependências não garante que o `content` novo seja aplicado — abrir
-outra nota montava o editor vazio com o conteúdo certo em mãos. Remontar o
-componente inteiro pela `key` é o caminho do React e não depende do que a
-biblioteca faz por dentro.
+outra nota montava o editor vazio com o conteúdo certo em mãos.
 
 **A nota nunca vem do cache (`gcTime: 0`).**
 Trocar de nota muda a chave da consulta, e o React Query entrega na hora o que
 tiver guardado — que podia ser a versão de quando a nota foi criada, ainda
-vazia. O editor montava com ela e a resposta fresca chegava depois sem
-remontar nada: nota cheia no banco, editor em branco na tela. É o mesmo erro
-que o canvas cometeu com `staleTime: Infinity`, numa roupa diferente.
+vazia. É o mesmo erro que o canvas cometeu com `staleTime: Infinity`, em outra
+roupa (ver seção 9).
 
 **Texto puro do HTML com uma quebra por bloco.**
 `textContent` cola tudo: `<p>Título</p><p>Corpo</p>` virava "TítuloCorpo" e o
-título da nota saía grudado no primeiro parágrafo. Fechar cada bloco com `\n`
-antes de ler resolve sem varrer a árvore, que duplicaria texto de bloco
-aninhado.
+título da nota saía grudado no primeiro parágrafo.
 
-**`?download=` na URL do Storage em vez de `<a download>`.**
-O atributo `download` é **ignorado** pelo browser em link cross-origin — o arquivo
-abre na aba em vez de baixar. O Supabase Storage aceita `?download=<nome>` e
-responde com `Content-Disposition: attachment`, que funciona.
-
-**Teleprompter renderizado via `createPortal` no `document.body`.**
-`position: fixed` não cobria a tela: um ancestral com `transform` cria um bloco
-de contenção e o "fixo" passa a ser fixo *dentro dele*. Medido: `1440x880 em (0, 20)`.
-Depois do portal: `1440x900 em (0,0)`.
-
-**Estado do teleprompter no `CalendarPage`, não dentro do painel.**
-O overlay do Radix Sheet (`z-50`, `aria-hidden`) interceptava os cliques. O
-teleprompter agora **substitui** o painel e o restaura ao fechar.
+**`position: absolute` ancorado no painel, não `fixed`.**
+O painel anima com `transform`, e um ancestral com transform vira bloco de
+contenção — o "fixo" passa a ser fixo dentro dele. Foi o bug do teleprompter,
+resolvido com `createPortal` no `document.body`; e a razão de o bloco de notas
+nascer como filho direto do `SheetContent`.
 
 **`#variable_conflict use_variable` no `enviar_ajuste`.**
 Os parâmetros `texto` e `autor` tinham o mesmo nome das colunas. O PL/pgSQL
-resolvia para a coluna, e **o autor era gravado sempre nulo**. Pego por teste
-próprio: `autor gravado: (nulo)`.
+resolvia para a coluna e **o autor era gravado sempre nulo**.
 
 **Erro de banco traduzido em instrução.**
-Os códigos `42703`, `42P01`, `PGRST204` e `PGRST202` significam sempre a mesma
-coisa na prática: falta rodar a migração. Em vez de vazar o erro do Postgres, o
-app diz o que fazer — *"falta rodar `supabase/setup-completo.sql` no SQL Editor"*.
+`42703`, `42P01`, `PGRST204` e `PGRST202` significam sempre a mesma coisa: falta
+rodar a migração. O app diz o que fazer em vez de vazar o erro do Postgres.
+`413` e `415` viram instrução sobre limite e formato.
+
+**`UPDATE` sempre com `.select()` de volta.**
+Um UPDATE que não acerta nenhuma linha volta **sem erro** do Postgres —
+confirmado em banco local. Sem o retorno, a tela diz "Salvo" com nada gravado.
 
 **Tipos de linha como `type`, não `interface`.**
 O client do Supabase exige `Record<string, unknown>`. `interface` não ganha
-assinatura de índice implícita e quebra a tipagem inteira — todas as operações
-de tabela resolvem para `never`.
+assinatura de índice implícita e quebra a tipagem inteira.
 
 ---
 
 ## 9. Limites reais que testamos
 
-Estes números não são estimativa. Foram medidos ou lidos na documentação oficial.
-
-### Canva — o carrossel **não** importa sozinho
-Testado ao vivo na Connect API: exportamos 3 páginas de um carrossel real de 9,
-e o slide 1 voltou como PNG **1080×1350 (4:5), 1,99 MB**. Ou seja: a API funciona,
-uma página vira uma imagem, e o link expira em **~24 h** (`X-Amz-Expires=86953`).
-
-O bloqueio não é técnico, é comercial:
-
-- **Integração privada** (só sua conta) → exige **Canva Enterprise**
-- **Integração pública** → exige passar pela revisão da Canva
-
-Por isso seguimos com a opção manual: **botão para o link do Canva + check de
-visto** controlado pelo expert. Custo zero, sem dependência de plano e sem link
-que expira em um dia.
-
-Conta de armazenamento, se um dia a importação automática for ligada:
-1,99 MB por slide × 9 slides ≈ **18 MB por carrossel** → cerca de **55 carrossels**
-no 1 GB gratuito do Supabase. Exportar em JPG em vez de PNG muda essa conta
-por um fator grande.
-
-### Instagram — **não dá para agendar pela plataforma**
-A Content Publishing API **não tem parâmetro de agendamento**. Quem agenda é o
-app: ele guarda a data e publica na hora. Isso exige um servidor rodando —
-o frontend sozinho não faz.
-
-Outros limites que valem antes de qualquer decisão:
-
-- Publicar em conta **sua ou que você administra**: Standard Access, **sem App Review**
-- Publicar em conta **de cliente**: Advanced Access + App Review + verificação do negócio
-- Carrossel pela API: **máximo 10 itens** (a interface aceita 20)
-- A mídia precisa estar em **URL pública** — que o bucket `media` já fornece
+Não são estimativas: foram medidos ou lidos na documentação oficial.
 
 ### Supabase — o limite de upload que vale é o do projeto
 O tamanho máximo mora em três camadas e vale **sempre a menor**: o app (300 MB),
 o bucket (300 MB) e o **limite global do projeto**, que só muda no painel em
 *Storage → Settings → Global file size limit* e vem com **50 MB** de padrão.
 
-Confirmado na documentação: *"you can specify the maximum file size on a per
-bucket level but it can't be higher than this global limit"*.
-
 | Plano | Teto por arquivo |
 | --- | --- |
 | Free | **50 MB** |
 | Pro / Team | 500 GB |
 
-Consequência prática: **no plano Free um Reels de 178 MB não sobe**, com qualquer
+Consequência: **no plano Free um Reels de 178 MB não sobe**, com qualquer
 configuração. Não é limitação do app — é teto de plano.
 
+**Egress** é o limite mais esquecido: cada cliente que abre o preview baixa o
+vídeo. No Free são 5 GB/mês → **~28 aberturas** de um vídeo de 178 MB.
+
+### Canva — o carrossel não importa sozinho
+Testado ao vivo na Connect API: exportamos páginas de um carrossel real e cada
+slide voltou como **1080×1350 (4:5)** — 1,99 MB em PNG, **~290 KB em JPG q85**.
+Os links expiram em horas.
+
+O bloqueio não é técnico, é comercial: integração **privada** exige **Canva
+Enterprise**; **pública** exige passar pela revisão da Canva. Por isso a opção
+manual: botão com o link + check de visto. Custo zero.
+
+### Instagram — não dá para agendar pela plataforma
+A Content Publishing API **não tem parâmetro de agendamento**: quem agenda é o
+app, o que exige um servidor rodando. Publicar em conta própria usa Standard
+Access sem App Review; em conta de cliente exige Advanced Access + App Review +
+verificação do negócio. Carrossel pela API: **máximo 10 itens** (a interface
+aceita 20).
+
 ### Vercel
-- `VITE_*` é variável de **build**. Mudar o valor sem redeploy não muda nada no site.
-- O tipo precisa ser **Config**, não Secret — `VITE_` significa que o valor vai para o bundle público de qualquer forma.
-- **Deployment Protection** bloqueia *todas* as rotas, inclusive `/preview/:id`. Com ela ligada, o produto não existe.
+- `VITE_*` é variável de **build**: mudar sem redeploy não muda nada.
+- O tipo precisa ser **Config**, não Secret.
+- **Deployment Protection** bloqueia *todas* as rotas, inclusive `/preview/:id`.
 
 ---
 
@@ -485,19 +420,26 @@ configuração. Não é limitação do app — é teto de plano.
 ### 1. Banco
 Abra `supabase/setup-completo.sql`, **copie o conteúdo do arquivo** (Ctrl+A,
 Ctrl+C) e cole no SQL Editor do Supabase. Não cole o caminho do arquivo.
-Link direto para o conteúdo bruto:
 
 ```
 https://raw.githubusercontent.com/designerswisz3-byte/calendario/main/supabase/setup-completo.sql
 ```
 
-O script é **idempotente** — rodar duas vezes não quebra nada.
+O arquivo é **gerado** por `scripts/gerar-setup-completo.mjs` a partir das
+migrações, e é **idempotente**.
 
-> O Supabase avisa *"potential destructive operation"*. O arquivo foi conferido
-> linha a linha: **zero** `drop table`, `truncate`, `delete from`, `drop schema`
-> ou `drop column`. O que existe são `drop policy if exists` (25 das 27 são
-> recriadas na sequência; as 2 que não voltam são exatamente as políticas do
-> furo de segurança) e `drop trigger` seguido de recriação. Pode seguir.
+> **Atenção à transação.** O SQL Editor roda o script inteiro numa transação:
+> se a parte de Storage falhar com *"must be owner of table objects"*, **tudo é
+> desfeito**, inclusive as tabelas. Se isso acontecer, rode o script sem as
+> seções de Storage e crie os buckets pela interface: `media` como **Public** e
+> `canvas` como **privado**.
+>
+> Para conferir num segundo:
+> ```sql
+> select to_regclass('public.notas') as notas,
+>        to_regclass('public.calendar_items') as calendario,
+>        (select count(*) from storage.buckets where id in ('media','canvas')) as buckets;
+> ```
 
 ### 2. Frontend
 Na Vercel → Settings → Environment Variables:
@@ -515,7 +457,32 @@ Abra `/login`, crie a conta, crie um conteúdo em `/criar`, copie o link e abra
 
 ---
 
-## 11. Histórico
+## 11. Como isto é testado
+
+Esta seção existe porque três bugs seguidos escaparam do mesmo jeito: eu
+testava a camada que eu tinha escrito, com o banco falso, e os bugs estavam na
+**fronteira com o banco de verdade**.
+
+O harness de teste sobe, localmente:
+
+1. **Postgres 16** com `auth.users`, `auth.uid()` e as migrações aplicadas
+2. **PostgREST** com um JWT assinado, falando a mesma API do Supabase
+3. Um **proxy** de 30 linhas mapeando `/rest/v1/*` para a raiz do PostgREST
+4. A página **real**, com os hooks de produção — só o `useAuth` é falso
+5. **Playwright** dirigindo um Chromium de verdade
+
+As asserções que importam **olham o que o usuário olha**:
+
+- contagem de **pixels desenhados no canvas**, não linhas no banco
+- o **HTML dentro do editor**, não a resposta da API
+- o conteúdo depois de **trocar de tela sem F5**, que é o caminho que o usuário usa e o F5 não cobre
+
+Foi assim que apareceram, antes de subir: o título grudado no parágrafo, o
+editor montando vazio ao trocar de nota, e o cache servindo a nota velha.
+
+---
+
+## 12. Histórico
 
 | # | Commit | O que entrou |
 | --- | --- | --- |
@@ -525,61 +492,93 @@ Abra `/login`, crie a conta, crie um conteúdo em `/criar`, copie o link e abra
 | 4 | `19e26ac` | ferramenta de criação e link público do post |
 | 5 | `7f421aa` | calendário mensal, painel do dia e integração com a criação |
 | 6 | `67be54f` | README e configuração de deploy |
-| 7 | `e693ed9` | `config.toml` e documentação da integração com o GitHub |
+| 7 | `e693ed9` | `config.toml` e a integração com o GitHub |
 | 8 | `bde765f` | **correção de segurança**: leitura pública passa a exigir o id |
 | 9 | `3e9b5c5` | servidor MCP do Supabase no escopo do projeto |
 | 10 | `46d65ad` | remoção da tela de login em favor de sessão anônima |
 | 11 | `d2e0c3b` | **revertido**: volta a tela de login + `setup-completo.sql` |
 | 12 | `3a82d31` | até 20 mídias por conteúdo, misturando imagem e vídeo |
 | 13 | `dae65cc` | carrossel respeita a proporção da arte; vídeo até 300 MB |
-| 14 | `6a6db05` | botão AJUSTES no link público, com retorno visível para o dono |
+| 14 | `6a6db05` | botão AJUSTES no link público |
 | 15 | `d093e8b` | som, linha do tempo e volume no preview |
 | 16 | `425e472` | legenda do reels sai de cima do vídeo; painel do dia arrastável |
 | 17 | `813f00b` | separa briefing de roteiro e adiciona o teleprompter |
 | 18 | `839bfb9` | abas sempre acessíveis e erro de migração que se explica |
-| 19 | `a01f996` | link do Canva no preview do expert, com visto que ele controla |
+| 19 | `a01f996` | link do Canva no preview, com visto que o expert controla |
 | 20 | `427724c` | botão para baixar as mídias no link público |
+| 21 | `8049a12` | este documento |
+| 22 | `828c970` | upload resumável para vídeos grandes, com progresso |
+| 23 | `6504249` | bloco de notas ao lado do painel do dia |
+| 24 | `49d977e` | item se chama pelo briefing; mês mostra passado/hoje/futuro |
+| 25 | `e1f2dd3` | aba Canvas, um quadro infinito |
+| 26 | `245b7a4` | **fix**: laço de salvamento que deixava a tela preta |
+| 27 | `f2cfccf` | **fix**: gravação silenciosa e nota do tamanho do texto |
+| 28 | `72ef31e` | **fix**: voltar para a tela montava o quadro vazio e apagava o trabalho |
+| 29 | `9d5be92` | aba **Notas**, estilo Apple + ligações estilo Obsidian |
 
-Os commits 10 e 11 são o mesmo pedido em duas direções — tirar o login e depois
-voltar atrás. Ficam no histórico porque a reversão é informação: a sessão anônima
-funcionava, mas some quando o cliente limpa o navegador, e conteúdo de cliente
-não pode depender disso.
+Os commits 10 e 11 são o mesmo pedido em duas direções — tirar o login e voltar
+atrás. Ficam no histórico porque a reversão é informação: a sessão anônima
+funcionava, mas some quando o cliente limpa o navegador.
+
+Os commits 25–28 são a aba Canvas inteira: nascimento, três correções e, no
+29, substituição pelas Notas. O que sobreviveu dela foi o desenho (agora dentro
+da nota), o bucket privado e as três lições de cache que a seção 8 registra.
 
 ---
 
-## 12. O que não existe (e o que custaria)
+## 13. O que não existe (e o que custaria)
 
 | Ideia | Situação | O que travaria |
 | --- | --- | --- |
-| Importar carrossel do Canva automaticamente | **não** | exige Canva Enterprise (privada) ou revisão da Canva (pública) |
-| Agendar post no Instagram | **não** | a API não agenda; exige servidor rodando + App Review para contas de cliente |
+| Grafo visual das notas | **não** | a navegação real acontece pelos dois painéis de ligação; o grafo é a parte cara e menos usada |
+| Importar carrossel do Canva automaticamente | **não** | exige Canva Enterprise ou revisão da Canva |
+| Agendar post no Instagram | **não** | a API não agenda; exige servidor + App Review para contas de cliente |
+| Imagens dentro do desenho | não | o desenho salva as formas, não os arquivos colados nele |
+| Renomear nota sem quebrar ligações | não | a ligação é por título — é o preço da escrita sem fricção |
 | Aprovar/reprovar com um clique no link público | não | hoje o retorno é texto livre em AJUSTES |
 | Notificação quando o cliente responde | não | exige e-mail transacional ou webhook |
-| Mais de um usuário por conta / times | não | a RLS hoje é por `auth.uid()`, um dono por linha |
+| Times / mais de um usuário por conta | não | a RLS é por `auth.uid()`, um dono por linha |
 | Métricas do post publicado | não | exige Instagram Graph API + vínculo da conta |
 
 ---
 
-## 13. Estrutura de arquivos
+## 14. Estrutura de arquivos
 
 ```
 src/
 ├── components/
 │   ├── auth/       AuthProvider, ProtectedRoute
-│   ├── calendar/   MonthGrid, DayCell, DayPanel, CalendarItemForm, Teleprompter,
-│   │               AjustesDoCliente, ListView, AgendaView, FiltersBar, TagPicker…
-│   ├── layout/     AppShell, ThemeToggle, SupabaseSetupNotice
+│   ├── calendar/   MonthGrid, DayCell, DayPanel, CalendarItemForm, BlocoDeNotas,
+│   │               Teleprompter, AjustesDoCliente, ListView, AgendaView, FiltersBar…
+│   ├── layout/     AppShell, ErrorBoundary, ThemeToggle, SupabaseSetupNotice
+│   ├── notas/      EditorDeNota, DesenhoDaNota, PainelDeLigacoes
 │   ├── preview/    InstagramPreview, InstagramCarousel, InstagramReel, VideoPlayer,
 │   │               MediaUploader, AjustesPanel, CanvaPanel, DownloadPanel…
 │   └── ui/         shadcn/ui escritos à mão sobre Radix
-├── hooks/          useCalendarItems, useContentPreviews, useAjustes, useMediaUpload,
-│                   useLarguraPainel, useTags, useTheme, queryKeys
-├── lib/            supabase, date, constants, zip, download, utils
-├── pages/          CalendarPage, CreatePage, PublicPreviewPage, LoginPage, NotFoundPage
+├── hooks/          useNotas, useCalendarItems, useContentPreviews, useAjustes,
+│                   useMediaUpload, useLarguraPainel, useTags, useTheme, queryKeys
+├── lib/            supabase, date, constants, texto, zip, download, tusUpload,
+│                   notasAnexos, notasLinks, utils
+├── pages/          NotasPage, CalendarPage, CreatePage, PublicPreviewPage,
+│                   LoginPage, NotFoundPage
 └── types/          database.ts
 
+scripts/
+├── copiar-fontes-excalidraw.mjs   roda no predev/prebuild
+└── gerar-setup-completo.mjs       regenera o SQL consolidado
+
 supabase/
-├── migrations/     7 migrações, em ordem
-├── setup-completo.sql   as 7 concatenadas — é este que se roda no SQL Editor
+├── migrations/     9 migrações, em ordem
+├── setup-completo.sql   gerado — é este que se roda no SQL Editor
 └── config.toml
 ```
+
+### Comandos
+
+| Comando | O quê |
+| --- | --- |
+| `npm run dev` | sobe o Vite (copia as fontes antes) |
+| `npm run build` | typecheck + build de produção |
+| `npm run lint` | só o typecheck |
+| `npm run fontes` | copia as fontes do Excalidraw para `public/fonts` |
+| `node scripts/gerar-setup-completo.mjs` | regenera o SQL consolidado |
