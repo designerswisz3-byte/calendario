@@ -96,7 +96,7 @@ Em **Project Settings → API**, copie a URL e a chave `anon` — elas vão no `
 
 E em **Authentication → URL Configuration**, coloque a URL da Vercel em *Site URL*, senão o link de confirmação de e-mail aponta para `localhost`.
 
-E em **Storage → Settings**, suba o *Global file size limit* para **500 MB**. Esse é o limite que realmente vale: o do bucket não consegue passar dele, e o padrão é 50 MB — o suficiente para recusar qualquer vídeo de Reels um pouco mais longo.
+E em **Storage → Settings**, suba o *Global file size limit* para **300 MB**. Esse é o limite que realmente vale: o do bucket não consegue passar dele, e o padrão é 50 MB — o suficiente para recusar qualquer vídeo de Reels um pouco mais longo.
 
 > **No plano Free o teto é 50 MB por arquivo** e nenhuma configuração passa por cima disso. Vídeo acima disso exige plano pago (no Pro o teto é 500 GB). Ver [Limites de upload](#limites-de-upload).
 
@@ -215,11 +215,11 @@ O limite de tamanho existe em **três lugares**, e vale sempre o menor deles:
 
 | Camada | Onde | Valor | Muda como |
 | --- | --- | --- | --- |
-| App | `MAX_VIDEO_SIZE_MB` em `src/lib/constants.ts` | **500 MB** | editando o código |
-| Bucket | `storage.buckets.file_size_limit` | **500 MB** | migração `...001100` |
+| App | `MAX_VIDEO_SIZE_MB` em `src/lib/constants.ts` | 300 MB | editando o código |
+| Bucket | `storage.buckets.file_size_limit` | 300 MB | migração `...000400` |
 | **Projeto** | **Storage → Settings → Global file size limit** | **padrão 50 MB** | **só no painel** |
 
-Os dois primeiros já estão em 500 MB. **Quem recusa o upload é o terceiro** — e ele não se resolve por SQL nem por deploy.
+Os dois primeiros já estão em 300 MB. **Quem recusa o upload é o terceiro** — e ele não se resolve por SQL nem por deploy.
 
 | Plano | Teto por arquivo |
 | --- | --- |
@@ -317,7 +317,7 @@ O upload sempre aceita as 20; quem decide quantas aparecem é o formato. Carross
 
 **Proporção do preview.** A moldura do carrossel assume a proporção real da primeira mídia, como o Instagram faz — e não um quadrado fixo. Sem isso, uma arte 4:5 (o formato mais comum de carrossel) perdia topo e base, justamente onde costuma ficar a chamada final. O intervalo é o que o Instagram aceita de fato, de 1.91:1 a 4:5; arte mais alta que isso ele corta mesmo, e o preview mostra o corte em vez de mentir que cabe.
 
-**Limite de upload.** Imagem até 10 MB, vídeo até 500 MB. O número vive em três lugares que precisam concordar: o app (`MAX_VIDEO_SIZE_MB`), o bucket (migração `20260914001100`) e o teto do plano do Supabase. Esse último não se resolve por SQL — no plano Free o limite por arquivo é de 50 MB, e nenhuma configuração de bucket passa por cima.
+**Limite de upload.** Imagem até 10 MB, vídeo até 300 MB. O número vive em três lugares que precisam concordar: o app (`MAX_VIDEO_SIZE_MB`), o bucket (migração `20260914000400`) e o teto do plano do Supabase. Esse último não se resolve por SQL — no plano Free o limite por arquivo é de 50 MB, e nenhuma configuração de bucket passa por cima.
 
 **Code splitting.** As rotas são lazy. O link público não baixa o bundle do calendário para renderizar um post.
 
