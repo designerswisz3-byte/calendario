@@ -266,16 +266,16 @@ pausar e continuar (espaço ou K), voltar ao início (R), espelhar o texto (M) e
 velocidade de primeira, e parar para reconfigurar no meio da gravação é perder
 a tomada. Fecha e devolve o painel do dia exatamente como estava.
 
-### `/canvas`
-Quadro infinito para a etapa que vinha antes do calendário: pensar. Notas com
-título e conteúdo, desenho à mão livre, formas, setas, texto e imagem, com pan
-e zoom livres. Salva sozinho.
+### `/notas`
+Caderno no estilo do Notas da Apple, com ligações no estilo do Obsidian.
+Substituiu a aba Canvas. Lista à esquerda só com títulos, editor rico à
+direita (TipTap), imagens por colar/arrastar, desenho por nota e ligações
+`[[por título]]` com retroligação automática.
 
-A nota é **duas caixas empilhadas** (título em cima, conteúdo embaixo), cada uma
-com texto *vinculado* ao seu retângulo. Não é enfeite: texto solto no Excalidraw
-cresce para a direita e vaza para fora do cartão no primeiro parágrafo. Texto
-vinculado quebra na largura do container — é o comportamento nativo, e o único
-que sobrevive a alguém colar um briefing dentro da nota.
+A ligação é **por título, não por id**: dá para citar um tema antes de a nota
+existir — que é exatamente como o Obsidian é usado. O preço é que renomear
+quebra as ligações para aquela nota; em troca, escrever não exige parar para
+escolher um identificador.
 
 ### `/criar`
 Nome do expert, legenda com contador de **2.200 caracteres** (o limite real do
@@ -370,6 +370,26 @@ Sem `EXCALIDRAW_ASSET_PATH` apontando para a nossa origem, o canvas busca fonte
 num CDN de terceiro — o app passa a depender de outro domínio para desenhar
 texto. O pacote traz 14 MB de fontes, e **13 MB são a Xiaolai** (chinesa). O
 script copia as outras oito: 516 KB em vez de 14 MB por deploy.
+
+**O editor da nota remonta pela `key`, não pelas deps do TipTap.**
+`useEditor` cria o gerenciador da instância uma vez só, num `useState`. Trocar
+o array de dependências não garante que o `content` novo seja aplicado — abrir
+outra nota montava o editor vazio com o conteúdo certo em mãos. Remontar o
+componente inteiro pela `key` é o caminho do React e não depende do que a
+biblioteca faz por dentro.
+
+**A nota nunca vem do cache (`gcTime: 0`).**
+Trocar de nota muda a chave da consulta, e o React Query entrega na hora o que
+tiver guardado — que podia ser a versão de quando a nota foi criada, ainda
+vazia. O editor montava com ela e a resposta fresca chegava depois sem
+remontar nada: nota cheia no banco, editor em branco na tela. É o mesmo erro
+que o canvas cometeu com `staleTime: Infinity`, numa roupa diferente.
+
+**Texto puro do HTML com uma quebra por bloco.**
+`textContent` cola tudo: `<p>Título</p><p>Corpo</p>` virava "TítuloCorpo" e o
+título da nota saía grudado no primeiro parágrafo. Fechar cada bloco com `\n`
+antes de ler resolve sem varrer a árvore, que duplicaria texto de bloco
+aninhado.
 
 **`?download=` na URL do Storage em vez de `<a download>`.**
 O atributo `download` é **ignorado** pelo browser em link cross-origin — o arquivo

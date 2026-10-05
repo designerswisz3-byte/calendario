@@ -85,6 +85,23 @@ export type CanvasDados = {
   imagens?: CanvasImagens
 }
 
+export type NotaRow = {
+  id: string
+  user_id: string
+  /** Primeira linha do conteúdo, como no Notas da Apple. */
+  titulo: string
+  /** HTML do editor. Imagens entram como `src="anexo:<caminho>"`. */
+  conteudo: string
+  /** Cena do Excalidraw do desenho desta nota. */
+  desenho: CanvasDados | null
+  imagens: CanvasImagens
+  criado_em: string
+  atualizado_em: string
+}
+
+/** O que a lista precisa — sem puxar o corpo de cada nota. */
+export type NotaResumo = Pick<NotaRow, 'id' | 'titulo' | 'atualizado_em'>
+
 export type CanvasBoardRow = {
   id: string
   user_id: string
@@ -186,6 +203,23 @@ export interface Database {
         Row: CalendarItemTagRow
         Insert: CalendarItemTagRow
         Update: Partial<CalendarItemTagRow>
+        Relationships: []
+      }
+      notas: {
+        Row: NotaRow
+        Insert: Omit<
+          NotaRow,
+          'id' | 'criado_em' | 'atualizado_em' | 'titulo' | 'conteudo' | 'desenho' | 'imagens'
+        > & {
+          id?: string
+          titulo?: string
+          conteudo?: string
+          desenho?: CanvasDados | null
+          imagens?: CanvasImagens
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<NotaRow, 'id' | 'user_id'>>
         Relationships: []
       }
       canvas_boards: {

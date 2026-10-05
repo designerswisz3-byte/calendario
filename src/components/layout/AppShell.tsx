@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { CalendarDays, LayoutDashboard, LogOut, Sparkles } from 'lucide-react'
+import { CalendarDays, LogOut, NotebookPen, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useAuth } from '@/components/auth/AuthProvider'
@@ -19,8 +19,8 @@ interface Props {
   children: React.ReactNode
   /**
    * Ocupa a janela inteira, sem a coluna central nem o respiro das outras
-   * telas. O canvas é um espaço infinito: enquadrá-lo em 7xl com padding
-   * seria desenhar dentro de uma caixa.
+   * telas. As Notas usam duas colunas que vão até a borda; enquadrá-las em
+   * 7xl com padding encolheria a área de escrita sem motivo.
    */
   telaCheia?: boolean
 }
@@ -58,9 +58,9 @@ export function AppShell({ children, telaCheia = false }: Props) {
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Criar conteúdo</span>
             </NavLink>
-            <NavLink to="/canvas" className={navLinkClass}>
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Canvas</span>
+            <NavLink to="/notas" className={navLinkClass}>
+              <NotebookPen className="h-4 w-4" />
+              <span className="hidden sm:inline">Notas</span>
             </NavLink>
           </nav>
 

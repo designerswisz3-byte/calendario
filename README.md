@@ -185,20 +185,23 @@ Velocidade, fonte e espelhamento ficam guardados no navegador. Os controles some
 
 O teleprompter **substitui** o painel do dia em vez de conviver com ele: o overlay modal do Sheet bloquearia os cliques dos controles. Ao fechar, o painel volta no mesmo dia.
 
-## Canvas
+## Notas
 
-Aba `/canvas`: um quadro infinito (estilo Miro) para pensar antes de planejar. Notas com título e conteúdo, desenho à mão, formas, setas, texto e upload de imagem — tudo com pan e zoom livres.
+Aba `/notas`: caderno no estilo do Notas da Apple, com ligações no estilo do Obsidian.
+
+- Lista à esquerda com **apenas o título** de cada nota — o título é a primeira linha do texto, como no app da Apple.
+- Editor com negrito, itálico, riscado, títulos, listas e **lista de tarefas**.
+- **Imagens** por botão, arrastar ou colar (Ctrl+V de um print).
+- **Desenho** por nota, numa seção que abre só quando usada.
+- **`[[Título da outra nota]]`** cria a ligação. O painel mostra as duas direções: o que esta nota cita e **quem cita esta nota** — a retroligação aparece sozinha, sem ninguém criar o caminho de volta.
 
 | Onde mora | O quê |
 | --- | --- |
-| `canvas_boards.dados` (jsonb) | elementos da cena + posição/zoom da câmera |
-| bucket `canvas` (**privado**) | as imagens, uma por arquivo |
+| `notas.conteudo` | HTML do editor; imagens entram como `src="anexo:<caminho>"` |
+| `notas.desenho` (jsonb) | cena do Excalidraw daquela nota |
+| bucket `canvas` (**privado**) | os arquivos de imagem |
 
-A separação é o que mantém o autosave barato: imagem colada vira base64, e base64 dentro do jsonb faria cada gravação reescrever megabytes. O jsonb guarda só o caminho.
-
-O bucket é **privado**, ao contrário do `media`: o canvas é material interno (referência de concorrente, print de conversa), e não deveria ser legível por quem tiver a URL.
-
-As fontes do Excalidraw são servidas por nós — `npm run fontes` copia para `public/fonts`, e `predev`/`prebuild` chamam sozinhos. Sem isso o canvas buscaria fontes num CDN de terceiro.
+A imagem nunca fica embutida no conteúdo: base64 faria cada autosave reescrever megabytes, e URL assinada expiraria dentro do texto salvo. O HTML guarda o caminho; a URL assinada é gerada na hora de exibir.
 
 ---
 

@@ -7,4 +7,7 @@ export const queryKeys = {
   ajustes: (previewId: string) => ['ajustes', previewId] as const,
   tags: () => ['tags'] as const,
   canvas: (nome: string) => ['canvas', nome] as const,
+  notas: () => ['notas'] as const,
+  nota: (id: string) => ['nota', id] as const,
+  notasLigacoes: () => ['notas', 'ligacoes'] as const,
 }

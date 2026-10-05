@@ -12,8 +12,8 @@ import { isSupabaseConfigured } from '@/lib/supabase'
  * então ele não deve baixar o bundle do calendário para renderizar um post.
  */
 const CalendarPage = React.lazy(() => import('@/pages/CalendarPage'))
-/** O bundle do Excalidraw é grande; só carrega para quem abre a aba Canvas. */
-const CanvasPage = React.lazy(() => import('@/pages/CanvasPage'))
+/** Editor e desenho são bundles grandes; só carregam para quem abre Notas. */
+const NotasPage = React.lazy(() => import('@/pages/NotasPage'))
 const CreatePage = React.lazy(() => import('@/pages/CreatePage'))
 const LoginPage = React.lazy(() => import('@/pages/LoginPage'))
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'))
@@ -33,8 +33,8 @@ function RouteFallback() {
  *
  * O ErrorBoundary fica DENTRO do AppShell de propósito: se uma tela quebrar, o
  * cabeçalho e a navegação continuam de pé e dá para sair dali sem recarregar.
- * Fora do AppShell, o erro levaria o menu junto — que é como o canvas
- * conseguiu deixar a tela preta.
+ * Fora do AppShell, o erro levaria o menu junto — que foi como uma tela
+ * sozinha já conseguiu deixar o app inteiro preto.
  */
 function RotaPrivada({
   children,
@@ -90,10 +90,10 @@ export default function App() {
           }
         />
         <Route
-          path="/canvas"
+          path="/notas"
           element={
             <RotaPrivada telaCheia>
-              <CanvasPage />
+              <NotasPage />
             </RotaPrivada>
           }
         />

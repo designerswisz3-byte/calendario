@@ -239,3 +239,100 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================================
+   Editor das Notas (TipTap)
+   ----------------------------------------------------------------------------
+   O editor é "headless": ele entrega a estrutura e nada de estilo. Sem isto,
+   título, lista e checkbox saem todos como parágrafo cru.
+   ========================================================================== */
+@layer components {
+  .prose-notas {
+    @apply text-[0.95rem] leading-relaxed text-foreground;
+  }
+
+  .prose-notas > * + * {
+    @apply mt-3;
+  }
+
+  .prose-notas h2 {
+    @apply mt-5 text-xl font-semibold tracking-tight first:mt-0;
+  }
+
+  .prose-notas h3 {
+    @apply mt-4 text-base font-semibold;
+  }
+
+  .prose-notas ul,
+  .prose-notas ol {
+    @apply pl-5;
+  }
+
+  .prose-notas ul {
+    @apply list-disc;
+  }
+
+  .prose-notas ol {
+    @apply list-decimal;
+  }
+
+  .prose-notas li > p {
+    @apply my-0;
+  }
+
+  .prose-notas blockquote {
+    @apply border-l-2 border-border pl-3 text-muted-foreground;
+  }
+
+  .prose-notas code {
+    @apply rounded bg-foreground/10 px-1 py-0.5 font-mono text-[0.85em];
+  }
+
+  .prose-notas pre {
+    @apply overflow-x-auto rounded-lg bg-foreground/[0.07] p-3 font-mono text-[0.82rem];
+  }
+
+  .prose-notas pre code {
+    @apply bg-transparent p-0;
+  }
+
+  .prose-notas hr {
+    @apply border-border;
+  }
+
+  /* Imagem colada na nota: nunca estoura a largura da coluna. */
+  .prose-notas img {
+    @apply my-3 max-w-full rounded-lg border border-border/60;
+  }
+
+  .prose-notas img.ProseMirror-selectednode {
+    @apply ring-2 ring-primary;
+  }
+
+  /* Lista de tarefas, como a do Notas da Apple. */
+  .prose-notas ul[data-type='taskList'] {
+    @apply list-none pl-0;
+  }
+
+  .prose-notas ul[data-type='taskList'] li {
+    @apply flex items-start gap-2;
+  }
+
+  .prose-notas ul[data-type='taskList'] li > label {
+    @apply mt-0.5 flex items-center;
+  }
+
+  .prose-notas ul[data-type='taskList'] input[type='checkbox'] {
+    @apply h-4 w-4 cursor-pointer accent-primary;
+  }
+
+  .prose-notas ul[data-type='taskList'] li[data-checked='true'] > div {
+    @apply text-muted-foreground line-through;
+  }
+
+  /* Texto de ajuda do editor vazio. */
+  .prose-notas p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    @apply pointer-events-none float-left h-0 text-muted-foreground;
+  }
+}
