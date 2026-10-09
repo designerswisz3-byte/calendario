@@ -28,6 +28,9 @@ interface Props {
  * Montado por portal no `document.body` porque a página vive dentro de
  * contêineres com `overflow` e `transform`; nascer lá dentro significaria ser
  * recortado justamente na hora de imprimir.
+ *
+ * A classe `area-de-impressao` é o que a regra de @media print procura para
+ * esconder o app em volta — é compartilhada com a impressão do Relatório.
  */
 export function ImpressaoDaNota({ conteudo, onConcluido }: Props) {
   const areaRef = React.useRef<HTMLDivElement>(null)
@@ -66,7 +69,7 @@ export function ImpressaoDaNota({ conteudo, onConcluido }: Props) {
   if (!conteudo) return null
 
   return createPortal(
-    <div ref={areaRef} className="impressao-da-nota" aria-hidden>
+    <div ref={areaRef} className="area-de-impressao impressao-da-nota" aria-hidden>
       <h1>{conteudo.titulo || 'Nota sem título'}</h1>
       <p className="impressao-data">
         {new Date(conteudo.atualizadoEm).toLocaleDateString('pt-BR', {

@@ -15,6 +15,8 @@ const CalendarPage = React.lazy(() => import('@/pages/CalendarPage'))
 /** Editor e desenho são bundles grandes; só carregam para quem abre Notas. */
 const NotasPage = React.lazy(() => import('@/pages/NotasPage'))
 const CreatePage = React.lazy(() => import('@/pages/CreatePage'))
+/** Dashboard de métricas — tabela larga e impressão própria, carrega sob demanda. */
+const RelatorioPage = React.lazy(() => import('@/pages/RelatorioPage'))
 const LoginPage = React.lazy(() => import('@/pages/LoginPage'))
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'))
 const PublicPreviewPage = React.lazy(() => import('@/pages/PublicPreviewPage'))
@@ -86,6 +88,14 @@ export default function App() {
           element={
             <RotaPrivada>
               <CalendarPage />
+            </RotaPrivada>
+          }
+        />
+        <Route
+          path="/relatorio"
+          element={
+            <RotaPrivada>
+              <RelatorioPage />
             </RotaPrivada>
           }
         />

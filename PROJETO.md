@@ -1,4 +1,4 @@
-# Projeto: Calendário Editorial + Preview + Notas
+# Projeto: Calendário Editorial + Preview + Notas + Relatório
 
 Registro completo do que foi construído: o produto, as decisões, os limites
 reais que testamos e o que ficou de fora. O `README.md` responde *como rodar*.
@@ -6,8 +6,8 @@ Este documento responde *o que existe e por quê* — é o documento de handover
 
 - **Repositório:** `designerswisz3-byte/calendario`
 - **Branches:** `main` e `claude/criacao-pdf-q9fjoh` (mantidas idênticas)
-- **Commits:** 29
-- **Migrações SQL:** 9 (consolidadas em `supabase/setup-completo.sql`)
+- **Commits:** 30
+- **Migrações SQL:** 11 (consolidadas em `supabase/setup-completo.sql`)
 
 ---
 
@@ -48,6 +48,7 @@ Funcionando e no ar:
 - Botão **AJUSTES** — o cliente escreve sem limite de caracteres
 - Botão do **Canva** com **visto** que o expert marca e desmarca
 - Botão **DOWNLOAD DE MÍDIA** — arquivo único ou tudo em `.zip`
+- **Relatório**: arquivo mês a mês e semana a semana de métricas de perfil, com comparativo e PDF
 - **ErrorBoundary por rota**: uma tela quebrada não derruba o app inteiro
 
 Dependências de ambiente (fora do código):
@@ -113,13 +114,14 @@ baixa o bundle do calendário, do editor nem do desenho para desenhar um post.
 | `/notas` | privada | caderno com texto, imagem, desenho e ligações |
 | `/calendario` | privada | mês, painel do dia, briefing, roteiro, teleprompter |
 | `/criar` | privada | monta o conteúdo e gera o link |
+| `/relatorio` | privada | métricas mensais/semanais, comparativo e exportação em PDF |
 | `*` | — | 404 |
 
 ---
 
 ## 5. Modelo de dados
 
-Sete tabelas em uso.
+Nove tabelas em uso.
 
 ### `notas` — o caderno
 `id`, `user_id`, `titulo`, `conteudo`, `desenho` (jsonb), `imagens` (jsonb),
@@ -166,6 +168,31 @@ sem isso o carrossel misto não saberia o que renderizar em cada slide.
 
 Sem limite de caracteres. **Não tem política de INSERT** — e isso é intencional
 (ver seção 6).
+
+### `relatorio_perfis` e `relatorio_metricas_diarias` — o arquivo de métricas
+
+`relatorio_perfis`: `id`, `user_id`, `rede`, `handle` (sem "@"), `nome`,
+`fonte`. Único por `(user_id, rede, handle)`.
+
+`relatorio_metricas_diarias`: `perfil_id`, `dia` (date), `seguidores`,
+`seguidores_ganhos`, `alcance`, `views`, `likes`, `comentarios`,
+`salvamentos`, `compartilhamentos`, `interacoes`, `cliques_no_link`,
+`publicacoes`, `fonte`. Único por `(perfil_id, dia)`.
+
+Duas decisões sustentam a aba:
+
+1. **O grão é o dia, não o mês.** Mensal, semanal e qualquer comparativo saem
+   de uma soma sobre dias; o contrário não vale — de um total mensal não se
+   extrai a semana.
+2. **Toda métrica é nullable, e `null` não é zero.** `null` = "não temos este
+   dia"; `0` = "a fonte devolveu zero". Misturar os dois produz gráfico que
+   mente para baixo: um mês com 15 dias coletados apareceria com metade do
+   alcance real. Cada período carrega quantos dias dele têm dado, e a tela
+   mostra a cobertura em vez de interpolar.
+
+As métricas não têm `user_id`: o dono é o perfil, e a RLS as alcança por
+`exists (select 1 from relatorio_perfis ...)`. Duas fontes de verdade para a
+mesma propriedade é como nasce a linha órfã que escapa da política.
 
 ### `canvas_boards` — órfã, de propósito
 Sobrou da aba Canvas, que saiu do projeto. **Não foi apagada**: `drop table` é
@@ -240,6 +267,38 @@ A ligação é **por título, não por id**: dá para citar um tema antes de a n
 existir — que é exatamente como o Obsidian é usado. O preço é que renomear
 quebra as ligações para aquela nota; em troca, escrever não exige parar para
 escolher um identificador.
+
+### `/relatorio`
+
+Duas colunas de informação, uma granularidade por vez.
+
+- **Perfil** no topo: vários perfis convivem (`@euraphaelaraujo`,
+  `@swiszoficial`), cada um com o próprio arquivo.
+- **Mensal / Semanal**: a semana é ISO-8601 (começa na segunda; a semana
+  pertence ao ano em que cai a quinta-feira dela).
+- **Cartões** com o número do período em foco e a variação contra o período
+  imediatamente anterior da mesma série.
+- **Barras** por período, clicáveis: clicar troca o foco dos cartões. Barra
+  listrada = período com dias sem coleta. Traço vazado = nenhum dado — nunca
+  uma barra de altura zero, que se leria como queda real.
+- **Tabela** com o arquivo inteiro, incluindo a coluna `dias` (coletados / do
+  período) — é ela que diz se o resto da linha pode ser lido.
+- **Exportar PDF** pelo motor de impressão do navegador, como nas Notas.
+
+Três proteções contra o número que mente:
+
+- quando os dois períodos comparados têm cobertura diferente em mais de um
+  dia, o percentual sai em cinza e a tela avisa em vez de pintar de vermelho;
+- `seguidores` é **estoque**, não fluxo: o período usa o primeiro e o último
+  snapshot, nunca a soma (somar seguidores de 30 dias daria 15 mil seguidores
+  num perfil de 500);
+- divisão por zero não vira percentual: de 0 para 50 a tela mostra `+50`.
+
+**De onde vêm os dados.** O app roda no navegador, então não pode guardar o
+token de página da Meta — quem abrisse o DevTools teria a conta. A entrada é
+por importação (CSV ou JSON, uma linha por dia), com `upsert` em
+`(perfil_id, dia)`: reimportar o mesmo mês corrige os dias em vez de duplicar
+o período. A tela mostra o que vai entrar antes de gravar.
 
 ### `/calendario`
 Grade do mês com os itens em cada dia. Arrastar um card move o item de data
@@ -437,6 +496,32 @@ Access sem App Review; em conta de cliente exige Advanced Access + App Review +
 verificação do negócio. Carrossel pela API: **máximo 10 itens** (a interface
 aceita 20).
 
+### Métricas de perfil — nenhum conector disponível entrega `@euraphaelaraujo`
+
+Verificado por chamada, não por memória, em 09/10/2026:
+
+- **Algrow** é inteligência de **YouTube**. `resolve_handle('@euraphaelaraujo')`
+  responde 404 ("não é um canal"), e `get_channel_daily_analytics` exige um
+  `UC…` de 24 caracteres. O que ele faz com Instagram é **por vídeo**
+  (`analyze_video`, `download_video`, `fetch_transcript`) — análise de
+  conteúdo, não métrica de conta. Não serve de fonte para o Relatório.
+- **Swisz** entrega métricas de Instagram de verdade (`swisz_insta_resumo`,
+  `swisz_insta_evolucao`, `swisz_insta_ranking`), mas está fixo em
+  **`@swiszoficial`**: as ferramentas não têm parâmetro de perfil.
+- **InsightfulPipe** não está instalado. **Windsor.ai** aparece como conexão
+  incompleta.
+
+Além disso, conector é ferramenta **desta sessão**, não do app publicado: a
+tela na Vercel só enxerga o Supabase. Por isso o Relatório lê do banco e a
+entrada é por importação — qualquer fonte que produza uma linha por dia serve,
+e trocar de fonte não mexe na tela.
+
+**Seguidores não voltam.** `swisz_insta_evolucao` só tem `seguidores` a partir
+de 16/09/2026; antes disso o coletor não rodava e a Meta **não devolve
+seguidores retroativo**. "Todos os meses arquivados" só existe a partir do dia
+em que alguém começa a arquivar — é exatamente por isso que o Relatório mostra
+a cobertura de cada período em vez de preencher o buraco.
+
 ### Vercel
 - `VITE_*` é variável de **build**: mudar sem redeploy não muda nada.
 - O tipo precisa ser **Config**, não Secret.
@@ -506,8 +591,27 @@ As asserções que importam **olham o que o usuário olha**:
 - o **HTML dentro do editor**, não a resposta da API
 - o conteúdo depois de **trocar de tela sem F5**, que é o caminho que o usuário usa e o F5 não cobre
 
+- o **texto extraído do PDF** com `pdftotext`, não o HTML que gerou o PDF
+- o número na tela conferido contra uma **soma independente** dos dados de
+  origem, nunca contra a mesma função que a tela usou para calcular
+
 Foi assim que apareceram, antes de subir: o título grudado no parágrafo, o
 editor montando vazio ao trocar de nota, e o cache servindo a nota velha.
+
+**No Relatório**, com 100 dias de dados reais de `@swiszoficial` (julho a
+outubro de 2026, com o buraco real de seguidores antes de 16/09) e 49
+asserções, o teste pegou quatro coisas que o typecheck não pegaria:
+
+1. `paraNumero('muitas')` devolvia **0** — a limpeza de caracteres deixava
+   string vazia e `Number('')` é zero. Texto lixo entrava no banco como um dia
+   de zero, que a agregação somaria como coleta real.
+2. O rodapé dizia "Fonte dos dados: **manual**" depois de uma importação
+   vinda do coletor — lia o campo do cadastro do perfil em vez da fonte das
+   linhas.
+3. Cartão vazio nos dois lados dizia "sem dado no **período anterior**",
+   sugerindo que o número atual existia.
+4. O PDF saía com um retângulo cinza do tamanho da página: o fundo do `<body>`
+   continua pintando depois que o conteúdo do app é escondido.
 
 ---
 

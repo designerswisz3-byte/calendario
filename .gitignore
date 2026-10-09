@@ -15,3 +15,6 @@ npm-debug.log*
 
 # gerado por scripts/copiar-fontes-excalidraw.mjs
 public/fonts
+
+# harness local de teste (Postgres + PostgREST + Playwright), nunca versionado
+harness.local/

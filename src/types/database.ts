@@ -159,6 +159,69 @@ export interface CalendarItemWithRelations extends CalendarItemRow {
   preview: ContentPreviewWithMedia | null
 }
 
+/* ------------------------------------------------------------- relatório -- */
+
+export type RedeSocial = 'instagram' | 'youtube' | 'tiktok'
+
+export type RelatorioPerfilRow = {
+  id: string
+  user_id: string
+  rede: RedeSocial
+  /** Sem o "@". */
+  handle: string
+  nome: string
+  /** De onde o dado vem: 'swisz', 'meta_graph', 'manual'. */
+  fonte: string
+  criado_em: string
+  atualizado_em: string
+}
+
+/**
+ * Um dia de métricas.
+ *
+ * Todo número é nullable e null NÃO é zero: é "não temos esse dia". A
+ * agregação em src/lib/relatorio.ts respeita essa diferença.
+ */
+export type RelatorioMetricaRow = {
+  id: string
+  perfil_id: string
+  /** `date` do Postgres: "YYYY-MM-DD". */
+  dia: string
+  /** Total de seguidores no dia (estoque — não se soma). */
+  seguidores: number | null
+  seguidores_ganhos: number | null
+  alcance: number | null
+  views: number | null
+  likes: number | null
+  comentarios: number | null
+  salvamentos: number | null
+  compartilhamentos: number | null
+  interacoes: number | null
+  cliques_no_link: number | null
+  publicacoes: number | null
+  fonte: string
+  criado_em: string
+  atualizado_em: string
+}
+
+/** O que a importação grava: um dia, com as métricas que existirem. */
+export type RelatorioMetricaEntrada = { dia: string } & Partial<
+  Pick<
+    RelatorioMetricaRow,
+    | 'seguidores'
+    | 'seguidores_ganhos'
+    | 'alcance'
+    | 'views'
+    | 'likes'
+    | 'comentarios'
+    | 'salvamentos'
+    | 'compartilhamentos'
+    | 'interacoes'
+    | 'cliques_no_link'
+    | 'publicacoes'
+  >
+>
+
 export interface Database {
   public: {
     Tables: {
@@ -237,6 +300,31 @@ export interface Database {
           atualizado_em?: string
         }
         Update: Partial<Omit<NotaRow, 'id' | 'user_id'>>
+        Relationships: []
+      }
+      relatorio_perfis: {
+        Row: RelatorioPerfilRow
+        Insert: Omit<RelatorioPerfilRow, 'id' | 'criado_em' | 'atualizado_em' | 'rede' | 'nome' | 'fonte'> & {
+          id?: string
+          rede?: RedeSocial
+          nome?: string
+          fonte?: string
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<RelatorioPerfilRow, 'id' | 'user_id'>>
+        Relationships: []
+      }
+      relatorio_metricas_diarias: {
+        Row: RelatorioMetricaRow
+        Insert: RelatorioMetricaEntrada & {
+          id?: string
+          perfil_id: string
+          fonte?: string
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<RelatorioMetricaRow, 'id' | 'perfil_id'>>
         Relationships: []
       }
       canvas_boards: {

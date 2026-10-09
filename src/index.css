@@ -344,7 +344,8 @@
    `display: none`, que em alguns navegadores adia o carregamento das imagens e
    faria o PDF sair com buracos.
    ========================================================================== */
-.impressao-da-nota {
+.impressao-da-nota,
+.impressao-do-relatorio {
   position: fixed;
   left: -200vw;
   top: 0;
@@ -365,11 +366,21 @@
    * impressão é montada por portal como filha direta de <body>, então basta
    * esconder os irmãos dela.
    */
-  body > *:not(.impressao-da-nota) {
+  body > *:not(.area-de-impressao) {
     display: none !important;
   }
 
-  .impressao-da-nota {
+  /*
+   * O app pinta o fundo no <body>. Escondido o conteúdo, o fundo continua lá
+   * e sai no PDF como um retângulo cinza do tamanho da página, abaixo do
+   * relatório — parece defeito de exportação.
+   */
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .area-de-impressao {
     position: static !important;
     left: auto !important;
     width: auto !important;
@@ -465,4 +476,127 @@
   border-top: 1px solid #ddd;
   break-inside: avoid;
   page-break-inside: avoid;
+}
+
+/* ============================================================================
+   Exportar o Relatório em PDF
+   ----------------------------------------------------------------------------
+   Mesmo motor da nota (impressão do navegador), tipografia própria: o
+   relatório é tabela e número, não texto corrido.
+   ========================================================================== */
+.impressao-do-relatorio {
+  color: #111;
+  background: #fff;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.45;
+  font-size: 10pt;
+}
+
+.impressao-do-relatorio h1 {
+  margin: 0 0 0.15rem;
+  font-size: 19pt;
+  font-weight: 700;
+}
+
+.impressao-do-relatorio .relatorio-subtitulo {
+  margin: 0 0 1.1rem;
+  font-size: 9pt;
+  color: #666;
+}
+
+.impressao-do-relatorio h2 {
+  margin: 1.4rem 0 0.5rem;
+  font-size: 12pt;
+  font-weight: 600;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.2rem;
+  /* Um título no pé da página com a tabela na seguinte é o jeito mais fácil
+     de o PDF sair confuso. */
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.impressao-do-relatorio .relatorio-cartoes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.impressao-do-relatorio .relatorio-cartao {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.impressao-do-relatorio .relatorio-cartao dt {
+  font-size: 8pt;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.impressao-do-relatorio .relatorio-cartao dd {
+  margin: 0.1rem 0 0;
+  font-size: 15pt;
+  font-weight: 700;
+}
+
+.impressao-do-relatorio .relatorio-cartao .relatorio-delta {
+  font-size: 8.5pt;
+  font-weight: 500;
+  color: #444;
+}
+
+.impressao-do-relatorio table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+}
+
+.impressao-do-relatorio th,
+.impressao-do-relatorio td {
+  border-bottom: 1px solid #e5e5e5;
+  padding: 0.28rem 0.3rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.impressao-do-relatorio th {
+  background: #f4f4f5;
+  font-weight: 600;
+  font-size: 8pt;
+}
+
+.impressao-do-relatorio th:first-child,
+.impressao-do-relatorio td:first-child {
+  text-align: left;
+}
+
+/* Cabeçalho repetido em cada página: tabela de 12 meses passa da primeira. */
+.impressao-do-relatorio thead {
+  display: table-header-group;
+}
+
+.impressao-do-relatorio tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.impressao-do-relatorio .relatorio-aviso {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-left: 3px solid #d4a017;
+  background: #fdf6e3;
+  font-size: 8.5pt;
+  color: #543;
+}
+
+.impressao-do-relatorio .relatorio-rodape {
+  margin-top: 1.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #ddd;
+  font-size: 8pt;
+  color: #777;
 }

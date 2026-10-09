@@ -10,4 +10,6 @@ export const queryKeys = {
   notas: () => ['notas'] as const,
   nota: (id: string) => ['nota', id] as const,
   notasLigacoes: () => ['notas', 'ligacoes'] as const,
+  relatorioPerfis: () => ['relatorio', 'perfis'] as const,
+  relatorioMetricas: (perfilId: string) => ['relatorio', 'metricas', perfilId] as const,
 }
