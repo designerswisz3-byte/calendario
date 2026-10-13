@@ -1,20 +1,22 @@
 import { useDroppable } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
 import { CalendarItemCard } from '@/components/calendar/CalendarItemCard'
+import { MarcadorDeEventos } from '@/components/calendar/MarcadorDeEventos'
 import { isPast, isToday, isSameMonth, toDateKey } from '@/lib/date'
 import { cn } from '@/lib/utils'
-import type { CalendarItemWithRelations } from '@/types/database'
+import type { CalendarItemWithRelations, EventoRow } from '@/types/database'
 
 interface Props {
   date: Date
   reference: Date
   items: CalendarItemWithRelations[]
+  eventos: EventoRow[]
   onOpenDay: (dateKey: string) => void
 }
 
 const MAX_VISIBLE = 3
 
-export function DayCell({ date, reference, items, onOpenDay }: Props) {
+export function DayCell({ date, reference, items, eventos, onOpenDay }: Props) {
   const dateKey = toDateKey(date)
   const { setNodeRef, isOver } = useDroppable({ id: `day-${dateKey}`, data: { dateKey } })
 
@@ -30,7 +32,7 @@ export function DayCell({ date, reference, items, onOpenDay }: Props) {
       onClick={() => onOpenDay(dateKey)}
       role="button"
       tabIndex={0}
-      aria-label={`Dia ${date.getDate()}${today ? ' (hoje)' : passado ? ' (já passou)' : ''}, ${items.length} ${items.length === 1 ? 'item' : 'itens'}`}
+      aria-label={`Dia ${date.getDate()}${today ? ' (hoje)' : passado ? ' (já passou)' : ''}, ${items.length} ${items.length === 1 ? 'item' : 'itens'}${eventos.length ? `, ${eventos.map((evento) => evento.titulo).join(', ')}` : ''}`}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
@@ -72,6 +74,8 @@ export function DayCell({ date, reference, items, onOpenDay }: Props) {
           <Plus className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
         </div>
       </div>
+
+      <MarcadorDeEventos eventos={eventos} dia={dateKey} />
 
       <div className="flex flex-col gap-1">
         {visible.map((item) => (

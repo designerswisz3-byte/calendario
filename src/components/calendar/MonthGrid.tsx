@@ -2,16 +2,17 @@ import { DayCell } from '@/components/calendar/DayCell'
 import { Skeleton } from '@/components/ui/skeleton'
 import { WEEKDAYS_SHORT } from '@/lib/constants'
 import { buildMonthGrid, toDateKey } from '@/lib/date'
-import type { CalendarItemWithRelations } from '@/types/database'
+import type { CalendarItemWithRelations, EventoRow } from '@/types/database'
 
 interface Props {
   reference: Date
   itemsByDay: Map<string, CalendarItemWithRelations[]>
+  eventosPorDia: Map<string, EventoRow[]>
   loading?: boolean
   onOpenDay: (dateKey: string) => void
 }
 
-export function MonthGrid({ reference, itemsByDay, loading, onOpenDay }: Props) {
+export function MonthGrid({ reference, itemsByDay, eventosPorDia, loading, onOpenDay }: Props) {
   const weeks = buildMonthGrid(reference)
 
   if (loading) {
@@ -52,6 +53,7 @@ export function MonthGrid({ reference, itemsByDay, loading, onOpenDay }: Props) 
               date={date}
               reference={reference}
               items={itemsByDay.get(key) ?? []}
+              eventos={eventosPorDia.get(key) ?? []}
               onOpenDay={onOpenDay}
             />
           )

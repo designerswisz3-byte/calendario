@@ -35,3 +35,37 @@ apelidos em inglês que as APIs costumam devolver):
 
 JSON também serve — uma lista de objetos com as mesmas chaves. Reimportar o
 mesmo dia **corrige** o valor; não duplica.
+
+## `eventos-2026-2027.json`
+
+As 52 datas do catálogo (`src/data/catalogoDeEventos.ts`) exportadas no formato
+que `scripts/importar.mjs` consome. A tela importa direto do módulo TypeScript;
+este arquivo existe para o caminho servidor:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/importar.mjs --tabela eventos \
+    --arquivo exemplos/eventos-2026-2027.json --usuario <uuid>
+```
+
+Datas de feiras brasileiras de 2027 (Couromoda, Francal, SPFW) **não entraram**:
+as organizadoras ainda não publicaram o calendário em out/2026, e data de evento
+inventada faz alguém comprar passagem errada.
+
+## `coleta-noticias-2026-10-13.json`
+
+A primeira coleta, montada em 13/10/2026. Seis notícias com fonte conferível,
+cada uma com o campo que justifica ela estar na lista: o que aquilo muda para
+quem vende moda.
+
+Serve de referência de formato e de régua de curadoria — `relevancia` 5 é "muda
+decisão esta semana", não "achei interessante".
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/importar.mjs --tabela noticias \
+    --arquivo exemplos/coleta-noticias-2026-10-13.json --usuario <uuid>
+```
+
+A chave de serviço ignora a RLS: ela só pode existir como segredo de ambiente
+do servidor ou do agendador — nunca em arquivo versionado, nunca no front.

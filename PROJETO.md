@@ -1,4 +1,4 @@
-# Projeto: Calendário Editorial + Preview + Notas + Relatório
+# Projeto: Calendário Editorial + Preview + Notas + Relatório + Notícias
 
 Registro completo do que foi construído: o produto, as decisões, os limites
 reais que testamos e o que ficou de fora. O `README.md` responde *como rodar*.
@@ -6,8 +6,8 @@ Este documento responde *o que existe e por quê* — é o documento de handover
 
 - **Repositório:** `designerswisz3-byte/calendario`
 - **Branches:** `main` e `claude/criacao-pdf-q9fjoh` (mantidas idênticas)
-- **Commits:** 30
-- **Migrações SQL:** 11 (consolidadas em `supabase/setup-completo.sql`)
+- **Commits:** 31
+- **Migrações SQL:** 12 (consolidadas em `supabase/setup-completo.sql`)
 
 ---
 
@@ -48,6 +48,8 @@ Funcionando e no ar:
 - Botão **AJUSTES** — o cliente escreve sem limite de caracteres
 - Botão do **Canva** com **visto** que o expert marca e desmarca
 - Botão **DOWNLOAD DE MÍDIA** — arquivo único ou tudo em `.zip`
+- **Datas do setor no calendário**: 52 eventos e datas comerciais de out/2026 a dez/2027, cada uma com um ângulo de post pronto para virar pauta
+- **Notícias**: curadoria de e-commerce de moda com relevância, "por que importa" e botão que transforma a notícia em pauta
 - **Relatório**: arquivo mês a mês e semana a semana de métricas de perfil, com comparativo e PDF
 - **ErrorBoundary por rota**: uma tela quebrada não derruba o app inteiro
 
@@ -114,6 +116,7 @@ baixa o bundle do calendário, do editor nem do desenho para desenhar um post.
 | `/notas` | privada | caderno com texto, imagem, desenho e ligações |
 | `/calendario` | privada | mês, painel do dia, briefing, roteiro, teleprompter |
 | `/criar` | privada | monta o conteúdo e gera o link |
+| `/noticias` | privada | curadoria do setor, com "virar pauta" |
 | `/relatorio` | privada | métricas mensais/semanais, comparativo e exportação em PDF |
 | `*` | — | 404 |
 
@@ -121,7 +124,7 @@ baixa o bundle do calendário, do editor nem do desenho para desenhar um post.
 
 ## 5. Modelo de dados
 
-Nove tabelas em uso.
+Onze tabelas em uso.
 
 ### `notas` — o caderno
 `id`, `user_id`, `titulo`, `conteudo`, `desenho` (jsonb), `imagens` (jsonb),
@@ -168,6 +171,35 @@ sem isso o carrossel misto não saberia o que renderizar em cada slide.
 
 Sem limite de caracteres. **Não tem política de INSERT** — e isso é intencional
 (ver seção 6).
+
+### `eventos` — o que vai acontecer, e o que postar sobre isso
+
+`id`, `user_id`, `data`, `data_fim` (null = um dia), `titulo`, `categoria`
+(`comercial` · `setorial` · `feriado` · `sazonal`), `escopo` (`brasil` ·
+`global` · `eua` · `europa` · `china`), `local`, `por_que_importa`,
+`ideia_de_post`, `fonte_url`. Único por `(user_id, data, titulo)`.
+
+Os dois campos de texto são o recurso inteiro. Calendário de feriado existe de
+graça na internet; o que não existe é a data já traduzida em decisão de quem
+vende moda — e é por isso que nenhuma linha do catálogo entra sem os dois
+preenchidos.
+
+`data_fim` existe porque feira dura três dias e a grade precisa marcar os três.
+O filtro de janela é de intervalos que se cruzam, não `data between`: uma feira
+de 28/10 a 02/11 pertence aos dois meses, e o filtro ingênuo a faria sumir de
+novembro.
+
+### `noticias` — o que já aconteceu, e o que fazer com isso
+
+`id`, `user_id`, `titulo`, `resumo`, `por_que_importa`, `url`, `fonte`,
+`publicado_em`, `coletado_em`, `relevancia` (1 a 5), `tags`, `lida`,
+`virou_pauta`. Único por `(user_id, url)` — a mesma notícia coletada duas vezes
+é a mesma notícia.
+
+`relevancia` é a curadoria: 1 é ruído, 5 muda decisão esta semana. A aba abre
+filtrada em 4 e 5, e não em "todas", porque ela existe para o Rapha estar
+atualizado em cinco minutos — abrir numa lista completa devolveria o problema
+que a curadoria veio resolver.
 
 ### `relatorio_perfis` e `relatorio_metricas_diarias` — o arquivo de métricas
 
@@ -300,6 +332,21 @@ por importação (CSV ou JSON, uma linha por dia), com `upsert` em
 `(perfil_id, dia)`: reimportar o mesmo mês corrige os dias em vez de duplicar
 o período. A tela mostra o que vai entrar antes de gravar.
 
+### `/noticias`
+
+Lista agrupada por dia de publicação, ordenada por relevância dentro do dia.
+Cada cartão traz resumo, o "por que importa" e as tags, e três ações: abrir a
+fonte, marcar como lida e **virar pauta**.
+
+"Virar pauta" cria um item no calendário **de hoje**, como ideia, com o
+briefing já montado (título na primeira linha, resumo, por que importa e a URL
+da fonte), e marca a notícia como lida. Hoje e não "algum dia": pauta que nasce
+de notícia tem prazo de validade, e jogá-la para uma data futura vazia é o
+jeito mais rápido de ela morrer na lista. Para outro dia, arrasta-se na grade.
+
+Nota lida **não some** da lista: apaga. Sumir esconderia o que já foi avaliado
+e faria a mesma notícia voltar a chamar atenção amanhã.
+
 ### `/calendario`
 Grade do mês com os itens em cada dia. Arrastar um card move o item de data
 (atualização otimista). Filtros por tipo, status e tag. Visão de lista e agenda.
@@ -311,6 +358,23 @@ justamente o que pede atenção.
 
 O card se chama pela **primeira linha do briefing**, sempre — inclusive depois
 de o conteúdo ser criado. O nome do expert é só reserva para item sem briefing.
+
+### Datas no calendário
+
+A grade ganhou uma faixa colorida por categoria acima dos cards de conteúdo —
+deliberadamente **menor** que eles, porque a data é contexto e o item planejado
+é tarefa. Evento de vários dias vira uma barra contínua atravessando a semana,
+com o título só no primeiro dia e "…fim" no último.
+
+No painel do dia, cada data aparece com `por_que_importa`, o ângulo de post e o
+botão **Virar pauta**, que cria o item já com o briefing montado. Sem esse
+botão isto seria um calendário de feriados; com ele, é o começo do mês de
+conteúdo.
+
+O catálogo (52 datas, `src/data/catalogoDeEventos.ts`) entra pelo botão da
+legenda. A importação é idempotente — `upsert` em `(user_id, data, titulo)` —
+então reimportar atualiza os ângulos sem duplicar a grade, e é por isso que o
+botão continua à vista depois da primeira carga.
 
 ### Painel do dia
 Abre ao clicar no dia. **Arrastável pela borda esquerda**; a largura fica salva.
@@ -522,6 +586,32 @@ seguidores retroativo**. "Todos os meses arquivados" só existe a partir do dia
 em que alguém começa a arquivar — é exatamente por isso que o Relatório mostra
 a cobertura de cada período em vez de preencher o buraco.
 
+### "Todos os dias" exige um agendador — e ele ainda não existe
+
+O pedido de mapear eventos e coletar notícias **diariamente** não pode ser
+atendido pela tela: o app roda no navegador e, para gravar em nome do usuário
+sem a sessão dele aberta, precisaria de uma chave de escrita dentro do bundle —
+que é chave pública. Conector de pesquisa, idem: eles são ferramentas da sessão
+do Claude, não do site publicado.
+
+O que existe hoje, testado:
+
+- `scripts/importar.mjs` — recebe um JSON e faz upsert em `eventos` ou
+  `noticias` via REST, de forma idempotente. É o lado servidor da coleta.
+- A importação pela tela (colar JSON), para quando a coleta é manual.
+
+O que falta para o diário rodar sozinho, do lado do Rapha:
+
+1. `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` como **segredos do ambiente**
+   (nunca em arquivo versionado, nunca no front). A chave de serviço ignora a
+   RLS.
+2. Uma Routine diária firando uma sessão que pesquisa, monta o JSON e roda o
+   script.
+
+Verificado em 13/10/2026: este ambiente não tem nenhuma variável de Supabase
+definida, então a Routine falharia em silêncio todo dia. Por isso ela não foi
+criada.
+
 ### Vercel
 - `VITE_*` é variável de **build**: mudar sem redeploy não muda nada.
 - O tipo precisa ser **Config**, não Secret.
@@ -597,6 +687,22 @@ As asserções que importam **olham o que o usuário olha**:
 
 Foi assim que apareceram, antes de subir: o título grudado no parágrafo, o
 editor montando vazio ao trocar de nota, e o cache servindo a nota velha.
+
+**Nas Datas e nas Notícias**, 42 asserções no navegador contra o banco real e
+45 de biblioteca pura. Pegaram três coisas:
+
+1. `scripts/importar.mjs` falhava com `PGRST102 — All object keys must match`.
+   O PostgREST monta um único comando a partir das chaves do PRIMEIRO objeto do
+   lote, e a coleta real tem itens com e sem `publicado_em`. O supabase-js
+   normaliza isso por dentro, então o mesmo JSON passava pela tela e quebrava
+   no script — ou seja, o caminho do agendador era o único quebrado, e era o
+   que ninguém veria falhar.
+2. `npm run lint` **não checava nada**. O `tsconfig.json` da raiz tem
+   `files: []` e só referências, e `tsc --noEmit` não compila referências:
+   o comando saía com 0 sobre qualquer código. Trocado por `tsc -b --force`,
+   que na mesma hora apontou dois erros reais que estavam no diretório.
+3. A faixa de evento de vários dias afinava nos dias do meio (rótulo vazio sem
+   altura mínima), e a feira de seis dias parecia três eventos soltos.
 
 **No Relatório**, com 100 dias de dados reais de `@swiszoficial` (julho a
 outubro de 2026, com o buraco real de seguidores antes de 16/09) e 49

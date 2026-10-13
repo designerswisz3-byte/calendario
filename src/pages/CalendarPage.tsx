@@ -20,11 +20,13 @@ import { EMPTY_FILTERS, FiltersBar, type CalendarFilters } from '@/components/ca
 import { ListView } from '@/components/calendar/ListView'
 import { MonthGrid } from '@/components/calendar/MonthGrid'
 import { MonthProgress } from '@/components/calendar/MonthProgress'
+import { LegendaDeEventos } from '@/components/calendar/LegendaDeEventos'
 import { Teleprompter } from '@/components/calendar/Teleprompter'
 import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
 import {
   addMonths,
+  buildMonthGrid,
   endOfMonth,
   formatMonthTitle,
   formatShortDate,
@@ -35,6 +37,8 @@ import {
 import { useCalendarItems, useMoveCalendarItem } from '@/hooks/useCalendarItems'
 import { TYPE_LABEL } from '@/lib/constants'
 import { useTags } from '@/hooks/useTags'
+import { useEventos, useImportarCatalogo } from '@/hooks/useEventos'
+import { eventosPorDia } from '@/lib/eventos'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { CalendarItemWithRelations } from '@/types/database'
 
@@ -50,7 +54,21 @@ export default function CalendarPage() {
   // De onde o teleprompter foi aberto, para devolver o painel ao fechar.
   const diaAntesDoPrompter = React.useRef<string | null>(null)
 
+  /*
+   * A janela de eventos é a da GRADE, não a do mês: as células das pontas são
+   * dias do mês vizinho, e uma Black Friday que cai numa delas tem de aparecer
+   * ali também. Buscar só o mês deixaria buraco visível na primeira e na
+   * última linha.
+   */
+  const grade = React.useMemo(() => buildMonthGrid(reference), [reference])
+  const janela = React.useMemo(() => {
+    const dias = grade.flat()
+    return { de: toDateKey(dias[0]), ate: toDateKey(dias[dias.length - 1]) }
+  }, [grade])
+
   const { data: items = [], isLoading, isError, error } = useCalendarItems(reference)
+  const { data: eventos = [] } = useEventos(janela.de, janela.ate)
+  const importarCatalogo = useImportarCatalogo()
   const { data: tags = [] } = useTags()
   const moveItem = useMoveCalendarItem()
   const isCompact = useMediaQuery('(max-width: 767px)')
@@ -116,7 +134,29 @@ export default function CalendarPage() {
     return [...keys].sort()
   }, [filteredMonthItems, monthStartKey, monthEndKey])
 
+  const eventosDoDia = React.useMemo(() => eventosPorDia(eventos), [eventos])
+
+  // Para a legenda: só as datas do mês de referência, sem as pontas da grade.
+  const eventosDoMes = React.useMemo(
+    () => eventos.filter((evento) => evento.data <= monthEndKey && (evento.data_fim ?? evento.data) >= monthStartKey),
+    [eventos, monthStartKey, monthEndKey],
+  )
+
   const openDayItems = openDayKey ? (itemsByDay.get(openDayKey) ?? []) : []
+  const openDayEventos = openDayKey ? (eventosDoDia.get(openDayKey) ?? []) : []
+
+  async function handleImportarCatalogo() {
+    try {
+      const total = await importarCatalogo.mutateAsync()
+      toast({ variant: 'success', title: `${total} datas no calendário` })
+    } catch (importError) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível carregar o catálogo',
+        description: errorMessage(importError),
+      })
+    }
+  }
 
   function handleDragStart(event: DragStartEvent) {
     setDragging((event.active.data.current?.item as CalendarItemWithRelations) ?? null)
@@ -201,6 +241,13 @@ export default function CalendarPage() {
       {/* ---------- Progresso do mês ---------- */}
       {isLoading ? <Skeleton className="h-[5.5rem] rounded-xl" /> : <MonthProgress items={monthItems} />}
 
+      {/* ---------- Datas do setor e do calendário comercial ---------- */}
+      <LegendaDeEventos
+        total={eventosDoMes.length}
+        importando={importarCatalogo.isPending}
+        onImportar={handleImportarCatalogo}
+      />
+
       {/* ---------- Filtros ---------- */}
       <FiltersBar filters={filters} onChange={setFilters} tags={tags} />
 
@@ -232,6 +279,7 @@ export default function CalendarPage() {
           <MonthGrid
             reference={reference}
             itemsByDay={itemsByDay}
+            eventosPorDia={eventosDoDia}
             loading={isLoading}
             onOpenDay={setOpenDayKey}
           />
@@ -249,6 +297,7 @@ export default function CalendarPage() {
       <DayPanel
         dateKey={openDayKey}
         items={openDayItems}
+        eventos={openDayEventos}
         onOpenChange={(open) => {
           if (!open) setOpenDayKey(null)
         }}

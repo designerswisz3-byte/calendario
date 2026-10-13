@@ -25,6 +25,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { CalendarItemForm } from '@/components/calendar/CalendarItemForm'
+import { EventosDoDia } from '@/components/calendar/EventosDoDia'
 import { StatusBadge } from '@/components/calendar/StatusBadge'
 import { TypeIcon } from '@/components/calendar/TypeIcon'
 import { toast } from '@/components/ui/use-toast'
@@ -32,6 +33,7 @@ import { errorMessage } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/constants'
 import { resumoDoRoteiro } from '@/lib/texto'
+import { briefingDoEvento } from '@/lib/eventos'
 import { formatFullDay, formatTime, parseDateKey } from '@/lib/date'
 import {
   useCreateCalendarItem,
@@ -43,11 +45,13 @@ import { useAjustes } from '@/hooks/useAjustes'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLarguraPainel } from '@/hooks/useLarguraPainel'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import type { CalendarItemWithRelations } from '@/types/database'
+import type { CalendarItemWithRelations, EventoRow } from '@/types/database'
 
 interface Props {
   dateKey: string | null
   items: CalendarItemWithRelations[]
+  /** Datas do setor e do calendário comercial que caem neste dia. */
+  eventos: EventoRow[]
   onOpenChange: (open: boolean) => void
   /**
    * Sobe para a página. O teleprompter é tela cheia e não pode conviver com o
@@ -157,13 +161,15 @@ function BadgeAjustes({ previewId }: { previewId: string }) {
   )
 }
 
-export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: Props) {
+export function DayPanel({ dateKey, items, eventos, onOpenChange, onAbrirTeleprompter }: Props) {
   const navigate = useNavigate()
   const createItem = useCreateCalendarItem()
   const updateItem = useUpdateCalendarItem()
   const deleteItem = useDeleteCalendarItem()
 
   const [adding, setAdding] = React.useState(false)
+  /** Qual evento está virando pauta agora, para o botão certo girar. */
+  const [criandoDoEvento, setCriandoDoEvento] = React.useState<string | null>(null)
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [abaDaEdicao, setAbaDaEdicao] = React.useState<'briefing' | 'roteiro'>('briefing')
   const { largura, arrastando, iniciarArrasto, redefinir } = useLarguraPainel()
@@ -195,6 +201,39 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
   function abrirAdicao() {
     setEditingId(null)
     setAdding(true)
+  }
+
+  /**
+   * Transforma a data em item do calendário.
+   *
+   * Nasce como `ideia` e não como `roteiro`: o ângulo ainda é uma hipótese, e
+   * marcar como roteiro pularia a etapa em que ele é testado contra o que
+   * realmente aconteceu no mês. O briefing já vem preenchido — a primeira
+   * linha é o título do evento, que é de onde o app tira o nome do item.
+   */
+  async function virarPauta(evento: EventoRow) {
+    if (!dateKey) return
+    setCriandoDoEvento(evento.id)
+    try {
+      await createItem.mutateAsync({
+        data: dateKey,
+        horario: null,
+        tipo: 'ideia',
+        status: 'ideia',
+        notas: briefingDoEvento(evento),
+        roteiro: '',
+        tagIds: [],
+      })
+      toast({ variant: 'success', title: 'Pauta criada', description: evento.titulo })
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível criar a pauta',
+        description: errorMessage(error),
+      })
+    } finally {
+      setCriandoDoEvento(null)
+    }
   }
 
   async function handleCreate(input: CalendarItemInput) {
@@ -288,15 +327,30 @@ export function DayPanel({ dateKey, items, onOpenChange, onAbrirTeleprompter }: 
         </SheetHeader>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-5 scrollbar-thin">
+          {/*
+            As datas vêm ANTES do planejamento do dia de propósito: elas são o
+            contexto que explica por que existe (ou deveria existir) um item
+            aqui. Depois da lista, viraria rodapé que ninguém lê.
+          */}
+          <EventosDoDia
+            eventos={eventos}
+            criandoId={criandoDoEvento}
+            onVirarPauta={virarPauta}
+          />
+
           {items.length === 0 && !adding && (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/70 px-6 py-10 text-center">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <CalendarPlus className="h-5 w-5" />
               </span>
               <div className="space-y-1">
-                <p className="text-sm font-medium">Dia livre</p>
+                <p className="text-sm font-medium">
+                  {eventos.length > 0 ? 'Data marcada, sem pauta' : 'Dia livre'}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Comece pelo planejamento: tipo, status e a ideia central.
+                  {eventos.length > 0
+                    ? 'Use "Virar pauta" acima para começar do ângulo já pronto.'
+                    : 'Comece pelo planejamento: tipo, status e a ideia central.'}
                 </p>
               </div>
               <Button size="sm" onClick={abrirAdicao}>

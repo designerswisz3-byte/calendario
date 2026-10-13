@@ -1,0 +1,57 @@
+[
+  {
+    "titulo": "Senado zera a 'taxa das blusinhas' em remessas de até US$ 50",
+    "resumo": "O Senado aprovou em 03/09/2026 a MP 1.357/2026, que zera o Imposto de Importação de 20% sobre compras internacionais de até US$ 50 — a alíquota já estava zerada por Medida Provisória desde maio. O ICMS estadual continua sendo cobrado, e há previsão de CBS sobre compras de baixo valor a partir de 2027.",
+    "por_que_importa": "É o fim da única vantagem fiscal que a confecção nacional ganhou em 2024. A peça de R$ 40 da Shein volta a chegar aqui 20% mais barata, e quem compete por preço nessa faixa perde a conta. A decisão prática é de posicionamento: ou você sai da faixa de preço onde a importação ganha, ou você compete por algo que o pacote de 30 dias não entrega — prazo, troca, prova e atendimento.",
+    "url": "https://www12.senado.leg.br/noticias/materias/2026/09/03/senado-zera-taxa-das-blusinhas-nas-remessas-internacionais-de-ate-us-50",
+    "fonte": "Agência Senado",
+    "publicado_em": "2026-09-03",
+    "relevancia": 5,
+    "tags": ["tributação", "importação", "concorrência", "precificação"]
+  },
+  {
+    "titulo": "Shopee acaba com o teto de comissão de R$ 100 e aumenta a taxa fixa por item",
+    "resumo": "A plataforma retirou o limite de R$ 100 por venda na comissão e elevou a taxa fixa cobrada por item. A comissão passou a variar por faixa de preço: cerca de 20% + valor fixo até R$ 79,99, e base menor com fixo maior acima disso.",
+    "por_que_importa": "Teto de comissão era o que protegia a margem da peça cara. Sem ele, quanto maior o ticket, maior a mordida — e a planilha de precificação que você montou em 2025 passou a mentir. A conta de margem de contribuição precisa ser refeita POR FAIXA de preço, não por produto, e pode ser que o item premium tenha deixado de fazer sentido nesse canal.",
+    "url": "https://www.ecommercebrasil.com.br/artigos/shopee-acaba-com-o-teto-de-comissao-de-r-100-e-aumenta-a-taxa-fixa-cobrada-por-cada-item-vendido-em-ate-550",
+    "fonte": "E-Commerce Brasil",
+    "relevancia": 5,
+    "tags": ["marketplace", "shopee", "margem", "precificação"]
+  },
+  {
+    "titulo": "XP: aumento de taxas da Shopee muda o equilíbrio com o Mercado Livre",
+    "resumo": "Relatório da XP analisa a elevação de taxas da Shopee no início de 2026 e o efeito competitivo sobre o Mercado Livre.",
+    "por_que_importa": "Quando dois marketplaces mexem em taxa no mesmo trimestre, o seller que opera nos dois não tem mais um canal 'barato' e um 'caro' — tem duas contas diferentes que mudam a cada faixa de preço. Vale recalcular o mix por canal: qual SKU vai para onde, e qual sai de um dos dois.",
+    "url": "https://conteudos.xpi.com.br/acoes/relatorios/mercado-livre-meli34-shopee-inicia-2026-com-aumento-de-taxas/",
+    "fonte": "XP Investimentos",
+    "relevancia": 4,
+    "tags": ["marketplace", "mercado livre", "shopee", "análise"]
+  },
+  {
+    "titulo": "Shein reduz avaliação para até US$ 27 bi em IPO em Hong Kong e reporta prejuízo trimestral",
+    "resumo": "A empresa cortou a avaliação pretendida no IPO para até US$ 27 bilhões e registrou prejuízo de US$ 99 milhões num trimestre, depois de os EUA encerrarem a isenção de imposto para pacotes pequenos.",
+    "por_que_importa": "Mostra que o modelo de ultra fast fashion sangra quando a vantagem tributária some — foi exatamente o que aconteceu nos EUA. É o contraponto do que acabou de acontecer aqui com a taxa das blusinhas, e o argumento de que competir por preço contra esse modelo é competir contra uma empresa que aceita perder dinheiro.",
+    "url": "https://www.cnnbrasil.com.br/economia/money/negocios/shein-reduz-seu-valor-de-mercado-para-ate-us-27-bi-em-ipo-em-hong-kong/",
+    "fonte": "CNN Brasil",
+    "relevancia": 4,
+    "tags": ["shein", "concorrência", "fast fashion"]
+  },
+  {
+    "titulo": "Shein, Shopee e Temu disputam o consumidor brasileiro",
+    "resumo": "Levantamento citado pela Meio & Mensagem aponta que, entre aplicativos de moda e vestuário, a Shein concentra 89,4% do market share, com Riachuelo, Renner, C&A e Marisa dividindo o restante.",
+    "por_que_importa": "O número é o tamanho real do campo de batalha: se 9 em cada 10 aberturas de app de moda são de uma plataforma estrangeira, disputar atenção dentro desse app é disputar migalha. O caminho que sobra é construir canal próprio — perfil, lista e recompra — em vez de depender de vitrine alugada.",
+    "url": "https://www.meioemensagem.com.br/marketing/shopee-shein-e-temu-travam-disputa-no-consumo-brasileiro",
+    "fonte": "Meio & Mensagem",
+    "relevancia": 4,
+    "tags": ["concorrência", "market share", "canal próprio"]
+  },
+  {
+    "titulo": "Tamanho e confiança no produto seguem travando a compra de moda online",
+    "resumo": "Relatório do BoF Insights com a Amazon Fashion & Sports aponta que compradores de moda online ainda têm dificuldade para acertar o tamanho e para confiar no que leem na descrição do produto.",
+    "por_que_importa": "É a causa raiz da devolução, que em moda come de 10% a 30% da venda. Ataca-se com ficha de medidas por peça (não por grade), foto com referência de corpo e descrição que diz como veste — e cada ponto de devolução a menos é margem que volta sem precisar vender mais.",
+    "url": "https://businessoffashion.com/articles/retail/bof-insights-amazon-fashion-sports-europe-e-commerce-online-data",
+    "fonte": "The Business of Fashion",
+    "relevancia": 4,
+    "tags": ["devolução", "conversão", "ficha técnica"]
+  }
+]

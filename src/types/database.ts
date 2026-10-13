@@ -222,6 +222,64 @@ export type RelatorioMetricaEntrada = { dia: string } & Partial<
   >
 >
 
+/* ------------------------------------------------- eventos e notícias -- */
+
+export type CategoriaDeEvento = 'comercial' | 'setorial' | 'feriado' | 'sazonal'
+export type EscopoDeEvento = 'brasil' | 'global' | 'eua' | 'europa' | 'china'
+
+export type EventoRow = {
+  id: string
+  user_id: string
+  /** `date` do Postgres: "AAAA-MM-DD". */
+  data: string
+  /** Null = evento de um dia. Feira ocupa uma faixa. */
+  data_fim: string | null
+  titulo: string
+  categoria: CategoriaDeEvento
+  escopo: EscopoDeEvento
+  local: string | null
+  /** O que esta data muda na operação de quem vende moda. */
+  por_que_importa: string
+  /** Ângulo pronto para virar briefing. */
+  ideia_de_post: string
+  fonte_url: string | null
+  criado_em: string
+  atualizado_em: string
+}
+
+export type EventoEntrada = Omit<EventoRow, 'id' | 'criado_em' | 'atualizado_em'>
+
+export type NoticiaRow = {
+  id: string
+  user_id: string
+  titulo: string
+  resumo: string
+  /** O que a notícia muda para quem vende moda — é o que a justifica na lista. */
+  por_que_importa: string
+  url: string
+  fonte: string
+  publicado_em: string | null
+  coletado_em: string
+  /** 1 = ruído, 5 = muda decisão esta semana. */
+  relevancia: number
+  tags: string[]
+  lida: boolean
+  virou_pauta: boolean
+  criado_em: string
+  atualizado_em: string
+}
+
+export type NoticiaEntrada = {
+  titulo: string
+  resumo?: string
+  por_que_importa?: string
+  url: string
+  fonte?: string
+  publicado_em?: string | null
+  relevancia?: number
+  tags?: string[]
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -300,6 +358,26 @@ export interface Database {
           atualizado_em?: string
         }
         Update: Partial<Omit<NotaRow, 'id' | 'user_id'>>
+        Relationships: []
+      }
+      eventos: {
+        Row: EventoRow
+        Insert: EventoEntrada & { id?: string; criado_em?: string; atualizado_em?: string }
+        Update: Partial<Omit<EventoRow, 'id' | 'user_id'>>
+        Relationships: []
+      }
+      noticias: {
+        Row: NoticiaRow
+        Insert: NoticiaEntrada & {
+          id?: string
+          user_id: string
+          lida?: boolean
+          virou_pauta?: boolean
+          coletado_em?: string
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<NoticiaRow, 'id' | 'user_id'>>
         Relationships: []
       }
       relatorio_perfis: {
