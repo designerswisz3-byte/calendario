@@ -628,15 +628,36 @@ ambiente**, nunca em arquivo versionado e nunca no front:
 | `SUPABASE_SERVICE_ROLE_KEY` | chave de serviço. **Ignora a RLS.** |
 | `SUPABASE_USER_ID` | uuid do dono das linhas em `auth.users` |
 
-**Enquanto elas não existirem**, a Routine não falha nem fica em silêncio: a
-sessão imprime o JSON no resultado e diz o que falta, e o Rapha cola em
-Notícias → Importar coleta. O dia útil não se perde por causa de configuração.
+**Modo entrega é o modo em uso hoje.** As variáveis acima não chegam nas
+sessões disparadas — testado em 13/10/2026 por duas sessões novas e
+independentes, as duas sem nenhuma delas. A hipótese em aberto é que o campo
+onde foram salvas ("Network secrets") não vira variável de ambiente no shell.
 
-Às segundas a mesma sessão também procura calendário novo de feira. Se alguma
-organizadora publicou as datas de 2027, ela grava o evento **direto na tabela
-`eventos`**, não no catálogo em código: a data aparece na grade no mesmo dia,
-sem branch, sem commit e sem deploy. O catálogo em `src/data/` continua sendo a
-semente; o banco é onde o calendário vive.
+Em vez de deixar a rotina esperando configuração, ela tem dois modos de
+primeira classe:
+
+| Modo | Quando | O que faz |
+| --- | --- | --- |
+| **Entrega** | falta alguma variável | pesquisa, cura e termina com o JSON pronto num bloco de código; o Rapha cola em Notícias → Importar coleta |
+| **Publicação** | as três existem | grava direto, sem ninguém no meio |
+
+O modo entrega **não é fallback**, e o prompt diz isso com todas as letras: texto
+com cara de erro todo dia de manhã treina a pessoa a ignorar a notificação. A
+saída é formatada para celular — destaque do dia, contagem, e o JSON como
+ÚLTIMA coisa da mensagem, para dar para selecionar sem caçar onde termina.
+
+O preço do modo entrega é a deduplicação: sem credencial não dá para consultar
+o que já foi coletado, e a sessão não lembra de ontem. Sobra a janela de 48h
+como defesa. Repetição não estraga o banco — a importação é por URL e atualiza
+em vez de duplicar — mas polui a leitura, e é o primeiro motivo real para
+resolver as variáveis.
+
+Às segundas a mesma sessão também procura calendário novo de feira. Em modo
+publicação ela grava o evento **direto na tabela `eventos`** — a data aparece na
+grade no mesmo dia, sem branch e sem deploy. Em modo entrega ela só reporta a
+data em texto, porque **não existe tela para cadastrar um evento à mão**: o
+único caminho de entrada é o botão do catálogo. É uma lacuna conhecida; se
+acontecer com frequência, vale um formulário de "nova data" no painel do dia.
 
 **Nota sobre conectores:** a Routine não carrega conectores MCP (Exa, Swisz,
 Canva). Não precisa: a pesquisa usa a busca web embutida, que não é conector.
