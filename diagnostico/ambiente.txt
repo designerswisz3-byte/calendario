@@ -1,0 +1,7 @@
+URL: NAO definida | host=(vazio)
+CHAVE: NAO definida | tamanho=0 | formato=ausente
+USER_ID: NAO definido
+GET noticias: nao executado (faltam SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY)
+GET eventos: nao executado (faltam SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY)
+GET com user_id: nao executado (faltam SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY e SUPABASE_USER_ID)
+VEREDITO: nenhuma das tres variaveis do Supabase existe neste ambiente de sessao - nada foi testado contra o banco; as variaveis precisam ser cadastradas nos secrets do ambiente (e na Vercel, se for o runtime de producao).
