@@ -9,8 +9,13 @@
  * nome de outro usuário.
  *
  * Uso:
- *   node scripts/importar.mjs --tabela noticias --arquivo coleta.json --usuario <uuid>
- *   node scripts/importar.mjs --tabela eventos  --arquivo eventos.json --usuario <uuid>
+ *   node scripts/importar.mjs --tabela noticias --arquivo coleta.json
+ *   node scripts/importar.mjs --tabela eventos  --arquivo eventos.json
+ *   node scripts/importar.mjs --tabela noticias --listar 60
+ *
+ * `--listar N` não grava nada: imprime as URLs já guardadas nos últimos N dias.
+ * É o que permite a coleta diária pular o que já entrou ontem, em vez de
+ * depender só do upsert para não repetir.
  *
  * Variáveis de ambiente (NUNCA no repositório):
  *   SUPABASE_URL                → https://<projeto>.supabase.co
@@ -18,6 +23,10 @@
  *                                 existir como segredo de ambiente do servidor
  *                                 ou do agendador. Nunca em .env versionado,
  *                                 nunca no front, nunca colada numa conversa.
+ *   SUPABASE_USER_ID            → uuid do dono das linhas. Fica no ambiente
+ *                                 junto com a chave porque quem agenda não
+ *                                 deveria precisar decorar um uuid para
+ *                                 montar a linha de comando todo dia.
  */
 
 import { readFileSync } from 'node:fs'
@@ -39,11 +48,14 @@ function morrer(mensagem) {
 
 const tabela = argumento('tabela')
 const arquivo = argumento('arquivo')
-const usuario = argumento('usuario')
+const listar = argumento('listar')
+const usuario = argumento('usuario') ?? process.env.SUPABASE_USER_ID
 
 if (!TABELAS[tabela]) morrer(`--tabela precisa ser ${Object.keys(TABELAS).join(' ou ')}`)
-if (!arquivo) morrer('--arquivo é obrigatório')
-if (!/^[0-9a-f-]{36}$/i.test(usuario ?? '')) morrer('--usuario precisa ser o uuid do dono das linhas')
+if (!listar && !arquivo) morrer('--arquivo é obrigatório (ou use --listar N)')
+if (!/^[0-9a-f-]{36}$/i.test(usuario ?? '')) {
+  morrer('informe o dono das linhas em --usuario <uuid> ou na variável SUPABASE_USER_ID')
+}
 
 const url = process.env.SUPABASE_URL
 const chave = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -53,6 +65,39 @@ if (!url || !chave) {
       '       A chave de serviço ignora a RLS: guarde-a como segredo do ambiente,\n' +
       '       nunca em arquivo versionado.',
   )
+}
+
+const base = `${url.replace(/\/$/, '')}/rest/v1`
+const cabecalhos = {
+  apikey: chave,
+  Authorization: `Bearer ${chave}`,
+  'Content-Type': 'application/json',
+}
+
+/* -------------------------------------------------------------- --listar -- */
+
+if (listar) {
+  const dias = Number(listar)
+  if (!Number.isFinite(dias) || dias < 1) morrer('--listar precisa de um número de dias')
+
+  const desde = new Date(Date.now() - dias * 86400000).toISOString()
+  const campo = tabela === 'noticias' ? 'url' : 'data,titulo'
+  const resposta = await fetch(
+    `${base}/${tabela}?select=${campo}&user_id=eq.${usuario}&coletado_em=gte.${desde}`.replace(
+      // `eventos` não tem coletado_em: nessa tabela a janela é por criado_em.
+      'coletado_em',
+      tabela === 'noticias' ? 'coletado_em' : 'criado_em',
+    ),
+    { headers: cabecalhos },
+  )
+  if (!resposta.ok) morrer(`${resposta.status} ${resposta.statusText}\n${await resposta.text()}`)
+
+  const linhas = await resposta.json()
+  for (const linha of linhas) {
+    console.log(tabela === 'noticias' ? linha.url : `${linha.data} ${linha.titulo}`)
+  }
+  console.error(`[importar] ${linhas.length} já guardada(s) nos últimos ${dias} dia(s)`)
+  process.exit(0)
 }
 
 const bruto = JSON.parse(readFileSync(arquivo, 'utf8'))
@@ -92,13 +137,11 @@ const linhas = [...porChave.values()].map((linha) =>
 const descartadas = lista.length - linhas.length
 
 const resposta = await fetch(
-  `${url.replace(/\/$/, '')}/rest/v1/${tabela}?on_conflict=${encodeURIComponent(conflito)}&select=id`,
+  `${base}/${tabela}?on_conflict=${encodeURIComponent(conflito)}&select=id`,
   {
     method: 'POST',
     headers: {
-      apikey: chave,
-      Authorization: `Bearer ${chave}`,
-      'Content-Type': 'application/json',
+      ...cabecalhos,
       // merge-duplicates = upsert. Sem isso, a segunda coleta do dia falharia
       // inteira por causa de um link repetido de ontem.
       Prefer: 'resolution=merge-duplicates,return=representation',

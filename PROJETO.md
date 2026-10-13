@@ -586,31 +586,50 @@ seguidores retroativo**. "Todos os meses arquivados" só existe a partir do dia
 em que alguém começa a arquivar — é exatamente por isso que o Relatório mostra
 a cobertura de cada período em vez de preencher o buraco.
 
-### "Todos os dias" exige um agendador — e ele ainda não existe
+### A coleta diária: como ela roda
 
-O pedido de mapear eventos e coletar notícias **diariamente** não pode ser
-atendido pela tela: o app roda no navegador e, para gravar em nome do usuário
-sem a sessão dele aberta, precisaria de uma chave de escrita dentro do bundle —
-que é chave pública. Conector de pesquisa, idem: eles são ferramentas da sessão
-do Claude, não do site publicado.
+A tela não pode fazer isso sozinha. O app roda no navegador e, para gravar em
+nome do usuário sem a sessão dele aberta, precisaria de uma chave de escrita
+dentro do bundle — que é chave pública. Então a coleta roda **fora** do app e o
+Supabase é o ponto de encontro.
 
-O que existe hoje, testado:
+As três peças:
 
-- `scripts/importar.mjs` — recebe um JSON e faz upsert em `eventos` ou
-  `noticias` via REST, de forma idempotente. É o lado servidor da coleta.
-- A importação pela tela (colar JSON), para quando a coleta é manual.
+1. **Routine diária** `trig_01LCPbNiHyETcnQ5dADJd7PU` — "Coleta diária de
+   notícias — e-commerce de moda", `CRON_TZ=America/Sao_Paulo 52 6 * * 1-5`.
+   Dispara uma sessão nova a cada dia útil, às 06:52 de Brasília.
 
-O que falta para o diário rodar sozinho, do lado do Rapha:
+   O horário não é 7:00 em ponto de propósito: a maioria dos agendamentos cai
+   na hora cheia, e fila de servidor no minuto 0 atrasa a execução. 06:52 é o
+   mesmo horário na prática, sem a fila.
 
-1. `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` como **segredos do ambiente**
-   (nunca em arquivo versionado, nunca no front). A chave de serviço ignora a
-   RLS.
-2. Uma Routine diária firando uma sessão que pesquisa, monta o JSON e roda o
-   script.
+2. **A sessão** pesquisa, cura pela régua de relevância, monta o JSON e publica.
+   Antes de pesquisar ela roda `--listar 30` para não recolher o que já entrou.
 
-Verificado em 13/10/2026: este ambiente não tem nenhuma variável de Supabase
-definida, então a Routine falharia em silêncio todo dia. Por isso ela não foi
-criada.
+3. **`scripts/importar.mjs`** faz o upsert idempotente via REST.
+
+Variáveis que a sessão lê do ambiente — e que só existem como **segredo do
+ambiente**, nunca em arquivo versionado e nunca no front:
+
+| Variável | O que é |
+| --- | --- |
+| `SUPABASE_URL` | `https://<projeto>.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | chave de serviço. **Ignora a RLS.** |
+| `SUPABASE_USER_ID` | uuid do dono das linhas em `auth.users` |
+
+**Enquanto elas não existirem**, a Routine não falha nem fica em silêncio: a
+sessão imprime o JSON no resultado e diz o que falta, e o Rapha cola em
+Notícias → Importar coleta. O dia útil não se perde por causa de configuração.
+
+Às segundas a mesma sessão também procura calendário novo de feira. Se alguma
+organizadora publicou as datas de 2027, ela abre uma branch `claude/datas-...`
+com o acréscimo ao catálogo — nunca commita direto na main, e não abre pull
+request sem pedirem.
+
+**Nota sobre conectores:** a Routine não carrega conectores MCP (Exa, Swisz,
+Canva). Não precisa: a pesquisa usa a busca web embutida, que não é conector.
+O que ela não consegue fazer é puxar dado proprietário do Swisz — isso continua
+sendo trabalho de sessão.
 
 ### Vercel
 - `VITE_*` é variável de **build**: mudar sem redeploy não muda nada.

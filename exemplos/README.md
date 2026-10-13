@@ -69,3 +69,19 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
 
 A chave de serviço ignora a RLS: ela só pode existir como segredo de ambiente
 do servidor ou do agendador — nunca em arquivo versionado, nunca no front.
+
+---
+
+## A coleta diária
+
+A Routine `Coleta diária de notícias — e-commerce de moda` roda em dia útil às
+06:52 (BRT) e grava direto na tabela `noticias`. Os arquivos acima são o
+formato que ela produz.
+
+Para listar o que já está guardado, sem gravar nada:
+
+```bash
+node scripts/importar.mjs --tabela noticias --listar 30
+```
+
+É o primeiro comando da coleta: sem ele, a mesma notícia voltaria todo dia.
