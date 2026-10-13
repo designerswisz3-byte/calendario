@@ -603,10 +603,21 @@ As três peças:
    na hora cheia, e fila de servidor no minuto 0 atrasa a execução. 06:52 é o
    mesmo horário na prática, sem a fila.
 
-2. **A sessão** pesquisa, cura pela régua de relevância, monta o JSON e publica.
-   Antes de pesquisar ela roda `--listar 30` para não recolher o que já entrou.
+2. **A sessão** pesquisa, cura pela régua de relevância, monta o JSON e publica
+   com `curl` direto no PostgREST. Antes de pesquisar ela lista as URLs dos
+   últimos 30 dias, para não recolher o que já entrou — o upsert sozinho só
+   pega URL idêntica, e a mesma história num link diferente passaria.
 
-3. **`scripts/importar.mjs`** faz o upsert idempotente via REST.
+   **A sessão disparada NÃO tem o repositório clonado** (`sources: []`,
+   `config:no-git-repo`). Descoberto na primeira execução de teste, não em
+   produção: a versão original do prompt mandava rodar
+   `node scripts/importar.mjs`, que não existe naquela máquina. Por isso o
+   prompt é autossuficiente — dois `curl` e um `python3 -c`, sem depender de
+   clone de repositório privado todo dia.
+
+3. **`scripts/importar.mjs`** continua no repositório para uso manual e para
+   qualquer outro agendador que tenha o checkout. Faz o mesmo upsert, com
+   `--listar N` para a deduplicação.
 
 Variáveis que a sessão lê do ambiente — e que só existem como **segredo do
 ambiente**, nunca em arquivo versionado e nunca no front:
@@ -622,9 +633,10 @@ sessão imprime o JSON no resultado e diz o que falta, e o Rapha cola em
 Notícias → Importar coleta. O dia útil não se perde por causa de configuração.
 
 Às segundas a mesma sessão também procura calendário novo de feira. Se alguma
-organizadora publicou as datas de 2027, ela abre uma branch `claude/datas-...`
-com o acréscimo ao catálogo — nunca commita direto na main, e não abre pull
-request sem pedirem.
+organizadora publicou as datas de 2027, ela grava o evento **direto na tabela
+`eventos`**, não no catálogo em código: a data aparece na grade no mesmo dia,
+sem branch, sem commit e sem deploy. O catálogo em `src/data/` continua sendo a
+semente; o banco é onde o calendário vive.
 
 **Nota sobre conectores:** a Routine não carrega conectores MCP (Exa, Swisz,
 Canva). Não precisa: a pesquisa usa a busca web embutida, que não é conector.
@@ -710,7 +722,9 @@ editor montando vazio ao trocar de nota, e o cache servindo a nota velha.
 **Nas Datas e nas Notícias**, 42 asserções no navegador contra o banco real e
 45 de biblioteca pura. Pegaram três coisas:
 
-1. `scripts/importar.mjs` falhava com `PGRST102 — All object keys must match`.
+1. `scripts/importar.mjs` falhava com `PGRST102 — All object keys must match`
+   (e a mesma pedra apareceu de novo no caminho do `curl`, confirmada com uma
+   requisição de propósito malformada antes de o comando entrar na Routine).
    O PostgREST monta um único comando a partir das chaves do PRIMEIRO objeto do
    lote, e a coleta real tem itens com e sem `publicado_em`. O supabase-js
    normaliza isso por dentro, então o mesmo JSON passava pela tela e quebrava
