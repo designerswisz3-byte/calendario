@@ -390,6 +390,21 @@ imagem: a curiosidade se aproxima dela, a autoridade a põe em cena, a enquete
 aparece por cima. São cinco palavras de trabalho para um resultado coeso de
 verdade, em vez de coeso no discurso.
 
+**Gerar a partir do assunto que a pessoa escreveu.** As sugestões do dia
+resolvem "não sei sobre o que falar". O caso mais comum de quem já tem pauta é
+o contrário — "eu sei o assunto, me dá a sequência" —, e ele terminava num
+rascunho vazio sem caminho de volta para o gerador. O bloco "Gerar a partir do
+seu assunto" usa o título escrito à mão como busca, com dois seletores:
+
+- **Finalidade** (autoridade · humanidade · ensino · conexão), porque o mesmo
+  assunto rende sequências diferentes: a Black Friday dá uma de autoridade (a
+  decisão com dado) e outra de humanidade (o erro do ano passado).
+- **Arco**, que decide o tamanho — de 4 a 7 stories.
+
+O título da pessoa nunca é atropelado pelo do tema; em troca, a tela mostra
+`Ângulo usado: …`, senão ela não teria como saber por onde o motor entrou.
+Regerar por cima de texto escrito pergunta antes.
+
 A primeira versão disso saiu errada e vale registrar o erro: o botão só sabia
 **regerar**, e exigia um tema já escolhido. Quem colava uma foto e escrevia a
 descrição — o caminho mais natural, e o que foi pedido — encontrava um botão

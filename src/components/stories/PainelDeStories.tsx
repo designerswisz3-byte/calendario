@@ -18,9 +18,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { EditorDeSequencia } from '@/components/stories/EditorDeSequencia'
+import { GerarDoAssunto, QUALQUER_EIXO } from '@/components/stories/GerarDoAssunto'
 import { ImagemDeApoio } from '@/components/stories/ImagemDeApoio'
 import { ARCOS } from '@/lib/stories/gatilhos'
-import { ROTULO_DE_EIXO } from '@/lib/stories/temas'
+import { ROTULO_DE_EIXO, TEMAS_POR_ID, type Eixo } from '@/lib/stories/temas'
 import {
   escolherTemaPor,
   gerarSequencia,
@@ -102,6 +103,20 @@ export function PainelDeStories({
   )
 
   const [arcoPorTema, setArcoPorTema] = React.useState<Record<string, string>>({})
+  /* Escolhas do bloco "gerar a partir do seu assunto". */
+  const [eixoEscolhido, setEixoEscolhido] = React.useState<Eixo | typeof QUALQUER_EIXO>(
+    QUALQUER_EIXO,
+  )
+  const [arcoEscolhido, setArcoEscolhido] = React.useState(ARCOS[0].id)
+
+  /*
+   * Abrir uma sequência salva traz o arco dela para o seletor. Sem isto, abrir
+   * uma sequência de 7 stories mostraria "Ensino rápido · 4 stories" no campo,
+   * e regerar encolheria a sequência sem a pessoa ter pedido.
+   */
+  React.useEffect(() => {
+    if (rascunho?.arcoId) setArcoEscolhido(rascunho.arcoId)
+  }, [rascunho?.id, rascunho?.arcoId])
 
   function gerar(temaId: string, arcoId?: string) {
     if (!dia) return
@@ -120,6 +135,46 @@ export function PainelDeStories({
       imagemCaminho: rascunho?.imagemCaminho ?? null,
       imagemDescricao: rascunho?.imagemDescricao ?? '',
       publicado: false,
+    })
+  }
+
+  /**
+   * Gera a sequência a partir do assunto que a PESSOA escreveu.
+   *
+   * As sugestões do dia resolvem "não sei sobre o que falar". Isto resolve o
+   * caso mais comum de quem já tem pauta — "eu sei o assunto, me dá a
+   * sequência" —, que antes terminava num rascunho vazio sem caminho de volta
+   * para o gerador.
+   */
+  function gerarDoAssunto() {
+    if (!rascunho || !dia) return
+    const assunto = rascunho.titulo.trim() || rascunho.imagemDescricao.trim()
+    if (!assunto) return
+
+    // Substituir texto já escrito é destrutivo: pergunta antes.
+    if (
+      rascunho.stories.length > 0 &&
+      !window.confirm('Isto substitui os stories escritos. Continuar?')
+    ) {
+      return
+    }
+
+    const eixo = eixoEscolhido === QUALQUER_EIXO ? undefined : eixoEscolhido
+    const tema = escolherTemaPor(assunto, dia, contexto, eixo)
+    const gerada = gerarSequencia(tema.id, arcoEscolhido, {
+      // A imagem continua mandando no objeto de cena quando existe; o assunto
+      // escolhe o ÂNGULO. São duas perguntas diferentes: "sobre o quê" e "o
+      // que aparece na tela".
+      oQueMostrar: rascunho.imagemDescricao.trim() || undefined,
+    })
+    if (!gerada) return
+
+    onAlterarRascunho({
+      temaId: gerada.temaId,
+      arcoId: gerada.arcoId,
+      // O título é da pessoa: o motor não o atropela.
+      stories: paraLinhas(gerada),
+      observacao: gerada.observacao,
     })
   }
 
@@ -176,6 +231,19 @@ export function PainelDeStories({
                 onDescricao={(texto) => onAlterarRascunho({ imagemDescricao: texto })}
                 onRemover={onRemoverImagem}
                 onRegerar={gerarComImagem}
+              />
+
+              <GerarDoAssunto
+                assunto={rascunho.titulo.trim() || rascunho.imagemDescricao.trim()}
+                eixo={eixoEscolhido}
+                arcoId={arcoEscolhido}
+                temStories={rascunho.stories.length > 0}
+                ultimoAngulo={
+                  rascunho.temaId ? (TEMAS_POR_ID.get(rascunho.temaId)?.titulo ?? null) : null
+                }
+                onEixo={setEixoEscolhido}
+                onArco={setArcoEscolhido}
+                onGerar={gerarDoAssunto}
               />
 
               <EditorDeSequencia

@@ -1,5 +1,5 @@
 import { ARCOS, GATILHOS, type Arco, type GatilhoId } from '@/lib/stories/gatilhos'
-import { TEMAS, TEMAS_POR_ID, type Tema } from '@/lib/stories/temas'
+import { TEMAS, TEMAS_POR_ID, type Eixo, type Tema } from '@/lib/stories/temas'
 
 export interface StoryGerado {
   ordem: number
@@ -336,10 +336,17 @@ function palavras(texto: string): string[] {
  * sequência com o ângulo do dia e o objeto certo é útil; um botão que não faz
  * nada, não. A tela diz qual ângulo entrou, para não haver surpresa.
  */
-export function escolherTemaPor(descricao: string, dia: string, contexto: ContextoDoDia): Tema {
+export function escolherTemaPor(
+  descricao: string,
+  dia: string,
+  contexto: ContextoDoDia,
+  /** Restringe ao eixo pedido. Sem ele, o banco inteiro concorre. */
+  eixo?: Eixo,
+): Tema {
+  const candidatos = eixo ? TEMAS.filter((tema) => tema.eixo === eixo) : TEMAS
   const termos = palavras(descricao)
 
-  if (termos.length > 0) {
+  if (termos.length > 0 && candidatos.length > 0) {
     /*
      * Os campos não valem o mesmo.
      *
@@ -355,7 +362,7 @@ export function escolherTemaPor(descricao: string, dia: string, contexto: Contex
         campo.some((p) => p === termo || p.startsWith(termo) || termo.startsWith(p)),
       ).length
 
-    const pontuados = TEMAS.map((tema) => {
+    const pontuados = candidatos.map((tema) => {
       const nota =
         pesar(termos, palavras((tema.contexto ?? []).join(' '))) * 3 +
         pesar(termos, palavras(`${tema.titulo} ${tema.alavanca}`)) * 2 +
@@ -366,6 +373,17 @@ export function escolherTemaPor(descricao: string, dia: string, contexto: Contex
     if (pontuados[0].nota > 0) return pontuados[0].tema
   }
 
+  /*
+   * Nada casou. Em vez de devolver null e travar o botão, cai na sugestão do
+   * dia — que é contextual. Com eixo pedido, cai no primeiro daquele eixo que
+   * a rotação do dia alcançar, para a escolha do usuário ser respeitada mesmo
+   * quando o texto dele não diz nada ao motor.
+   */
+  if (eixo) {
+    const doEixo = sugerirTemas(dia, contexto, TEMAS.length).find((s) => s.tema.eixo === eixo)
+    if (doEixo) return doEixo.tema
+    if (candidatos.length > 0) return candidatos[0]
+  }
   return sugerirTemas(dia, contexto, 1)[0].tema
 }
 
