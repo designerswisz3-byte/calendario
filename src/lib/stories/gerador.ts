@@ -1,4 +1,5 @@
-import { ARCOS, GATILHOS, type Arco, type GatilhoId } from '@/lib/stories/gatilhos'
+import { ARCOS, GATILHOS, type Arco, type Gatilho, type GatilhoId } from '@/lib/stories/gatilhos'
+import { contrair } from '@/lib/stories/frases'
 import { TEMAS, TEMAS_POR_ID, type Eixo, type Tema } from '@/lib/stories/temas'
 
 export interface StoryGerado {
@@ -19,138 +20,121 @@ export interface Sequencia {
   observacao: string
 }
 
-/* ------------------------------------------------------------ português -- */
+/* ------------------------------------------------------------- semente -- */
 
 /**
- * Contrai a preposição com o artigo: "de" + "a arara" vira "da arara".
+ * O número que decide a REDAÇÃO.
  *
- * Sem isto o gerador escrevia "Antes de a arara do estoque virar venda" e
- * "aproximando de a arara" — português de robô, logo na primeira frase que a
- * pessoa lê. O texto é para ser falado em vídeo; se ele tropeça na leitura,
- * a pessoa reescreve tudo e o gerador perde a razão de existir.
+ * Os gatilhos trazem de três a cinco formas de escrever o mesmo movimento, e
+ * os temas trazem mais de um formato possível. Alguém tem de escolher. Não é
+ * sorteio: é o dia, mais o número de vezes que a pessoa pediu outra ideia,
+ * mais o número de vezes que ela apertou gerar.
+ *
+ * O efeito prático é o que foi pedido: o mesmo assunto em duas semanas
+ * diferentes não sai com a mesma frase, e apertar "gerar" de novo reescreve em
+ * vez de repetir.
  */
-const CONTRACOES: Record<'de' | 'em', Record<string, string>> = {
-  de: { a: 'da', o: 'do', as: 'das', os: 'dos' },
-  em: { a: 'na', o: 'no', as: 'nas', os: 'nos' },
+export function sementeDoDia(dia: string, giro = 0, tentativa = 0): number {
+  // Dias desde a epoch, não a soma dos caracteres: '2026-10-09' e '2026-10-18'
+  // somam igual, e a colisão travava a rotação.
+  const dias = Math.floor(Date.parse(`${dia}T00:00:00Z`) / 86_400_000) || 0
+  return Math.abs(dias + giro * 7 + tentativa)
 }
 
-export function contrair(preposicao: 'de' | 'em', texto: string): string {
-  const limpo = texto.trim()
-  if (!limpo) return preposicao
+/** A última frase do story — é por ela que se percebe a repetição na tela. */
+const fechamento = (texto: string) => texto.split('\n\n').pop()?.trim() ?? ''
 
-  const [primeira, ...resto] = limpo.split(/\s+/)
-  const contraida = CONTRACOES[preposicao][primeira.toLowerCase()]
-
-  // Artigo indefinido fica solto de propósito: "de um estoque" é como se
-  // fala, e "dum" soa datado em texto que vai ser lido em voz alta.
-  if (!contraida || resto.length === 0) return `${preposicao} ${limpo}`
-  return `${contraida} ${resto.join(' ')}`
+/** Espalha os gatilhos: sem isto, na semente 0 todos cairiam na variante 0. */
+function digitos(texto: string): number {
+  let soma = 0
+  for (let i = 0; i < texto.length; i++) soma = (soma * 31 + texto.charCodeAt(i)) % 100_003
+  return soma
 }
 
-/* ------------------------------------------------------------- escritores -- */
-/*
- * Um escritor por gatilho. Cada um recebe o tema e devolve o texto DAQUELE
- * story — é aqui que gatilho (o movimento) e tema (o assunto) viram frase.
+/**
+ * Qual das formas de escrever este story entra.
  *
- * O texto sai em rascunho, não em versão final, e isso é de propósito: a
- * sequência é editável e quem grava é o Raphael. Um gerador que entregasse
- * texto fechado seria pior, porque a pessoa leria em vez de falar — e story
- * lido se reconhece de longe.
+ * `ocorrencia` entra na conta por dois motivos. Um: o gatilho que se repete no
+ * arco — o diário tem dois stories de tempo real — nunca cai duas vezes na
+ * mesma frase. Dois: passo e item precisam da ORDEM, não do sorteio, porque o
+ * segundo passo tem de ser o segundo.
  */
+function escolherVariante(gatilho: Gatilho, semente: number, ocorrencia: number): number {
+  const total = gatilho.variantes.length
+  if (gatilho.porOcorrencia) {
+    // Arco com mais passos do que o gatilho tem variantes repete a última em
+    // vez de voltar ao "Passo 1", que seria pior: a pessoa perde a conta.
+    return Math.min(ocorrencia, total - 1)
+  }
+  return (semente + digitos(gatilho.id) + ocorrencia) % total
+}
 
-const ESCRITORES: Record<GatilhoId, (tema: Tema) => string> = {
-  abertura: (t) => t.promessa,
+/* ------------------------------------------------------- arco possível -- */
 
-  /*
-   * "Por trás de X", e não "antes de X virar venda".
-   *
-   * O segundo só funciona quando X é produto. Metade dos temas mostra uma
-   * tela, uma mesa de devolução ou a equipe — e "antes da mesa de devolução
-   * virar venda" é frase quebrada. Testado sobre os 21 temas: esta forma
-   * fecha em todos.
-   */
-  curiosidade: (t) =>
-    [
-      `Por trás ${contrair('de', t.oQueMostrar)} existe uma decisão que quase ninguém vê:`,
-      '',
-      t.pergunta,
-      '',
-      'Vou te mostrar como eu decido.',
-    ].join('\n'),
+/**
+ * Campos opcionais que cada gatilho exige.
+ *
+ * Quem escolhe o arco na mão pode pedir um que o tema não sustenta — e aí o
+ * story sai como `[preencha: …]`, que é de propósito. Mas a escolha AUTOMÁTICA
+ * não pode cair nisso: sequência sugerida pelo app precisa sair pronta para
+ * gravar, senão a pessoa aprende a desconfiar da sugestão.
+ */
+const EXIGE: Partial<Record<GatilhoId, (tema: Tema, vezes: number) => boolean>> = {
+  mito: (t) => Boolean(t.contraste),
+  contraste: (t) => Boolean(t.contraste),
+  vulnerabilidade: (t) => Boolean(t.erro),
+  prova_social: (t) => Boolean(t.provaSocial),
+  // Conta as REPETIÇÕES: a oficina de quatro passos só serve ao tema que tem
+  // quatro ações. Com três, o quarto story sairia pedindo o passo que falta.
+  passo: (t, vezes) => t.acaoUtil.length >= vezes,
+  item: (t, vezes) => t.acaoUtil.length >= vezes,
+}
 
-  identificacao: (t) =>
-    [
-      'Na sua operação, qual destes cenários mais preocupa você?',
-      '',
-      `🔘 ${t.opcoesDeEnquete[0]}`,
-      `🔘 ${t.opcoesDeEnquete[1]}`,
-    ].join('\n'),
+/** Os arcos que este tema consegue sustentar inteiros, sem lacuna. */
+export function arcosPossiveis(tema: Tema): Arco[] {
+  return ARCOS.filter((arco) => {
+    const vezes = new Map<GatilhoId, number>()
+    for (const gatilho of arco.passos) vezes.set(gatilho, (vezes.get(gatilho) ?? 0) + 1)
+    return [...vezes].every(([gatilho, n]) => EXIGE[gatilho]?.(tema, n) ?? true)
+  })
+}
 
-  autoridade: (t) =>
-    [
-      `Vou usar ${t.oQueMostrar} como exemplo.`,
-      '',
-      `Para decidir, eu olho ${t.dadoQueProva}.`,
-      '',
-      'É isso que define onde colocar o dinheiro.',
-    ].join('\n'),
+/**
+ * Gatilhos cujo texto FALA do objeto que está na tela.
+ *
+ * Serve ao caminho da imagem: quando a pessoa colou uma foto, a sequência
+ * precisa falar daquela foto, não só mostrá-la. O tutorial é abertura, passos e
+ * pergunta final — nenhum desses gatilhos cita a cena, e uma sequência assim
+ * ignoraria a imagem que foi o ponto de partida.
+ */
+const CITAM_O_OBJETO: GatilhoId[] = ['bastidor', 'tempo_real', 'curiosidade']
 
-  reciprocidade: (t) => ['Faça uma conferência hoje:', '', ...t.acaoUtil].join('\n'),
-
-  urgencia: (t) =>
-    [
-      `Agora pense no seu prazo: ${t.prazoReal}.`,
-      '',
-      'Se isso te pegar no meio da campanha, quando você consegue resolver?',
-      '',
-      'Essa resposta precisa entrar no planejamento de agora.',
-    ].join('\n'),
-
-  compromisso: (t) =>
-    [
-      `Pensando na sua operação: ${t.perguntaFinal}`,
-      '',
-      t.opcoesFinais.join('? '),
-      '',
-      '📩 Me conte aqui o que está travando.',
-    ].join('\n'),
-
-  bastidor: (t) =>
-    [
-      `Isto aqui é ${t.oQueMostrar}.`,
-      '',
-      'É onde a decisão que eu vou te contar acontece de verdade.',
-    ].join('\n'),
-
-  // Os três abaixo dependem de campo opcional. Sem ele, o texto vira um pedido
-  // explícito em vez de recheio genérico: `[preencha: ...]` não passa
-  // despercebido na hora de gravar; um parágrafo vago passa.
-  vulnerabilidade: (t) =>
-    t.erro
-      ? [
-          'Já errei isso, e o erro foi caro:',
-          '',
-          t.erro.charAt(0).toUpperCase() + t.erro.slice(1) + '.',
-          '',
-          'O que eu mudei depois foi o que vou te mostrar agora.',
-        ].join('\n')
-      : `[preencha: um erro seu nesse assunto e QUANTO ele custou — sem o número, vira humildade de fachada]`,
-
-  prova_social: (t) =>
-    t.provaSocial
-      ? [`Olha ${t.provaSocial}.`, '', 'Não sou só eu passando por isso.'].join('\n')
-      : `[preencha: print de conversa, depoimento ou alguém da equipe falando sobre ${t.alavanca.toLowerCase()}]`,
-
-  contraste: (t) =>
-    t.contraste
-      ? [
-          `O que quase todo mundo faz: ${t.contraste.comum}.`,
-          '',
-          `O que funciona: ${t.contraste.queFunciona}.`,
-          '',
-          'A diferença entre os dois aparece na margem, não na venda.',
-        ].join('\n')
-      : `[preencha: o jeito comum de fazer isso, e o jeito que funciona]`,
+/**
+ * O formato que entra quando a pessoa não escolheu.
+ *
+ * Antes era sempre `arcosSugeridos[0]` — o que fazia o mesmo tema sair sempre
+ * no mesmo formato, e os dezesseis arcos existirem só no seletor. Agora a roda
+ * começa pelos sugeridos (que são os que combinam melhor com o assunto) e
+ * segue pelos demais que o tema sustenta, girando com o dia.
+ */
+export function arcoPadrao(
+  tema: Tema,
+  semente = 0,
+  opcoes: { citaObjeto?: boolean } = {},
+): string {
+  const possiveis = arcosPossiveis(tema).map((arco) => arco.id)
+  const roda = opcoes.citaObjeto
+    ? possiveis.filter((id) =>
+        arcoPorId(id).passos.some((gatilho) => CITAM_O_OBJETO.includes(gatilho)),
+      )
+    : possiveis
+  // Sem nenhum arco que sirva, vale qualquer um que o tema sustente: é melhor
+  // uma sequência com a cena só na direção visual do que botão que não gera.
+  const usavel = roda.length > 0 ? roda : possiveis
+  const sugeridos = tema.arcosSugeridos.filter((id) => usavel.includes(id))
+  const fila = [...sugeridos, ...usavel.filter((id) => !sugeridos.includes(id))]
+  if (fila.length === 0) return tema.arcosSugeridos[0] ?? ARCOS[0].id
+  return fila[semente % fila.length]
 }
 
 /* --------------------------------------------------------------- gerar -- */
@@ -169,6 +153,8 @@ export interface OpcoesDeGeracao {
    * autoridade a segura na mão, a enquete aparece por cima dela.
    */
   oQueMostrar?: string
+  /** Decide a redação e, quando o arco não vem pedido, o formato. */
+  semente?: number
 }
 
 export function gerarSequencia(
@@ -181,20 +167,87 @@ export function gerarSequencia(
 
   const descricao = opcoes.oQueMostrar?.trim()
   const tema: Tema = descricao ? { ...base, oQueMostrar: descricao } : base
+  const semente = opcoes.semente ?? 0
 
-  const arco = arcoPorId(arcoId ?? tema.arcosSugeridos[0] ?? ARCOS[0].id)
+  const arco = arcoPorId(arcoId ?? arcoPadrao(tema, semente, { citaObjeto: Boolean(descricao) }))
 
-  const stories = arco.passos.map((gatilhoId, i) => {
+  /*
+   * O texto sai em RASCUNHO, não em versão final, e isso é de propósito: a
+   * sequência é editável e quem grava é o Raphael. Um gerador que entregasse
+   * texto fechado seria pior, porque a pessoa leria em vez de falar — e story
+   * lido se reconhece de longe.
+   */
+  const repeticoes = new Map<GatilhoId, number>()
+  const ocorrencias: number[] = []
+  const stories: StoryGerado[] = []
+
+  for (const [i, gatilhoId] of arco.passos.entries()) {
     const gatilho = GATILHOS[gatilhoId]
-    return {
+    const ocorrencia = repeticoes.get(gatilhoId) ?? 0
+    repeticoes.set(gatilhoId, ocorrencia + 1)
+    ocorrencias.push(ocorrencia)
+
+    let indice = escolherVariante(gatilho, semente, ocorrencia)
+    let texto = gatilho.variantes[indice](tema, ocorrencia)
+
+    /*
+     * Dois stories seguidos não terminam na mesma frase.
+     *
+     * O bastidor e o tempo real citam os dois o objeto do tema, e o sorteio
+     * podia fechar os dois com a linha idêntica — "a peça nacional ao lado da
+     * embalagem de uma importada." duas vezes, em telas seguidas. Quem assiste
+     * acha que é repost.
+     */
+    const anterior = stories[stories.length - 1]
+    if (anterior && !gatilho.porOcorrencia && fechamento(texto) === fechamento(anterior.texto)) {
+      indice = (indice + 1) % gatilho.variantes.length
+      texto = gatilho.variantes[indice](tema, ocorrencia)
+    }
+
+    stories.push({
       ordem: i + 1,
       rotulo: `Story ${i + 1} — ${gatilho.rotulo}`,
       gatilho: gatilhoId,
-      direcaoVisual: i === 0 ? gatilho.direcaoVisual : direcaoDoTema(gatilhoId, tema),
-      texto: ESCRITORES[gatilhoId](tema),
+      direcaoVisual: direcaoDoTema(gatilhoId, tema),
+      texto,
       pedeInteracao: Boolean(gatilho.pedeInteracao),
+    })
+  }
+
+  /*
+   * A imagem TEM de aparecer em cena, e de preferência na FALA.
+   *
+   * Nem todo arco toca o objeto: o tutorial é abertura, passos e pergunta
+   * final, e nenhum desses gatilhos cita o que está na tela. Quem acabou de
+   * colar uma foto e pediu "gerar em torno da imagem" receberia uma sequência
+   * onde a foto não entra em lugar nenhum — o botão faria algo e não pareceria
+   * ter feito nada.
+   *
+   * São dois remendos, em ordem de qualidade: trocar UM story por uma variante
+   * que fale do objeto (o resto da sequência continua sorteado, então a
+   * variedade fica de pé), e, se nenhum gatilho do arco souber citar, pelo
+   * menos escrever a cena na direção visual da abertura.
+   */
+  if (descricao && !stories.some((story) => story.texto.includes(descricao))) {
+    const alvo = stories.findIndex((story) =>
+      GATILHOS[story.gatilho].variantes.some((v) => v(tema, 0).includes(descricao)),
+    )
+    if (alvo >= 0) {
+      const gatilho = GATILHOS[stories[alvo].gatilho]
+      const ocorrencia = ocorrencias[alvo]
+      const citam = gatilho.variantes.filter((v) => v(tema, ocorrencia).includes(descricao))
+      if (citam.length > 0) {
+        stories[alvo] = { ...stories[alvo], texto: citam[semente % citam.length](tema, ocorrencia) }
+      }
     }
-  })
+  }
+
+  if (descricao && !stories.some((story) => (story.texto + story.direcaoVisual).includes(descricao))) {
+    stories[0] = {
+      ...stories[0],
+      direcaoVisual: `${stories[0].direcaoVisual} Abra mostrando ${descricao}.`,
+    }
+  }
 
   return {
     temaId: tema.id,
@@ -205,7 +258,14 @@ export function gerarSequencia(
   }
 }
 
-/** A direção visual puxa o objeto concreto do tema quando faz sentido. */
+/**
+ * A direção visual puxa o objeto concreto do tema quando faz sentido.
+ *
+ * Vale para o primeiro story também. Enquanto todo arco abria em `abertura`
+ * ("você falando com a câmera"), não fazia diferença; com arcos que abrem no
+ * bastidor ou em tempo real, o story 1 é justamente o que mais precisa dizer o
+ * que aparece na tela.
+ */
 function direcaoDoTema(gatilhoId: GatilhoId, tema: Tema): string {
   const padrao = GATILHOS[gatilhoId].direcaoVisual
   switch (gatilhoId) {
@@ -213,13 +273,25 @@ function direcaoDoTema(gatilhoId: GatilhoId, tema: Tema): string {
       return `Movimento: a câmera se aproximando ${contrair('de', tema.oQueMostrar)}.`
     case 'bastidor':
       return `Plano aberto ${contrair('de', tema.oQueMostrar)}.`
+    case 'tempo_real':
+      return `Gravação de mão, sem corte: ${tema.oQueMostrar}.`
     case 'autoridade':
-      // "Você com a arara com as peças..." — o objeto do tema já costuma
-      // trazer um "com". "Em cena:" não colide com nada e serve igual para
-      // objeto, tela e pessoa.
+      // "Você com a arara com as peças…" — o objeto do tema já costuma trazer
+      // um "com". "Em cena:" não colide com nada e serve igual para objeto,
+      // tela e pessoa.
       return `Em cena: ${tema.oQueMostrar}. Mostre o dado na tela: ${tema.dadoQueProva}.`
+    case 'numero':
+      return `Tela cheia, fonte grande, só o dado: ${tema.dadoQueProva}.`
     case 'identificacao':
-      return `Imagem ${contrair('de', tema.oQueMostrar)}, com enquete por cima.`
+      // "Imagem da arara com as peças, com enquete por cima" empilhava dois
+      // "com" na mesma frase. Em duas frases, lê-se na gravação.
+      return `Imagem ${contrair('de', tema.oQueMostrar)}. Enquete por cima.`
+    case 'urgencia':
+      return `A etapa seguinte do processo, com o prazo escrito na tela: ${tema.prazoReal}.`
+    case 'gancho':
+      // "Plano rápido da peça que encalhou, ainda no estoque, ainda inacabado"
+      // — dois "ainda" e três vírgulas. Em duas frases, não empilha.
+      return `O que vem a seguir, ainda inacabado. Em cena: ${tema.oQueMostrar}.`
     default:
       return padrao
   }
@@ -229,22 +301,38 @@ function direcaoDoTema(gatilhoId: GatilhoId, tema: Tema): string {
  * O recado final.
  *
  * Aponta o story que sustenta a sequência — aquele que, se sair fraco, derruba
- * o resto. É sempre o da prova concreta quando ela existe; sem ela, o da ação
- * útil, que é o que faz salvar.
+ * o resto. Cada tipo de fecho tem um ponto fraco diferente, e isso importa
+ * agora que existe arco sem dado, sem tarefa e sem pedido de resposta.
  */
+const PESO_DO_STORY: Partial<Record<GatilhoId, string>> = {
+  autoridade:
+    'é o story que torna a sua autoridade visível. Um dado real ali dá força a todos os outros.',
+  reciprocidade:
+    'é o story que faz salvar. Sem uma tarefa que a pessoa consiga fazer hoje, a sequência vira opinião.',
+  passo: 'é o passo em que a pessoa para o celular e executa. Se for vago, ela abandona no meio.',
+  item: 'é o item que precisa valer sozinho. Quem chega no meio da lista começa por ele.',
+  compromisso: 'é onde a conversa abre. Se a pergunta for vaga, ninguém responde.',
+  gancho:
+    'é o que traz a pessoa de volta amanhã. Só prometa a continuação que você realmente vai gravar.',
+  vulnerabilidade:
+    'é o story que compra confiança. Erro sem o número do prejuízo soa a humildade de fachada.',
+  curiosidade: 'é o laço que segura a sequência. Se ele entregar a resposta, ninguém vê o resto.',
+}
+
+const ORDEM_DE_PESO: GatilhoId[] = ['autoridade', 'reciprocidade', 'passo', 'item', 'vulnerabilidade']
+
 function observacaoDe(arco: Arco, stories: StoryGerado[]): string {
-  const prova = stories.find((s) => s.gatilho === 'autoridade')
-  const util = stories.find((s) => s.gatilho === 'reciprocidade')
-  const alvo = prova ?? util ?? stories[stories.length - 1]
+  const alvo =
+    ORDEM_DE_PESO.map((gatilho) => stories.find((s) => s.gatilho === gatilho)).find(Boolean) ??
+    stories[stories.length - 1]
 
   const porque =
-    alvo === prova
-      ? 'é o story que torna a sua autoridade visível. Um dado real ali dá força a todos os outros.'
-      : alvo === util
-        ? 'é o story que faz salvar. Sem uma tarefa que a pessoa consiga fazer hoje, a sequência vira opinião.'
-        : 'é onde a conversa abre. Se a pergunta for vaga, ninguém responde.'
+    PESO_DO_STORY[alvo.gatilho] ??
+    'é o story que fecha. Se ele não der um motivo para voltar, a sequência termina em silêncio.'
 
-  return `Arco: ${arco.rotulo}. O ${alvo.rotulo.split(' — ')[0].toLowerCase()} merece mais atenção — ${porque}`
+  return `Arco: ${arco.rotulo} (${arco.tom.toLowerCase()}). O ${alvo.rotulo
+    .split(' — ')[0]
+    .toLowerCase()} merece mais atenção — ${porque}`
 }
 
 /* ------------------------------------------------------------ sugestões -- */

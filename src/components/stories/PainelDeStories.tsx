@@ -23,8 +23,10 @@ import { ImagemDeApoio } from '@/components/stories/ImagemDeApoio'
 import { ARCOS } from '@/lib/stories/gatilhos'
 import { ROTULO_DE_EIXO, TEMAS_POR_ID, type Eixo } from '@/lib/stories/temas'
 import {
+  arcoPadrao,
   escolherTemaPor,
   gerarSequencia,
+  sementeDoDia,
   sugerirTemas,
   type Sugestao,
 } from '@/lib/stories/gerador'
@@ -108,6 +110,24 @@ export function PainelDeStories({
     [dia, contexto, giro],
   )
 
+  /*
+   * A semente da REDAÇÃO.
+   *
+   * O dia e a rodada já mudam os assuntos; a semente muda as frases e o
+   * formato. O contador de tentativas é o que faz apertar "gerar" de novo
+   * reescrever em vez de devolver o mesmo texto — era essa a reclamação: todas
+   * as sequências saíam no mesmo molde.
+   *
+   * Fica num ref, não em estado: quem lê é a função de gerar, no clique.
+   * Em estado, cada clique causaria um render inútil do painel inteiro.
+   */
+  const tentativa = React.useRef(0)
+  React.useEffect(() => {
+    tentativa.current = 0
+  }, [dia])
+
+  const sementeBase = React.useMemo(() => (dia ? sementeDoDia(dia, giro) : 0), [dia, giro])
+
   const [arcoPorTema, setArcoPorTema] = React.useState<Record<string, string>>({})
   /* Escolhas do bloco "gerar a partir do seu assunto". */
   const [eixoEscolhido, setEixoEscolhido] = React.useState<Eixo | typeof QUALQUER_EIXO>(
@@ -128,6 +148,7 @@ export function PainelDeStories({
     if (!dia) return
     const gerada = gerarSequencia(temaId, arcoId, {
       oQueMostrar: rascunho?.imagemDescricao,
+      semente: sementeDoDia(dia, giro, tentativa.current++),
     })
     if (!gerada) return
     onAbrirRascunho({
@@ -172,6 +193,7 @@ export function PainelDeStories({
       // escolhe o ÂNGULO. São duas perguntas diferentes: "sobre o quê" e "o
       // que aparece na tela".
       oQueMostrar: rascunho.imagemDescricao.trim() || undefined,
+      semente: sementeDoDia(dia, giro, tentativa.current++),
     })
     if (!gerada) return
 
@@ -200,6 +222,7 @@ export function PainelDeStories({
     const temaId = rascunho.temaId ?? escolherTemaPor(descricao, dia, contexto).id
     const gerada = gerarSequencia(temaId, rascunho.arcoId ?? undefined, {
       oQueMostrar: descricao,
+      semente: sementeDoDia(dia, giro, tentativa.current++),
     })
     if (!gerada) return
 
@@ -393,7 +416,7 @@ export function PainelDeStories({
 
                     <div className="flex flex-wrap items-center gap-2">
                       <Select
-                        value={arcoPorTema[tema.id] ?? tema.arcosSugeridos[0]}
+                        value={arcoPorTema[tema.id] ?? arcoPadrao(tema, sementeBase)}
                         onValueChange={(valor) =>
                           setArcoPorTema((atual) => ({ ...atual, [tema.id]: valor }))
                         }
@@ -407,7 +430,7 @@ export function PainelDeStories({
                         <SelectContent>
                           {ARCOS.map((arco) => (
                             <SelectItem key={arco.id} value={arco.id}>
-                              {arco.rotulo} · {arco.passos.length} stories
+                              {arco.rotulo} · {arco.passos.length} stories · {arco.tom}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -415,7 +438,9 @@ export function PainelDeStories({
 
                       <Button
                         size="sm"
-                        onClick={() => gerar(tema.id, arcoPorTema[tema.id] ?? tema.arcosSugeridos[0])}
+                        onClick={() =>
+                          gerar(tema.id, arcoPorTema[tema.id] ?? arcoPadrao(tema, sementeBase))
+                        }
                       >
                         <Sparkles className="mr-1.5 h-3.5 w-3.5" />
                         Gerar sequência

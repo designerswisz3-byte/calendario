@@ -392,14 +392,51 @@ dos 21 temas.
 
 | Arquivo | O que é |
 | --- | --- |
-| `gatilhos.ts` | os movimentos (curiosidade, identificação, autoridade, reciprocidade, urgência, compromisso, bastidor, vulnerabilidade, prova social, contraste) e os 5 arcos |
+| `gatilhos.ts` | os 18 movimentos (abertura, dado na tela, mito, bastidor, tempo real, pergunta da caixinha, curiosidade, identificação, autoridade, prova social, contraste, vulnerabilidade, reciprocidade, passo, item, urgência, compromisso, gancho), cada um com 3 a 5 formas de ser escrito, e os 16 arcos |
 | `temas.ts` | 21 assuntos que o Raphael sustenta com operação real, cada um com pergunta, dado que prova, ação útil, prazo real e as opções da enquete |
-| `gerador.ts` | compõe gatilho × tema em texto, e escolhe os três do dia |
+| `frases.ts` | as costuras de português que as variantes usam: contração, artigo, maiúscula, parágrafos |
+| `gerador.ts` | compõe gatilho × tema × redação em texto, e escolhe os três assuntos do dia |
 
 A separação é o que torna o motor reutilizável: trocar o tema mantém a
 estrutura que funciona; trocar o arco reconta o mesmo assunto com outra
 intenção. Um gerador que misturasse os dois só saberia repetir o exemplo que
 lhe deram.
+
+#### Variedade: o motor tinha 11 frases, não 105 sequências
+
+A primeira versão tinha **uma** função de escrita por gatilho e cinco arcos que
+abriam todos em `abertura` e fechavam todos em `compromisso`. Com 21 temas e 5
+arcos parecia haver 105 sequências; havia 11 frases, e trocar o tema só trocava
+os substantivos. O Raphael viu isso em uma semana de uso: *"TODAS as sequências
+seguem um padrão — aquele foi apenas um exemplo"*. Estava certo, e o número
+confirmou: 11 escritores, 5 arcos, 1 abertura, 1 fechamento.
+
+O que mudou, em três camadas:
+
+1. **Redação.** Cada gatilho carrega de 3 a 5 variantes — não sinônimos, e sim
+   ângulos: a curiosidade pode abrir pelo objeto, pela pergunta que ninguém
+   faz, pelo tempo que você levou para entender. São 65 frases no banco.
+2. **Formato.** 16 arcos, com 7 aberturas diferentes (promessa, dado cru,
+   crença do mercado, bastidor, tempo real, pergunta da caixinha, prova social)
+   e 3 fechamentos (pedido de resposta, gancho para o dia seguinte, tarefa
+   entregue sem pedir nada). Há arco que não pede interação nenhuma e arco que
+   não ensina nada — porque sequência que sempre termina pedindo algo cansa a
+   audiência mais rápido do que qualquer assunto repetido.
+3. **Quem escolhe.** Uma semente: dia + rodada do botão "outras ideias" +
+   número de vezes que a pessoa apertou gerar. Não é sorteio — o mesmo dia
+   reaberto dá o mesmo texto —, mas o mesmo assunto em duas semanas diferentes
+   não sai com a mesma frase, e apertar "gerar" de novo **reescreve**. A tela
+   diz isso, senão ninguém descobre.
+
+O arco padrão também gira: era sempre `arcosSugeridos[0]`, o que fazia os
+dezesseis formatos existirem só no seletor. Agora a roda começa pelos sugeridos
+e segue pelos demais **que o tema sustenta inteiros** — a escolha automática
+nunca cai num arco que produziria `[preencha: ...]`, embora a escolha manual
+possa, de propósito.
+
+Medido: o mesmo tema, no mesmo arco, dá 14 redações distintas em 14 dias; 209
+de 210 sequências do caminho da imagem são distintas; a rotação automática
+alcança os 16 arcos; nenhuma variante fica fora da rotação.
 
 **Campo opcional ausente vira `[preencha: ...]`**, nunca enchimento. Um
 parágrafo vago parece pronto e não é — e isso custa uma gravação inteira.
@@ -412,6 +449,15 @@ imagem: a curiosidade se aproxima dela, a autoridade a põe em cena, a enquete
 aparece por cima. São cinco palavras de trabalho para um resultado coeso de
 verdade, em vez de coeso no discurso.
 
+Com dezesseis arcos isso passou a exigir cuidado: o tutorial é abertura, passos
+e pergunta final, e nenhum desses gatilhos fala do objeto — uma foto colada ali
+não entraria em lugar nenhum. Três garantias, em ordem de qualidade: quando o
+app escolhe o arco, prefere os que **falam** do objeto; se mesmo assim nenhum
+story citar a cena, um deles troca de variante por uma que cite; e, se o arco
+escolhido à mão não souber citar, a cena vai para a direção visual da abertura.
+Resultado medido: 203 de 210 combinações citam a imagem na fala, e 210 de 210
+a põem em cena.
+
 **Gerar a partir do assunto que a pessoa escreveu.** As sugestões do dia
 resolvem "não sei sobre o que falar". O caso mais comum de quem já tem pauta é
 o contrário — "eu sei o assunto, me dá a sequência" —, e ele terminava num
@@ -421,7 +467,9 @@ seu assunto" usa o título escrito à mão como busca, com dois seletores:
 - **Finalidade** (autoridade · humanidade · ensino · conexão), porque o mesmo
   assunto rende sequências diferentes: a Black Friday dá uma de autoridade (a
   decisão com dado) e outra de humanidade (o erro do ano passado).
-- **Arco**, que decide o tamanho — de 4 a 7 stories.
+- **Arco**, que decide o tamanho (de 4 a 7 stories) e o tom — o seletor mostra
+  os dois, porque "Lista numerada · 5 stories" e "Diário do dia · 5 stories"
+  são a mesma altura e coisas opostas.
 
 O título da pessoa nunca é atropelado pelo do tema; em troca, a tela mostra
 `Ângulo usado: …`, senão ela não teria como saber por onde o motor entrou.
@@ -867,8 +915,8 @@ editor montando vazio ao trocar de nota, e o cache servindo a nota velha.
 3. A faixa de evento de vários dias afinava nos dias do meio (rótulo vazio sem
    altura mínima), e a feira de seis dias parecia três eventos soltos.
 
-**Nos Stories**, 36 asserções de motor puro e 39 no navegador contra o banco
-real. Pegaram quatro coisas:
+**Nos Stories**, 73 asserções de motor puro e 97 no navegador contra o banco
+real. Pegaram seis coisas:
 
 1. A rotação das sugestões cobria só **13 dos 21 temas** em um mês. A semente
    era a soma dos caracteres da data, e `2026-10-09` soma igual a `2026-10-18`:
@@ -884,10 +932,26 @@ real. Pegaram quatro coisas:
    vê"*, verificado sobre os 21 temas.
 4. *"Você com a arara com as peças…"* — o objeto do tema já costuma trazer um
    "com". A direção de câmera da autoridade virou "Em cena: …".
+5. Na rodada da variedade, a varredura sobre 2.016 sequências pegou frases que
+   só quebram em alguns temas: *"A peça que encalhou, ainda no estoque neste
+   momento."* e *"Por trás da arara do modelo, separada por tamanho existe uma
+   decisão"*. Metade dos temas tem uma vírgula no meio do `oQueMostrar`, e
+   qualquer palavra colada depois dele entra na oração errada. Regra que ficou:
+   **campo do tema fecha a frase**.
+6. Dois stories seguidos podiam terminar na mesma linha (bastidor e tempo real
+   citam os dois o objeto), e na tela isso parece repost. O gerador passa para
+   a variante seguinte quando o fechamento se repete — 0 pares em 2.688
+   sequências.
 
-As duas últimas só apareceram porque o teste roda o gerador sobre **todos** os
-temas e lê a frase resultante, em vez de conferir um exemplo. Testar um caso
-teria passado.
+Três dessas só apareceram porque o teste roda o gerador sobre **todos** os
+temas, em todos os arcos, e lê a frase resultante — em vez de conferir um
+exemplo. Testar um caso teria passado.
+
+Vale registrar também o que os testes antigos *não* pegaram: duas asserções
+codificavam o defeito. Uma exigia que a curiosidade começasse em "Por trás
+d…", a outra que todo story 7 trouxesse as opções do compromisso — e as duas
+passavam exatamente porque existia uma única redação possível. Teste que fixa a
+frase impede a variedade de nascer; o que vale fixar é o **movimento**.
 
 Também vale registrar um susto do harness: a imagem de apoio chegava quebrada
 na tela, e parecia bug do app. Era o stub de Storage guardando o envelope

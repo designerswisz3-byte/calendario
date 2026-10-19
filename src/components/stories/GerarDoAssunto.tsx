@@ -91,7 +91,7 @@ export function GerarDoAssunto({
             <SelectContent>
               {ARCOS.map((arco) => (
                 <SelectItem key={arco.id} value={arco.id}>
-                  {arco.rotulo} · {arco.passos.length} stories
+                  {arco.rotulo} · {arco.passos.length} stories · {arco.tom}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -108,9 +108,16 @@ export function GerarDoAssunto({
           <Sparkles className="mr-1.5 h-3.5 w-3.5" />
           {temStories ? 'Regerar sequência' : 'Gerar sequência'}
         </Button>
-        {temStories && (
-          <span className="text-xs text-muted-foreground">Substitui o que está escrito.</span>
-        )}
+        {/*
+          * Dizer que regerar REESCREVE é o que fecha a reclamação de que tudo
+          * saía no mesmo molde: sem isso, ninguém descobre que o botão dá uma
+          * redação nova a cada toque — e continua achando que é sempre igual.
+          */}
+        <span className="text-xs text-muted-foreground">
+          {temStories
+            ? 'Substitui o que está escrito — e escreve com outras palavras a cada toque.'
+            : 'Cada toque escreve de um jeito diferente.'}
+        </span>
       </div>
 
       {/* Nunca travar sem dizer o motivo na tela. */}

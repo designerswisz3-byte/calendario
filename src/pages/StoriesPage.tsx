@@ -224,10 +224,11 @@ export default function StoriesPage() {
           <h2 className="text-sm font-semibold">Como esta aba funciona</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Clique num dia. A aba sugere três assuntos, escolhidos pelo que está no seu
-            calendário e nas suas notícias — não por sorteio. Escolha um arco (de 4 a 7 stories)
-            e a sequência nasce escrita: promessa, curiosidade, enquete, prova com dado, tarefa
-            útil, prazo real e a pergunta que abre a caixinha. Tudo editável, porque quem grava
-            é você.
+            calendário e nas suas notícias — não por sorteio. São dezesseis formatos de
+            sequência: uns abrem na promessa, outros no dado cru, no bastidor, numa crença do
+            mercado ou numa pergunta da caixinha; uns fecham pedindo resposta, outros só
+            prometendo o próximo. O formato e a redação mudam de um dia para o outro, e apertar
+            "gerar" de novo escreve diferente. Tudo editável, porque quem grava é você.
           </p>
         </Card>
       )}

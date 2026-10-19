@@ -123,7 +123,7 @@ export const TEMAS: Tema[] = [
     arcosSugeridos: ['contraste_curto', 'ensino_rapido'],
     contraste: {
       comum: 'segurar a peça esperando vender pelo preço justo',
-      queFunciona: 'uma régua de desconto por tempo de estoque, decidida antes de a peça encalhar',
+      queFunciona: 'uma régua de desconto por tempo de estoque, decidida antes da peça encalhar',
     },
     contexto: ['liquidação', 'inventário', 'coleção', 'queima'],
   },
@@ -213,7 +213,7 @@ export const TEMAS: Tema[] = [
     promessa: 'Em moda, de 10% a 30% do que você vende volta. Quem não mede por produto paga sem saber.',
     pergunta: 'Quais são os três produtos que mais voltam, e por quê?',
     oQueMostrar: 'a mesa de devolução com as peças que voltaram',
-    dadoQueProva: 'a taxa de devolução dos seus três produtos campeões, em porcentagem',
+    dadoQueProva: 'a taxa de devolução dos três produtos campeões, em porcentagem',
     acaoUtil: [
       'Liste a devolução dos últimos 90 dias por produto, não no total.',
       'Pegue os três que mais voltam.',
@@ -285,7 +285,7 @@ export const TEMAS: Tema[] = [
     promessa: 'Você não vai ganhar de preço de quem aceita perder dinheiro. E não precisa.',
     pergunta: 'O que a peça de 30 dias de entrega não entrega, e a sua entrega?',
     oQueMostrar: 'a peça nacional ao lado da embalagem de uma importada',
-    dadoQueProva: 'o prazo médio de entrega seu contra o do importado, e a sua taxa de troca resolvida',
+    dadoQueProva: 'o prazo médio de entrega nacional contra o do importado, e a taxa de troca resolvida',
     acaoUtil: [
       'Liste três coisas que você faz e o importado não: prazo, troca, prova, atendimento.',
       'Escolha a mais forte e coloque na página de produto, não no rodapé.',
@@ -334,7 +334,7 @@ export const TEMAS: Tema[] = [
     promessa: 'Produzir dá mais trabalho e menos margem no começo. Vou te contar por que eu escolhi assim mesmo.',
     pergunta: 'O que você ganha controlando a produção, e o que você perde?',
     oQueMostrar: 'o chão da confecção, com as máquinas rodando',
-    dadoQueProva: 'o prazo de reposição seu contra o de quem compra pronto',
+    dadoQueProva: 'o prazo de reposição da confecção própria contra o de quem compra pronto',
     acaoUtil: [
       'Liste o que trava sua operação hoje: prazo, qualidade, exclusividade ou custo.',
       'Produzir resolve prazo e exclusividade. Não resolve custo no começo.',
@@ -422,7 +422,7 @@ export const TEMAS: Tema[] = [
     promessa: 'Quem vende bem na data decidiu três meses antes. Dezembro é só execução.',
     pergunta: 'O que precisa estar resolvido hoje para a campanha ser só execução?',
     oQueMostrar: 'o calendário de campanhas na parede',
-    dadoQueProva: 'a sua data-limite de compra, de foto e de preço para a próxima campanha',
+    dadoQueProva: 'a data-limite de compra, de foto e de preço para a próxima campanha',
     acaoUtil: [
       'Pegue a próxima data grande do seu calendário.',
       'Conte para trás: entrega, produção, compra, decisão de mix.',
@@ -443,7 +443,7 @@ export const TEMAS: Tema[] = [
     promessa: 'Aceitar pedido depois da data de corte troca faturamento por reclamação.',
     pergunta: 'Qual é o último dia em que você consegue prometer entrega antes da data?',
     oQueMostrar: 'a expedição, com as caixas prontas para sair',
-    dadoQueProva: 'o prazo real da sua transportadora por região, não o do site',
+    dadoQueProva: 'o prazo real da transportadora por região, não o do site',
     acaoUtil: [
       'Pegue o prazo real de entrega por região do último mês.',
       'Conte para trás a partir da data da campanha.',
@@ -513,7 +513,7 @@ export const TEMAS: Tema[] = [
     promessa: 'Em data de presente, a embalagem decide se a cliente volta — e ela custa menos que um anúncio.',
     pergunta: 'O que a sua cliente sente ao abrir a caixa que você mandou?',
     oQueMostrar: 'a embalagem sendo montada na expedição',
-    dadoQueProva: 'o custo da embalagem por pedido contra o seu custo de aquisição de cliente',
+    dadoQueProva: 'o custo da embalagem por pedido contra o custo de aquisição de cliente',
     acaoUtil: [
       'Peça um pedido seu para a sua própria casa.',
       'Abra como se fosse cliente e filme.',
