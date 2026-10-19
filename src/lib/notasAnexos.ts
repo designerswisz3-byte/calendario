@@ -35,12 +35,22 @@ const EXTENSAO_POR_MIME: Record<string, string> = {
 
 export const TIPOS_DE_IMAGEM = Object.keys(EXTENSAO_POR_MIME)
 
-/** Sobe o arquivo e devolve o caminho no bucket (nunca uma URL). */
-export async function subirAnexo(userId: string, arquivo: File): Promise<string> {
+/**
+ * Sobe o arquivo e devolve o caminho no bucket (nunca uma URL).
+ *
+ * `pasta` separa as origens dentro do mesmo balde — notas, stories. É só
+ * organização: a política de acesso olha o primeiro segmento, que é o id do
+ * dono, e não o segundo.
+ */
+export async function subirAnexo(
+  userId: string,
+  arquivo: File,
+  pasta: 'notas' | 'stories' = 'notas',
+): Promise<string> {
   const extensao = EXTENSAO_POR_MIME[arquivo.type]
   if (!extensao) throw new Error(`"${arquivo.name}" não é um formato de imagem aceito.`)
 
-  const caminho = `${userId}/notas/${crypto.randomUUID()}.${extensao}`
+  const caminho = `${userId}/${pasta}/${crypto.randomUUID()}.${extensao}`
   const { error } = await supabase.storage.from(BUCKET_ANEXOS).upload(caminho, arquivo, {
     contentType: arquivo.type,
     cacheControl: '3600',

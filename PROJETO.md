@@ -1,4 +1,4 @@
-# Projeto: Calendário Editorial + Preview + Notas + Relatório + Notícias
+# Projeto: Calendário Editorial + Stories + Preview + Notas + Relatório + Notícias
 
 Registro completo do que foi construído: o produto, as decisões, os limites
 reais que testamos e o que ficou de fora. O `README.md` responde *como rodar*.
@@ -6,8 +6,8 @@ Este documento responde *o que existe e por quê* — é o documento de handover
 
 - **Repositório:** `designerswisz3-byte/calendario`
 - **Branches:** `main` e `claude/criacao-pdf-q9fjoh` (mantidas idênticas)
-- **Commits:** 31
-- **Migrações SQL:** 12 (consolidadas em `supabase/setup-completo.sql`)
+- **Commits:** 32
+- **Migrações SQL:** 13 (consolidadas em `supabase/setup-completo.sql`)
 
 ---
 
@@ -48,6 +48,8 @@ Funcionando e no ar:
 - Botão **AJUSTES** — o cliente escreve sem limite de caracteres
 - Botão do **Canva** com **visto** que o expert marca e desmarca
 - Botão **DOWNLOAD DE MÍDIA** — arquivo único ou tudo em `.zip`
+- **Stories**: calendário próprio, com sugestão de assunto puxada pelo contexto e sequências geradas, editáveis e ancoráveis numa imagem
+- **Data de publicação editável** no formulário do item — o conteúdo já nasce no dia em que vai ao ar
 - **Datas do setor no calendário**: 52 eventos e datas comerciais de out/2026 a dez/2027, cada uma com um ângulo de post pronto para virar pauta
 - **Notícias**: curadoria de e-commerce de moda com relevância, "por que importa" e botão que transforma a notícia em pauta
 - **Relatório**: arquivo mês a mês e semana a semana de métricas de perfil, com comparativo e PDF
@@ -116,6 +118,7 @@ baixa o bundle do calendário, do editor nem do desenho para desenhar um post.
 | `/notas` | privada | caderno com texto, imagem, desenho e ligações |
 | `/calendario` | privada | mês, painel do dia, briefing, roteiro, teleprompter |
 | `/criar` | privada | monta o conteúdo e gera o link |
+| `/stories` | privada | calendário de stories, sugestão de assunto e gerador de sequência |
 | `/noticias` | privada | curadoria do setor, com "virar pauta" |
 | `/relatorio` | privada | métricas mensais/semanais, comparativo e exportação em PDF |
 | `*` | — | 404 |
@@ -124,7 +127,7 @@ baixa o bundle do calendário, do editor nem do desenho para desenhar um post.
 
 ## 5. Modelo de dados
 
-Onze tabelas em uso.
+Doze tabelas em uso.
 
 ### `notas` — o caderno
 `id`, `user_id`, `titulo`, `conteudo`, `desenho` (jsonb), `imagens` (jsonb),
@@ -171,6 +174,23 @@ sem isso o carrossel misto não saberia o que renderizar em cada slide.
 
 Sem limite de caracteres. **Não tem política de INSERT** — e isso é intencional
 (ver seção 6).
+
+### `stories_sequencias` — o calendário paralelo
+
+`id`, `user_id`, `data`, `titulo`, `tema_id`, `arco_id`, `stories` (jsonb),
+`imagem_caminho`, `imagem_descricao`, `observacao`, `publicado`.
+
+**Por que não é mais um `tipo` em `calendar_items`.** Story e post são produtos
+diferentes. O post tem legenda, mídia, link de aprovação e um expert; o story
+tem uma sequência — blocos de texto com ordem, gatilho e direção de câmera — e
+vive 24 horas. Forçar os dois na mesma linha deixaria metade das colunas sempre
+nula e encheria a tela de `if` perguntando "mas é story?". São duas grades
+porque são dois ofícios.
+
+**Por que a sequência é jsonb e não uma tabela filha.** Ela é editada como
+documento: a pessoa reordena, apaga o story 3, reescreve o 5 e salva o
+conjunto. Normalizar trocaria um UPDATE por um diff de linhas, sem ganhar
+nenhuma consulta que a tela precise fazer.
 
 ### `eventos` — o que vai acontecer, e o que postar sobre isso
 
@@ -331,6 +351,44 @@ token de página da Meta — quem abrisse o DevTools teria a conta. A entrada é
 por importação (CSV ou JSON, uma linha por dia), com `upsert` em
 `(perfil_id, dia)`: reimportar o mesmo mês corrige os dias em vez de duplicar
 o período. A tela mostra o que vai entrar antes de gravar.
+
+### `/stories`
+
+Grade própria, mais leve que a do calendário editorial: sem arrastar, sem tags,
+sem status. A célula só responde "tem sequência aqui, e sobre o quê".
+
+Clicar num dia abre três assuntos. **Não é sorteio**: a pontuação lê o que já
+está no app — as datas do mês e as notícias recentes — e sobe os temas que
+conversam com elas. Por isso uma terça de novembro sugere estoque e margem, e
+uma terça de janeiro sugere queima e caixa. O desempate é semeado pela data, o
+que dá duas propriedades que importam: a lista é a MESMA se você reabrir o
+mesmo dia (sugestão que muda a cada clique faz a pessoa ficar caçando uma
+melhor em vez de gravar), e anda uma casa por dia, de modo que o banco inteiro
+circula ao longo do mês.
+
+**O motor** está em `src/lib/stories/`, em três peças:
+
+| Arquivo | O que é |
+| --- | --- |
+| `gatilhos.ts` | os movimentos (curiosidade, identificação, autoridade, reciprocidade, urgência, compromisso, bastidor, vulnerabilidade, prova social, contraste) e os 5 arcos |
+| `temas.ts` | 21 assuntos que o Raphael sustenta com operação real, cada um com pergunta, dado que prova, ação útil, prazo real e as opções da enquete |
+| `gerador.ts` | compõe gatilho × tema em texto, e escolhe os três do dia |
+
+A separação é o que torna o motor reutilizável: trocar o tema mantém a
+estrutura que funciona; trocar o arco reconta o mesmo assunto com outra
+intenção. Um gerador que misturasse os dois só saberia repetir o exemplo que
+lhe deram.
+
+**Campo opcional ausente vira `[preencha: ...]`**, nunca enchimento. Um
+parágrafo vago parece pronto e não é — e isso custa uma gravação inteira.
+
+**A imagem.** O app roda no navegador e não LÊ a imagem: isso exigiria um
+modelo de visão, que exigiria chave de API no bundle, que é chave pública. Em
+vez de fingir, a tela pede a única coisa que falta — uma linha dizendo o que a
+foto mostra. Com ela, a sequência inteira passa a girar em torno daquela
+imagem: a curiosidade se aproxima dela, a autoridade a põe em cena, a enquete
+aparece por cima. São cinco palavras de trabalho para um resultado coeso de
+verdade, em vez de coeso no discurso.
 
 ### `/noticias`
 
@@ -757,6 +815,34 @@ editor montando vazio ao trocar de nota, e o cache servindo a nota velha.
    que na mesma hora apontou dois erros reais que estavam no diretório.
 3. A faixa de evento de vários dias afinava nos dias do meio (rótulo vazio sem
    altura mínima), e a feira de seis dias parecia três eventos soltos.
+
+**Nos Stories**, 36 asserções de motor puro e 39 no navegador contra o banco
+real. Pegaram quatro coisas:
+
+1. A rotação das sugestões cobria só **13 dos 21 temas** em um mês. A semente
+   era a soma dos caracteres da data, e `2026-10-09` soma igual a `2026-10-18`:
+   a janela parava nos mesmos lugares. Trocada por dias-desde-a-epoch, que anda
+   exatamente uma casa por dia — 21 de 21.
+2. Português de robô na primeira frase: *"Antes de a arara virar venda"*. O
+   gerador concatenava `de` + descrição sem contrair. Agora contrai (`da`,
+   `do`, `das`, `dos`), e o artigo indefinido fica solto de propósito, porque
+   "dum" soa datado em texto que vai ser lido em voz alta.
+3. O molde de curiosidade era *"Antes de X virar venda"*, que só fecha quando X
+   é produto — metade dos temas mostra uma tela, uma mesa de devolução ou a
+   equipe. Trocado por *"Por trás de X existe uma decisão que quase ninguém
+   vê"*, verificado sobre os 21 temas.
+4. *"Você com a arara com as peças…"* — o objeto do tema já costuma trazer um
+   "com". A direção de câmera da autoridade virou "Em cena: …".
+
+As duas últimas só apareceram porque o teste roda o gerador sobre **todos** os
+temas e lê a frase resultante, em vez de conferir um exemplo. Testar um caso
+teria passado.
+
+Também vale registrar um susto do harness: a imagem de apoio chegava quebrada
+na tela, e parecia bug do app. Era o stub de Storage guardando o envelope
+`multipart/form-data` inteiro como se fosse o PNG — o supabase-js manda o
+arquivo como form-data no navegador. Defeito do harness disfarçado de defeito
+do produto; o stub passou a desembrulhar.
 
 **No Relatório**, com 100 dias de dados reais de `@swiszoficial` (julho a
 outubro de 2026, com o buraco real de seguidores antes de 16/09) e 49

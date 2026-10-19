@@ -13,7 +13,7 @@ import {
 import { TagPicker } from '@/components/calendar/TagPicker'
 import { BlocoDeNotas, type AbaDeTexto } from '@/components/calendar/BlocoDeNotas'
 import { PLANNING_TYPES, STATUSES, STATUS_LABEL, TYPE_LABEL } from '@/lib/constants'
-import { formatTime } from '@/lib/date'
+import { formatShortDate, formatTime } from '@/lib/date'
 import { contarPalavras, resumoDoRoteiro } from '@/lib/texto'
 import type { CalendarItemInput } from '@/hooks/useCalendarItems'
 import type { CalendarItemWithRelations, CalendarStatus, PlanningType } from '@/types/database'
@@ -57,6 +57,15 @@ export function CalendarItemForm({
   titulo,
 }: Props) {
   const formId = React.useId()
+  /*
+   * A data começa no dia que foi clicado, mas é editável.
+   *
+   * Antes ela era fixa: quem abria o dia 12 e percebia que a pauta era do 15
+   * tinha de salvar no dia errado e depois arrastar na grade. Arrastar é bom
+   * para reorganizar o mês inteiro de uma vez; é péssimo para corrigir uma
+   * data que você já sabia qual era na hora de escrever.
+   */
+  const [data, setData] = React.useState(item?.data ?? dateKey)
   const [tipo, setTipo] = React.useState<PlanningType | ''>(item?.tipo ?? '')
   const [status, setStatus] = React.useState<CalendarStatus>(item?.status ?? 'ideia')
   const [horario, setHorario] = React.useState(formatTime(item?.horario))
@@ -74,10 +83,14 @@ export function CalendarItemForm({
       setError('Escolha o tipo de conteúdo antes de salvar.')
       return
     }
+    if (!data) {
+      setError('Informe a data em que o conteúdo vai ao ar.')
+      return
+    }
     setError(null)
 
     await onSubmit({
-      data: dateKey,
+      data,
       horario: horario || null,
       tipo,
       status,
@@ -129,15 +142,35 @@ export function CalendarItemForm({
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="item-horario">Horário sugerido</Label>
-          <Input
-            id="item-horario"
-            type="time"
-            value={horario}
-            onChange={(event) => setHorario(event.target.value)}
-            className="w-36"
-          />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="item-data">
+              Vai ao ar em <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="item-data"
+              type="date"
+              value={data}
+              onChange={(event) => setData(event.target.value)}
+            />
+            {data !== dateKey && (
+              /* Mudar a data aqui MOVE o item na grade. Dizer isso evita a
+                 surpresa de salvar e não achar o card onde ele estava. */
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Fora do dia aberto — ao salvar, o item aparece em {formatShortDate(data)}.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="item-horario">Horário sugerido</Label>
+            <Input
+              id="item-horario"
+              type="time"
+              value={horario}
+              onChange={(event) => setHorario(event.target.value)}
+            />
+          </div>
         </div>
 
         <div className="space-y-1.5">

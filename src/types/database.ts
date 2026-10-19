@@ -280,6 +280,42 @@ export type NoticiaEntrada = {
   tags?: string[]
 }
 
+/* ----------------------------------------------------------- stories -- */
+
+/** Um story dentro da sequência. Espelha src/lib/stories/gerador.ts. */
+export type StoryDaSequencia = {
+  ordem: number
+  rotulo: string
+  gatilho: string
+  direcao_visual: string
+  texto: string
+  pede_interacao: boolean
+}
+
+export type StorySequenciaRow = {
+  id: string
+  user_id: string
+  /** `date` do Postgres: "AAAA-MM-DD". */
+  data: string
+  titulo: string
+  /** De onde nasceu. Null quando foi escrita do zero. */
+  tema_id: string | null
+  arco_id: string | null
+  stories: StoryDaSequencia[]
+  imagem_caminho: string | null
+  imagem_descricao: string
+  observacao: string
+  publicado: boolean
+  criado_em: string
+  atualizado_em: string
+}
+
+export type StorySequenciaEntrada = Pick<
+  StorySequenciaRow,
+  'data' | 'titulo' | 'tema_id' | 'arco_id' | 'stories' | 'observacao'
+> &
+  Partial<Pick<StorySequenciaRow, 'imagem_caminho' | 'imagem_descricao' | 'publicado'>>
+
 export interface Database {
   public: {
     Tables: {
@@ -358,6 +394,17 @@ export interface Database {
           atualizado_em?: string
         }
         Update: Partial<Omit<NotaRow, 'id' | 'user_id'>>
+        Relationships: []
+      }
+      stories_sequencias: {
+        Row: StorySequenciaRow
+        Insert: StorySequenciaEntrada & {
+          id?: string
+          user_id: string
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<StorySequenciaRow, 'id' | 'user_id'>>
         Relationships: []
       }
       eventos: {

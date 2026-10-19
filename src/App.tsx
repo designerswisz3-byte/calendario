@@ -18,6 +18,7 @@ const CreatePage = React.lazy(() => import('@/pages/CreatePage'))
 /** Dashboard de métricas — tabela larga e impressão própria, carrega sob demanda. */
 const RelatorioPage = React.lazy(() => import('@/pages/RelatorioPage'))
 const NoticiasPage = React.lazy(() => import('@/pages/NoticiasPage'))
+const StoriesPage = React.lazy(() => import('@/pages/StoriesPage'))
 const LoginPage = React.lazy(() => import('@/pages/LoginPage'))
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'))
 const PublicPreviewPage = React.lazy(() => import('@/pages/PublicPreviewPage'))
@@ -89,6 +90,14 @@ export default function App() {
           element={
             <RotaPrivada>
               <CalendarPage />
+            </RotaPrivada>
+          }
+        />
+        <Route
+          path="/stories"
+          element={
+            <RotaPrivada>
+              <StoriesPage />
             </RotaPrivada>
           }
         />

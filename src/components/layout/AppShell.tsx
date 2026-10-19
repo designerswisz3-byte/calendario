@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, CalendarDays, LogOut, Newspaper, NotebookPen, Sparkles } from 'lucide-react'
+import { BarChart3, CalendarDays, Clapperboard, LogOut, Newspaper, NotebookPen, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useAuth } from '@/components/auth/AuthProvider'
@@ -57,6 +57,10 @@ export function AppShell({ children, telaCheia = false }: Props) {
             <NavLink to="/criar" className={navLinkClass} end>
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Criar conteúdo</span>
+            </NavLink>
+            <NavLink to="/stories" className={navLinkClass}>
+              <Clapperboard className="h-4 w-4" />
+              <span className="hidden sm:inline">Stories</span>
             </NavLink>
             <NavLink to="/notas" className={navLinkClass}>
               <NotebookPen className="h-4 w-4" />
