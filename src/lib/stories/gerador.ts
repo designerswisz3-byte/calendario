@@ -274,37 +274,81 @@ export interface Sugestao {
  * a MESMA se você abrir o mesmo dia duas vezes. Sugestão que muda a cada
  * clique faz a pessoa ficar clicando à procura de uma melhor em vez de gravar.
  */
-export function sugerirTemas(dia: string, contexto: ContextoDoDia, quantos = 3): Sugestao[] {
+const mdc = (a: number, b: number): number => (b === 0 ? a : mdc(b, a % b))
+
+/**
+ * De quantas casas a janela anda por dia.
+ *
+ * Andar de 1 em 1 fazia dois dias seguidos compartilharem 2 dos 3 temas — a
+ * lista mudava no papel e parecia a mesma na tela. O passo precisa ser primo
+ * com o tamanho do banco, senão a rotação fecha num ciclo curto e parte dos
+ * temas nunca aparece.
+ */
+function passoDaRotacao(tamanho: number): number {
+  for (let passo = Math.floor(tamanho / 3) + 1; passo < tamanho; passo++) {
+    if (mdc(passo, tamanho) === 1) return passo
+  }
+  return 1
+}
+
+/**
+ * Como contexto e rotação dividem as vagas.
+ *
+ * Somar um bônus à rotação não funcionou, e foi medido duas vezes: com bônus 1
+ * por acerto, três temas ficaram grudados no topo por oito dias seguidos
+ * (bastava uma notícia na base conter "compra"); baixando para 0,45, os temas
+ * com DOIS acertos continuaram grudados em 7 de 8 dias. Enquanto o bônus for
+ * comparável à faixa da rotação, quem acerta contexto sempre ganha.
+ *
+ * A mecânica aqui é outra: UMA vaga é reservada ao contexto e as demais vêm da
+ * rotação pura. O tema relevante está sempre representado, e nunca ocupa a
+ * lista inteira. É uma regra que dá para explicar em uma frase — e, ao
+ * contrário de um peso, não precisa ser recalibrada quando o banco cresce.
+ */
+const VAGAS_DE_CONTEXTO = 1
+
+export function sugerirTemas(
+  dia: string,
+  contexto: ContextoDoDia,
+  quantos = 3,
+  /** Cada giro reembaralha: é o "quero outras ideias" do botão. */
+  giro = 0,
+): Sugestao[] {
   const alvo = [...contexto.eventos, ...contexto.noticias].join(' · ').toLowerCase()
   /*
    * A semente é o número de DIAS desde a epoch, não a soma dos caracteres da
-   * data.
-   *
-   * Somar caracteres parecia equivalente e não era: '2026-10-09' e
-   * '2026-10-18' somam igual, e a colisão fazia a janela de três temas parar
-   * nos mesmos lugares. Medido, 8 dos 21 temas nunca chegavam ao topo em um
-   * mês inteiro. Com dias-desde-a-epoch a janela anda exatamente uma casa por
-   * dia e o banco inteiro circula.
+   * data: '2026-10-09' e '2026-10-18' somam igual, e a colisão travava a
+   * rotação.
    */
-  const semente = Math.floor(Date.parse(`${dia}T00:00:00Z`) / 86_400_000) || 0
+  const dias = Math.floor(Date.parse(`${dia}T00:00:00Z`) / 86_400_000) || 0
+  const semente = (dias + giro) * passoDaRotacao(TEMAS.length)
 
-  const pontuados = TEMAS.map((tema, i) => {
-    const batidas = (tema.contexto ?? []).filter((palavra) => alvo.includes(palavra))
-    // A rotação é determinística e espalhada: sem ela, os primeiros temas da
-    // lista apareceriam todo dia e os últimos, nunca.
-    const rotacao = ((i + semente) % TEMAS.length) / (TEMAS.length * 2)
-    return { tema, batidas, nota: batidas.length + rotacao }
-  })
+  const porRotacao = TEMAS.map((tema, i) => ({
+    tema,
+    batidas: (tema.contexto ?? []).filter((palavra) => alvo.includes(palavra)),
+    ordem: ((i + semente) % TEMAS.length) / TEMAS.length,
+  })).sort((a, b) => b.ordem - a.ordem)
 
-  return pontuados
-    .sort((a, b) => b.nota - a.nota)
-    .slice(0, quantos)
-    .map(({ tema, batidas }) => ({
-      tema,
-      motivo: batidas.length
-        ? `Puxado pelo que está no seu calendário e nas notícias: ${batidas.join(', ')}.`
-        : '',
-    }))
+  const escolhidos: typeof porRotacao = []
+
+  // A vaga do contexto: o tema relevante que está mais à frente na rotação de
+  // hoje — então ela também muda de um dia para o outro.
+  if (quantos > VAGAS_DE_CONTEXTO) {
+    const relevante = porRotacao.find((p) => p.batidas.length > 0)
+    if (relevante) escolhidos.push(relevante)
+  }
+
+  for (const candidato of porRotacao) {
+    if (escolhidos.length >= quantos) break
+    if (!escolhidos.includes(candidato)) escolhidos.push(candidato)
+  }
+
+  return escolhidos.map(({ tema, batidas }) => ({
+    tema,
+    motivo: batidas.length
+      ? `Puxado pelo que está no seu calendário e nas notícias: ${batidas.join(', ')}.`
+      : '',
+  }))
 }
 
 /* ------------------------------------------------- tema a partir do texto -- */

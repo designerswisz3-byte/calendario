@@ -357,14 +357,36 @@ o período. A tela mostra o que vai entrar antes de gravar.
 Grade própria, mais leve que a do calendário editorial: sem arrastar, sem tags,
 sem status. A célula só responde "tem sequência aqui, e sobre o quê".
 
-Clicar num dia abre três assuntos. **Não é sorteio**: a pontuação lê o que já
-está no app — as datas do mês e as notícias recentes — e sobe os temas que
-conversam com elas. Por isso uma terça de novembro sugere estoque e margem, e
-uma terça de janeiro sugere queima e caixa. O desempate é semeado pela data, o
-que dá duas propriedades que importam: a lista é a MESMA se você reabrir o
-mesmo dia (sugestão que muda a cada clique faz a pessoa ficar caçando uma
-melhor em vez de gravar), e anda uma casa por dia, de modo que o banco inteiro
-circula ao longo do mês.
+Clicar num dia abre três assuntos, e o botão **Outras ideias** troca os três
+por outros. Como as vagas são preenchidas:
+
+- **Uma vaga é do contexto** — o tema relevante que está mais à frente na
+  rotação do dia. Relevante = casa com as datas do calendário em volta daquele
+  dia (±21 dias) e com as notícias recentes.
+- **As outras duas vêm da rotação pura**, que anda um passo largo por dia.
+
+Esse desenho substituiu um que não funcionava, e o erro vale registrar porque
+ele é fácil de repetir: a versão anterior **somava** um bônus de contexto à
+rotação. Medido com a base real do Raphael, três temas ficaram grudados no topo
+por oito dias seguidos — bastava uma notícia conter a palavra "compra". Baixar
+o peso de 1 para 0,45 não resolveu: os temas com dois acertos continuaram
+grudados em 7 de 8 dias. **Enquanto o bônus for comparável à faixa da rotação,
+quem acerta contexto sempre ganha.** A vaga reservada resolve de vez, dá para
+explicar numa frase e não precisa ser recalibrada quando o banco cresce.
+
+Medido depois da correção, sobre 28 dias e a base real: 0 de sobreposição entre
+dias consecutivos, os 21 temas circulam dentro do mês, nenhum passa de 10 dias
+de 28, e os temas de contexto ficam 32% acima da rotação pura — inclinam sem
+tomar a lista.
+
+O **passo** da rotação é calculado para ser primo com o tamanho do banco. Andar
+de 1 em 1 fazia dois dias seguidos compartilharem 2 dos 3 temas: a lista mudava
+no papel e parecia a mesma na tela.
+
+A lista é **estável** se você reabrir o mesmo dia — sugestão que muda a cada
+clique faz a pessoa caçar uma melhor em vez de gravar. Quem quer variedade usa
+o botão, que diz em qual rodada está e oferece a volta. Sete rodadas varrem 18
+dos 21 temas.
 
 **O motor** está em `src/lib/stories/`, em três peças:
 

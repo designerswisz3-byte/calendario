@@ -68,13 +68,29 @@ export default function StoriesPage() {
    * e margem: o calendário já sabe que a Black Friday está chegando, e a aba
    * Notícias já sabe o que mudou no marketplace esta semana.
    */
-  const contexto = React.useMemo(
-    () => ({
-      eventos: eventos.map((evento) => evento.titulo),
-      noticias: noticias.slice(0, 15).flatMap((noticia) => [noticia.titulo, ...noticia.tags]),
-    }),
-    [eventos, noticias],
-  )
+  const contexto = React.useMemo(() => {
+    /*
+     * Só o que está PERTO do dia aberto.
+     *
+     * Antes entravam os eventos da janela inteira do mês, então clicar no dia 3
+     * e no dia 28 dava o mesmo contexto — e a frase "puxado pelo que está no
+     * seu calendário" ficava falsa para uma data a cinco semanas de distância.
+     */
+    const referencia = diaAberto ? Date.parse(`${diaAberto}T00:00:00Z`) : Date.now()
+    const PERTO = 21 * 86_400_000
+
+    return {
+      eventos: eventos
+        .filter((evento) => {
+          const inicio = Date.parse(`${evento.data}T00:00:00Z`)
+          const fim = Date.parse(`${evento.data_fim ?? evento.data}T00:00:00Z`)
+          return Math.min(Math.abs(inicio - referencia), Math.abs(fim - referencia)) <= PERTO
+        })
+        .map((evento) => evento.titulo),
+      // As notícias já vêm da mais recente para a mais antiga.
+      noticias: noticias.slice(0, 10).flatMap((noticia) => [noticia.titulo, ...noticia.tags]),
+    }
+  }, [eventos, noticias, diaAberto])
 
   /* Busca a URL assinada sempre que o rascunho aponta para outra imagem. */
   React.useEffect(() => {

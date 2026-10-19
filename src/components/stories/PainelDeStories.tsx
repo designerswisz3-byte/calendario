@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Lightbulb, Loader2, PenLine, Sparkles, Trash2 } from 'lucide-react'
+import { Lightbulb, Loader2, PenLine, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -97,9 +97,15 @@ export function PainelDeStories({
    * veria os três temas dançando enquanto escreve. Pior: a escolha deixaria de
    * ser "a sugestão de hoje" e viraria "a sugestão deste instante".
    */
+  /** Quantas vezes a pessoa pediu "outras ideias" para o dia aberto. */
+  const [giro, setGiro] = React.useState(0)
+
+  // Trocar de dia zera o giro: o dia novo merece começar pela sugestão dele.
+  React.useEffect(() => setGiro(0), [dia])
+
   const sugestoes: Sugestao[] = React.useMemo(
-    () => (dia ? sugerirTemas(dia, contexto) : []),
-    [dia, contexto],
+    () => (dia ? sugerirTemas(dia, contexto, 3, giro) : []),
+    [dia, contexto, giro],
   )
 
   const [arcoPorTema, setArcoPorTema] = React.useState<Record<string, string>>({})
@@ -337,8 +343,36 @@ export function PainelDeStories({
               <section className="space-y-2.5">
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-4 w-4 shrink-0 text-primary" />
-                  <h3 className="text-sm font-semibold">Assuntos para hoje</h3>
+                  <h3 className="text-sm font-semibold">Assuntos para este dia</h3>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto h-7 px-2 text-xs"
+                    onClick={() => setGiro((atual) => atual + 1)}
+                  >
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                    Outras ideias
+                  </Button>
                 </div>
+
+                {giro > 0 && (
+                  /*
+                   * Dizer em que rodada a pessoa está evita o clique infinito
+                   * à procura de "a melhor": com 21 temas e 3 por rodada, sete
+                   * cliques varrem o banco quase inteiro, e saber disso é o
+                   * que faz parar e gravar.
+                   */
+                  <p className="text-xs text-muted-foreground">
+                    Rodada {giro + 1}.{' '}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-foreground"
+                      onClick={() => setGiro(0)}
+                    >
+                      Voltar às sugestões do dia
+                    </button>
+                  </p>
+                )}
 
                 {sugestoes.map(({ tema, motivo }) => (
                   <article key={tema.id} className="space-y-2 rounded-lg border border-border/70 p-3">
