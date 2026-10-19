@@ -390,6 +390,20 @@ imagem: a curiosidade se aproxima dela, a autoridade a põe em cena, a enquete
 aparece por cima. São cinco palavras de trabalho para um resultado coeso de
 verdade, em vez de coeso no discurso.
 
+A primeira versão disso saiu errada e vale registrar o erro: o botão só sabia
+**regerar**, e exigia um tema já escolhido. Quem colava uma foto e escrevia a
+descrição — o caminho mais natural, e o que foi pedido — encontrava um botão
+cinza, sem nada na tela explicando o motivo. Duas correções:
+
+1. Sem tema escolhido, o assunto sai da **própria descrição**
+   (`escolherTemaPor`), pesando `contexto` (3) acima de `titulo`/`alavanca` (2)
+   e de `oQueMostrar` (1) — sem esse peso, "a mesa de corte com os tecidos"
+   caía no tema de devolução, por causa da "mesa de devolução".
+2. O botão só desabilita por falta de descrição, e nesse caso **a linha abaixo
+   dele diz isso**. Controle cinza sem explicação na tela é o pior tipo de
+   trava: a pessoa clica, não acontece nada, e ela conclui que o produto
+   quebrou.
+
 ### `/noticias`
 
 Lista agrupada por dia de publicação, ordenada por relevância dentro do dia.

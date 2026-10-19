@@ -307,6 +307,68 @@ export function sugerirTemas(dia: string, contexto: ContextoDoDia, quantos = 3):
     }))
 }
 
+/* ------------------------------------------------- tema a partir do texto -- */
+
+const VAZIAS = new Set([
+  'de', 'da', 'do', 'das', 'dos', 'a', 'o', 'as', 'os', 'um', 'uma', 'e', 'em',
+  'no', 'na', 'nos', 'nas', 'com', 'para', 'por', 'que', 'meu', 'minha', 'nosso',
+  'nossa', 'the', 'esta', 'este', 'essa', 'esse', 'foto', 'imagem', 'print',
+])
+
+function palavras(texto: string): string[] {
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((p) => p.length > 2 && !VAZIAS.has(p))
+}
+
+/**
+ * Qual assunto combina com o que a pessoa descreveu.
+ *
+ * Existe porque "gerar a partir da imagem" não pode exigir que um tema já
+ * tenha sido escolhido — quem acabou de colar uma foto do galpão não escolheu
+ * assunto nenhum, e esse era justamente o caminho que o botão deixava
+ * desativado.
+ *
+ * Quando nada casa, devolve a primeira sugestão do dia em vez de null: uma
+ * sequência com o ângulo do dia e o objeto certo é útil; um botão que não faz
+ * nada, não. A tela diz qual ângulo entrou, para não haver surpresa.
+ */
+export function escolherTemaPor(descricao: string, dia: string, contexto: ContextoDoDia): Tema {
+  const termos = palavras(descricao)
+
+  if (termos.length > 0) {
+    /*
+     * Os campos não valem o mesmo.
+     *
+     * `contexto` é a lista que existe PARA casar — é curada. `titulo` e
+     * `alavanca` dizem do que o tema trata. `oQueMostrar` é cenário, e casa por
+     * acidente: "mesa" aparece tanto na mesa de corte quanto na mesa de
+     * devolução. Sem peso, "a mesa de corte com os tecidos" caía em devolução.
+     */
+    const pesar = (termos2: string[], campo: string[]) =>
+      termos2.filter((termo) =>
+        // `startsWith` nos dois sentidos cobre plural e flexão sem stemmer:
+        // "estoque" casa com "estoques", que é o caso que aparece de verdade.
+        campo.some((p) => p === termo || p.startsWith(termo) || termo.startsWith(p)),
+      ).length
+
+    const pontuados = TEMAS.map((tema) => {
+      const nota =
+        pesar(termos, palavras((tema.contexto ?? []).join(' '))) * 3 +
+        pesar(termos, palavras(`${tema.titulo} ${tema.alavanca}`)) * 2 +
+        pesar(termos, palavras(tema.oQueMostrar))
+      return { tema, nota }
+    }).sort((a, b) => b.nota - a.nota)
+
+    if (pontuados[0].nota > 0) return pontuados[0].tema
+  }
+
+  return sugerirTemas(dia, contexto, 1)[0].tema
+}
+
 /** A sequência em texto corrido, para colar em qualquer lugar. */
 export function sequenciaEmTexto(sequencia: Sequencia): string {
   const partes = [sequencia.titulo, '']

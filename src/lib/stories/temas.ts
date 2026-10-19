@@ -225,7 +225,7 @@ export const TEMAS: Tema[] = [
     perguntaFinal: 'Você sabe qual é o seu produto que mais volta?',
     opcoesFinais: ['Sei e já corrigi', 'Sei e não mexi', 'Nunca separei por produto'],
     arcosSugeridos: ['autoridade_pratica', 'ensino_rapido'],
-    contexto: ['devolução', 'troca', 'natal', 'ficha técnica'],
+    contexto: ['devolução', 'troca', 'natal', 'ficha técnica', 'voltou', 'voltaram'],
   },
   {
     id: 'foto-e-descricao',
@@ -275,7 +275,7 @@ export const TEMAS: Tema[] = [
     perguntaFinal: 'Você já refez seus preços depois da última mudança de comissão?',
     opcoesFinais: ['Refiz tudo', 'Refiz só os campeões', 'Ainda não refiz'],
     arcosSugeridos: ['autoridade_pratica', 'conversa'],
-    contexto: ['marketplace', 'comissão', 'shopee', 'mercado livre', 'taxa'],
+    contexto: ['marketplace', 'comissão', 'shopee', 'mercado livre', 'taxa', 'plataforma', 'canal'],
   },
   {
     id: 'competir-com-importado',
@@ -345,7 +345,7 @@ export const TEMAS: Tema[] = [
     perguntaFinal: 'O que mais te trava hoje na sua operação?',
     opcoesFinais: ['Prazo do fornecedor', 'Falta de exclusividade', 'Custo da peça'],
     arcosSugeridos: ['historia', 'conversa'],
-    contexto: ['produção', 'fornecedor', 'confecção'],
+    contexto: ['produção', 'fornecedor', 'confecção', 'cadeia', 'própria'],
   },
   {
     id: 'quem-decide-o-que',
@@ -545,7 +545,7 @@ export const TEMAS: Tema[] = [
     perguntaFinal: 'Você sabe onde seu pedido fica parado?',
     opcoesFinais: ['Sei e já reduzi', 'Sei e não mexi', 'Nunca mapeei'],
     arcosSugeridos: ['historia', 'conversa'],
-    contexto: ['produção', 'bastidor', 'prazo', 'equipe'],
+    contexto: ['produção', 'bastidor', 'prazo', 'equipe', 'galpão', 'fábrica', 'corte', 'costura', 'tecido', 'máquina', 'oficina'],
   },
 ]
 

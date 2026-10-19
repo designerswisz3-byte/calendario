@@ -21,7 +21,12 @@ import { EditorDeSequencia } from '@/components/stories/EditorDeSequencia'
 import { ImagemDeApoio } from '@/components/stories/ImagemDeApoio'
 import { ARCOS } from '@/lib/stories/gatilhos'
 import { ROTULO_DE_EIXO } from '@/lib/stories/temas'
-import { gerarSequencia, sugerirTemas, type Sugestao } from '@/lib/stories/gerador'
+import {
+  escolherTemaPor,
+  gerarSequencia,
+  sugerirTemas,
+  type Sugestao,
+} from '@/lib/stories/gerador'
 import { formatFullDay, parseDateKey } from '@/lib/date'
 import type { StoryDaSequencia, StorySequenciaRow } from '@/types/database'
 
@@ -118,14 +123,33 @@ export function PainelDeStories({
     })
   }
 
-  /** Refaz a sequência atual em torno da descrição da imagem. */
-  function regerarComImagem() {
-    if (!rascunho?.temaId) return
-    const gerada = gerarSequencia(rascunho.temaId, rascunho.arcoId ?? undefined, {
-      oQueMostrar: rascunho.imagemDescricao,
+  /**
+   * Gera (ou refaz) a sequência em torno da imagem.
+   *
+   * Quando ainda não há assunto escolhido — que é o caso de quem acabou de
+   * colar uma foto e não passou pelas sugestões —, o assunto sai da própria
+   * descrição. Era aqui que o botão ficava desativado: ele só sabia REGERAR, e
+   * exigia um tema que esse caminho nunca teve.
+   */
+  function gerarComImagem() {
+    if (!rascunho || !dia) return
+    const descricao = rascunho.imagemDescricao.trim()
+    if (!descricao) return
+
+    const temaId = rascunho.temaId ?? escolherTemaPor(descricao, dia, contexto).id
+    const gerada = gerarSequencia(temaId, rascunho.arcoId ?? undefined, {
+      oQueMostrar: descricao,
     })
     if (!gerada) return
-    onAlterarRascunho({ stories: paraLinhas(gerada), observacao: gerada.observacao })
+
+    onAlterarRascunho({
+      temaId: gerada.temaId,
+      arcoId: gerada.arcoId,
+      // Só assume o título do tema quando a pessoa ainda não escreveu o dela.
+      titulo: rascunho.titulo.trim() || gerada.titulo,
+      stories: paraLinhas(gerada),
+      observacao: gerada.observacao,
+    })
   }
 
   return (
@@ -147,11 +171,11 @@ export function PainelDeStories({
                 url={urlDaImagem}
                 descricao={rascunho.imagemDescricao}
                 subindo={subindoImagem}
-                podeRegerar={Boolean(rascunho.temaId)}
+                temTema={Boolean(rascunho.temaId)}
                 onArquivo={onImagem}
                 onDescricao={(texto) => onAlterarRascunho({ imagemDescricao: texto })}
                 onRemover={onRemoverImagem}
-                onRegerar={regerarComImagem}
+                onRegerar={gerarComImagem}
               />
 
               <EditorDeSequencia

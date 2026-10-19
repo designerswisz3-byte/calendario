@@ -10,7 +10,8 @@ interface Props {
   url: string | null
   descricao: string
   subindo: boolean
-  podeRegerar: boolean
+  /** Já existe um assunto escolhido? Muda o verbo do botão, não o estado. */
+  temTema: boolean
   onArquivo: (arquivo: File) => void
   onDescricao: (texto: string) => void
   onRemover: () => void
@@ -34,7 +35,7 @@ export function ImagemDeApoio({
   url,
   descricao,
   subindo,
-  podeRegerar,
+  temTema,
   onArquivo,
   onDescricao,
   onRemover,
@@ -105,33 +106,42 @@ export function ImagemDeApoio({
                 id="imagem-descricao"
                 value={descricao}
                 onChange={(e) => onDescricao(e.target.value)}
-                placeholder="a arara do estoque de verão"
+                placeholder="o galpão da produção"
               />
               <p className="text-xs text-muted-foreground">
-                Escreva como se fosse completar "vou mostrar…". É esta frase que entra na
-                sequência.
+                Um objeto ou lugar, como se fosse completar "vou mostrar…". Não é a legenda do
+                story — é o que aparece na tela.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!podeRegerar || !descricao.trim()}
-                onClick={onRegerar}
-                title={
-                  descricao.trim()
-                    ? 'Reescreve a sequência em torno desta imagem'
-                    : 'Descreva a imagem primeiro'
-                }
-              >
+            <div className="flex flex-wrap items-center gap-2">
+              {/*
+                O botão só desabilita por falta de descrição — e, quando
+                desabilita, a linha abaixo diz o porquê. Controle cinza sem
+                explicação na tela é o pior tipo de trava: a pessoa fica
+                clicando e conclui que o produto está quebrado.
+              */}
+              <Button size="sm" disabled={!descricao.trim()} onClick={onRegerar}>
                 <Wand2 className="mr-1.5 h-3.5 w-3.5" />
-                Gerar em torno da imagem
+                {temTema ? 'Regerar em torno da imagem' : 'Gerar sequência a partir da imagem'}
               </Button>
               <Button size="sm" variant="ghost" onClick={onRemover}>
                 <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                 Remover
               </Button>
             </div>
+
+            {!descricao.trim() ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Escreva acima o que a imagem mostra para liberar o botão.
+              </p>
+            ) : (
+              !temTema && (
+                <p className="text-xs text-muted-foreground">
+                  O assunto é escolhido pela sua descrição e aparece em "Assunto da sequência".
+                  Dá para trocar depois.
+                </p>
+              )
+            )}
           </div>
         </div>
       ) : (
