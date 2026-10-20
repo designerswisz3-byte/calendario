@@ -342,12 +342,23 @@ export interface ContextoDoDia {
   eventos: string[]
   /** Títulos e tags de notícias recentes. */
   noticias: string[]
+  /**
+   * O assunto das postagens já marcadas NESTE dia no calendário.
+   *
+   * É o laço que faltava entre as duas abas: se o dia 12 tem um post sobre
+   * ruptura de estoque, os stories do dia 12 têm de falar disso. Post e story
+   * no mesmo dia sobre assuntos diferentes é o jeito mais rápido de a audiência
+   * não lembrar de nenhum dos dois.
+   */
+  pautas?: string[]
 }
 
 export interface Sugestao {
   tema: Tema
   /** Por que este tema hoje. Vazio quando a escolha foi só rotação. */
   motivo: string
+  /** Veio da postagem do dia. A tela destaca esta sugestão. */
+  daPauta?: boolean
 }
 
 /**
@@ -395,6 +406,15 @@ function passoDaRotacao(tamanho: number): number {
  */
 const VAGAS_DE_CONTEXTO = 1
 
+const NOTA_MINIMA_DA_PAUTA = 3.5
+
+/**
+ * A vaga da pauta vem ANTES da vaga do contexto.
+ *
+ * Ordem de prioridade: o que já está marcado para hoje ganha do que está no ar
+ * esta semana, que ganha da rotação. Faz sentido na prática — a postagem do dia
+ * já foi decidida, e o story existe para sustentá-la.
+ */
 export function sugerirTemas(
   dia: string,
   contexto: ContextoDoDia,
@@ -419,10 +439,27 @@ export function sugerirTemas(
 
   const escolhidos: typeof porRotacao = []
 
+  /*
+   * A vaga da pauta: o assunto da postagem marcada para hoje.
+   *
+   * Exige nota mínima porque a tela vai DIZER que aquele tema veio do post.
+   * Medido sobre pautas reais: casamento de verdade pontua de 4,7 a 7,7;
+   * coincidência boba — "dicas de produtividade pessoal" roçando em "produto e
+   * pessoas" — pontua 2,8. Abaixo da régua, melhor não ter vaga de pauta do
+   * que ter uma etiqueta mentindo.
+   */
+  const pauta = (contexto.pautas ?? []).join(' · ').trim()
+  const casado = quantos > 1 && pauta ? melhorTemaPara(pauta, TEMAS) : null
+  const daPauta = casado && casado.nota >= NOTA_MINIMA_DA_PAUTA ? casado : null
+  if (daPauta) {
+    const entrada = porRotacao.find((p) => p.tema.id === daPauta.tema.id)
+    if (entrada) escolhidos.push(entrada)
+  }
+
   // A vaga do contexto: o tema relevante que está mais à frente na rotação de
   // hoje — então ela também muda de um dia para o outro.
-  if (quantos > VAGAS_DE_CONTEXTO) {
-    const relevante = porRotacao.find((p) => p.batidas.length > 0)
+  if (quantos > escolhidos.length + VAGAS_DE_CONTEXTO) {
+    const relevante = porRotacao.find((p) => p.batidas.length > 0 && !escolhidos.includes(p))
     if (relevante) escolhidos.push(relevante)
   }
 
@@ -431,12 +468,27 @@ export function sugerirTemas(
     if (!escolhidos.includes(candidato)) escolhidos.push(candidato)
   }
 
-  return escolhidos.map(({ tema, batidas }) => ({
-    tema,
-    motivo: batidas.length
-      ? `Puxado pelo que está no seu calendário e nas notícias: ${batidas.join(', ')}.`
-      : '',
-  }))
+  return escolhidos.map(({ tema, batidas }) => {
+    if (daPauta && tema.id === daPauta.tema.id) {
+      return {
+        tema,
+        motivo: `Puxado da postagem deste dia: ${resumir(pauta)}.`,
+        daPauta: true,
+      }
+    }
+    return {
+      tema,
+      motivo: batidas.length
+        ? `Puxado pelo que está no seu calendário e nas notícias: ${batidas.join(', ')}.`
+        : '',
+    }
+  })
+}
+
+/** Corta o assunto da postagem para caber numa linha de motivo. */
+function resumir(texto: string, limite = 60): string {
+  const limpo = texto.replace(/\s+/g, ' ').trim()
+  return limpo.length <= limite ? limpo : `${limpo.slice(0, limite - 1).trimEnd()}…`
 }
 
 /* ------------------------------------------------- tema a partir do texto -- */
@@ -468,6 +520,101 @@ function palavras(texto: string): string[] {
  * sequência com o ângulo do dia e o objeto certo é útil; um botão que não faz
  * nada, não. A tela diz qual ângulo entrou, para não haver surpresa.
  */
+/**
+ * O tema que mais combina com um texto livre, ou `null` se nada casar.
+ *
+ * Fica separado de `escolherTemaPor` porque tem dois clientes com necessidades
+ * opostas: o botão, que precisa SEMPRE devolver um tema (e por isso cai na
+ * sugestão do dia quando nada casa), e a vaga da pauta, que só existe quando o
+ * texto da postagem realmente casa com algum assunto do banco — senão a tela
+ * diria "puxado da sua postagem" apontando para um tema sem relação nenhuma.
+ */
+/**
+ * Em quantos temas cada palavra aparece.
+ *
+ * "coleção" e "mercado" estão em meio banco; "bastidor" e "devolução" estão em
+ * um tema só. Contar as duas igual foi o que fez "post sobre devolução alta no
+ * Mercado Livre" cair em precificação por canal: a expressão "mercado livre"
+ * valia dois acertos e "devolução" valia um.
+ */
+const EM_QUANTOS_TEMAS = (() => {
+  const mapa = new Map<string, number>()
+  for (const tema of TEMAS) {
+    const texto = `${tema.titulo} ${tema.alavanca} ${tema.oQueMostrar} ${(tema.contexto ?? []).join(' ')}`
+    for (const palavra of new Set(palavras(texto))) {
+      mapa.set(palavra, (mapa.get(palavra) ?? 0) + 1)
+    }
+  }
+  return mapa
+})()
+
+/** 1 para a palavra que só existe num tema; ~0,2 para a que está em todos. */
+function raridade(palavra: string): number {
+  const em = EM_QUANTOS_TEMAS.get(palavra) ?? 1
+  return Math.log(1 + TEMAS.length / em) / Math.log(1 + TEMAS.length)
+}
+
+/**
+ * Casa plural e flexão sem stemmer.
+ *
+ * Prefixo nos dois sentidos resolve "estoque"/"estoques". Não resolve
+ * "embalando"/"embalagem", que é o jeito como as pautas são escritas de
+ * verdade — por isso o segundo teste: seis letras iniciais em comum. Seis, e
+ * não cinco, porque "produção" e "produto" compartilham cinco e são assuntos
+ * diferentes.
+ */
+const RAIZ = 6
+
+const casa = (termos: string[], palavra: string) =>
+  termos.some(
+    (t) =>
+      t === palavra ||
+      t.startsWith(palavra) ||
+      palavra.startsWith(t) ||
+      (t.length >= RAIZ && palavra.length >= RAIZ && t.slice(0, RAIZ) === palavra.slice(0, RAIZ)),
+  )
+
+export function melhorTemaPara(
+  descricao: string,
+  candidatos: Tema[] = TEMAS,
+): { tema: Tema; nota: number } | null {
+  const termos = palavras(descricao)
+  if (termos.length === 0 || candidatos.length === 0) return null
+
+  /*
+   * Os campos não valem o mesmo.
+   *
+   * `contexto` é a lista que existe PARA casar — é curada, e conta por
+   * EXPRESSÃO: "mercado livre" é um acerto, não dois. `titulo` e `alavanca`
+   * dizem do que o tema trata. `oQueMostrar` é cenário, e casa por acidente:
+   * "mesa" aparece tanto na mesa de corte quanto na mesa de devolução. Sem
+   * peso, "a mesa de corte com os tecidos" caía em devolução.
+   */
+  const porExpressao = (expressoes: string[]) =>
+    expressoes.reduce((soma, expressao) => {
+      const partes = palavras(expressao)
+      if (partes.length === 0 || !partes.every((parte) => casa(termos, parte))) return soma
+      return soma + partes.reduce((s, parte) => s + raridade(parte), 0) / partes.length
+    }, 0)
+
+  const porPalavra = (campo: string) =>
+    [...new Set(palavras(campo))]
+      .filter((palavra) => casa(termos, palavra))
+      .reduce((soma, palavra) => soma + raridade(palavra), 0)
+
+  const pontuados = candidatos
+    .map((tema) => ({
+      tema,
+      nota:
+        porExpressao(tema.contexto ?? []) * 3 +
+        porPalavra(`${tema.titulo} ${tema.alavanca}`) * 2 +
+        porPalavra(tema.oQueMostrar),
+    }))
+    .sort((a, b) => b.nota - a.nota)
+
+  return pontuados[0].nota > 0 ? pontuados[0] : null
+}
+
 export function escolherTemaPor(
   descricao: string,
   dia: string,
@@ -476,34 +623,8 @@ export function escolherTemaPor(
   eixo?: Eixo,
 ): Tema {
   const candidatos = eixo ? TEMAS.filter((tema) => tema.eixo === eixo) : TEMAS
-  const termos = palavras(descricao)
-
-  if (termos.length > 0 && candidatos.length > 0) {
-    /*
-     * Os campos não valem o mesmo.
-     *
-     * `contexto` é a lista que existe PARA casar — é curada. `titulo` e
-     * `alavanca` dizem do que o tema trata. `oQueMostrar` é cenário, e casa por
-     * acidente: "mesa" aparece tanto na mesa de corte quanto na mesa de
-     * devolução. Sem peso, "a mesa de corte com os tecidos" caía em devolução.
-     */
-    const pesar = (termos2: string[], campo: string[]) =>
-      termos2.filter((termo) =>
-        // `startsWith` nos dois sentidos cobre plural e flexão sem stemmer:
-        // "estoque" casa com "estoques", que é o caso que aparece de verdade.
-        campo.some((p) => p === termo || p.startsWith(termo) || termo.startsWith(p)),
-      ).length
-
-    const pontuados = candidatos.map((tema) => {
-      const nota =
-        pesar(termos, palavras((tema.contexto ?? []).join(' '))) * 3 +
-        pesar(termos, palavras(`${tema.titulo} ${tema.alavanca}`)) * 2 +
-        pesar(termos, palavras(tema.oQueMostrar))
-      return { tema, nota }
-    }).sort((a, b) => b.nota - a.nota)
-
-    if (pontuados[0].nota > 0) return pontuados[0].tema
-  }
+  const casado = melhorTemaPara(descricao, candidatos)
+  if (casado) return casado.tema
 
   /*
    * Nada casou. Em vez de devolver null e travar o botão, cai na sugestão do

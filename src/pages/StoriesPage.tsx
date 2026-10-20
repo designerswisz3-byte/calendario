@@ -19,7 +19,9 @@ import {
   toDateKey,
   todayKey,
 } from '@/lib/date'
+import { pautaDaPostagem, type PautaDoDia } from '@/lib/stories/pautas'
 import { useAuth } from '@/components/auth/AuthProvider'
+import { useCalendarItems } from '@/hooks/useCalendarItems'
 import { useEventos } from '@/hooks/useEventos'
 import { useNoticias } from '@/hooks/useNoticias'
 import {
@@ -46,9 +48,28 @@ export default function StoriesPage() {
   const { data: sequencias = [], isLoading } = useStoriesDoMes(janela.de, janela.ate)
   const { data: eventos = [] } = useEventos(janela.de, janela.ate)
   const { data: noticias = [] } = useNoticias()
+  // A mesma query do calendário editorial — o cache é compartilhado por mês,
+  // então abrir Stories depois do Calendário não vai ao banco de novo.
+  const { data: postagens = [] } = useCalendarItems(referencia)
   const criar = useCriarSequencia()
   const salvar = useSalvarSequencia()
   const excluir = useExcluirSequencia()
+
+  const pautasPorDia = React.useMemo(() => {
+    const mapa = new Map<string, PautaDoDia[]>()
+    for (const item of postagens) {
+      const lista = mapa.get(item.data)
+      const pauta = pautaDaPostagem(item)
+      if (lista) lista.push(pauta)
+      else mapa.set(item.data, [pauta])
+    }
+    return mapa
+  }, [postagens])
+
+  const pautasDoDia = React.useMemo(
+    () => (diaAberto ? (pautasPorDia.get(diaAberto) ?? []) : []),
+    [pautasPorDia, diaAberto],
+  )
 
   const porDia = React.useMemo(() => {
     const mapa = new Map<string, StorySequenciaRow[]>()
@@ -89,8 +110,17 @@ export default function StoriesPage() {
         .map((evento) => evento.titulo),
       // As notícias já vêm da mais recente para a mais antiga.
       noticias: noticias.slice(0, 10).flatMap((noticia) => [noticia.titulo, ...noticia.tags]),
+      /*
+       * Só as postagens DO DIA ABERTO, não as da semana.
+       *
+       * Diferente de evento e notícia, que valem por uma janela: o post do dia
+       * 12 manda nos stories do dia 12 e em mais nenhum outro. É isso que faz
+       * a vaga da pauta ser confiável — se ela puxasse a semana, o motivo
+       * "puxado da postagem deste dia" seria mentira em quatro dias de cinco.
+       */
+      pautas: pautasDoDia.map((pauta) => pauta.texto || pauta.assunto),
     }
-  }, [eventos, noticias, diaAberto])
+  }, [eventos, noticias, diaAberto, pautasDoDia])
 
   /* Busca a URL assinada sempre que o rascunho aponta para outra imagem. */
   React.useEffect(() => {
@@ -236,6 +266,7 @@ export default function StoriesPage() {
       <GradeDeStories
         reference={referencia}
         porDia={porDia}
+        pautasPorDia={pautasPorDia}
         loading={isLoading}
         onAbrirDia={(dia) => {
           setDiaAberto(dia)
@@ -247,6 +278,7 @@ export default function StoriesPage() {
         dia={diaAberto}
         sequencias={diaAberto ? (porDia.get(diaAberto) ?? []) : []}
         contexto={contexto}
+        pautas={pautasDoDia}
         rascunho={rascunho}
         urlDaImagem={urlDaImagem}
         subindoImagem={subindoImagem}

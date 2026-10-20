@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Lightbulb, Loader2, PenLine, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
+import { FileText, Lightbulb, Loader2, PenLine, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -30,7 +30,9 @@ import {
   sugerirTemas,
   type Sugestao,
 } from '@/lib/stories/gerador'
+import { cn } from '@/lib/utils'
 import { formatFullDay, parseDateKey } from '@/lib/date'
+import type { PautaDoDia } from '@/lib/stories/pautas'
 import type { StoryDaSequencia, StorySequenciaRow } from '@/types/database'
 
 export interface RascunhoDeSequencia {
@@ -49,8 +51,10 @@ export interface RascunhoDeSequencia {
 interface Props {
   dia: string | null
   sequencias: StorySequenciaRow[]
-  /** O que está acontecendo: datas do calendário e notícias recentes. */
-  contexto: { eventos: string[]; noticias: string[] }
+  /** O que está acontecendo: datas do calendário, notícias recentes e os posts do dia. */
+  contexto: { eventos: string[]; noticias: string[]; pautas?: string[] }
+  /** As postagens marcadas para ESTE dia na aba Calendário. */
+  pautas: PautaDoDia[]
   rascunho: RascunhoDeSequencia | null
   urlDaImagem: string | null
   subindoImagem: boolean
@@ -80,6 +84,7 @@ export function PainelDeStories({
   dia,
   sequencias,
   contexto,
+  pautas,
   rascunho,
   urlDaImagem,
   subindoImagem,
@@ -161,6 +166,35 @@ export function PainelDeStories({
       observacao: gerada.observacao,
       imagemCaminho: rascunho?.imagemCaminho ?? null,
       imagemDescricao: rascunho?.imagemDescricao ?? '',
+      publicado: false,
+    })
+  }
+
+  /**
+   * Gera a sequência a partir da POSTAGEM já marcada para o dia.
+   *
+   * É o laço entre as duas abas. O ângulo sai do briefing inteiro (o assunto
+   * costuma estar no meio, não na primeira linha), e o título da sequência
+   * nasce com o assunto do post — assim, na grade, dá para ver de relance que
+   * o story daquele dia sustenta o post daquele dia.
+   */
+  function gerarDaPauta(pauta: PautaDoDia) {
+    if (!dia) return
+    const tema = escolherTemaPor(pauta.texto || pauta.assunto, dia, contexto)
+    const gerada = gerarSequencia(tema.id, undefined, {
+      semente: sementeDoDia(dia, giro, tentativa.current++),
+    })
+    if (!gerada) return
+    onAbrirRascunho({
+      id: null,
+      data: dia,
+      titulo: pauta.assunto,
+      temaId: gerada.temaId,
+      arcoId: gerada.arcoId,
+      stories: paraLinhas(gerada),
+      observacao: gerada.observacao,
+      imagemCaminho: null,
+      imagemDescricao: '',
       publicado: false,
     })
   }
@@ -363,6 +397,42 @@ export function PainelDeStories({
                 </section>
               )}
 
+              {pautas.length > 0 && (
+                <section className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 shrink-0 text-primary" />
+                    <h3 className="text-sm font-semibold">Postagens deste dia no calendário</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    O story sustenta o post. Gerando daqui, a sequência sai sobre o mesmo
+                    assunto que vai ao ar hoje no feed.
+                  </p>
+
+                  {pautas.map((pauta) => (
+                    <article
+                      key={pauta.id}
+                      className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="text-[0.65rem]">
+                          {pauta.rotuloDoTipo}
+                        </Badge>
+                        {pauta.horario && (
+                          <span className="text-xs text-muted-foreground">
+                            {pauta.horario.slice(0, 5)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium leading-snug">{pauta.assunto}</p>
+                      <Button size="sm" onClick={() => gerarDaPauta(pauta)}>
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        Gerar stories deste post
+                      </Button>
+                    </article>
+                  ))}
+                </section>
+              )}
+
               <section className="space-y-2.5">
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-4 w-4 shrink-0 text-primary" />
@@ -397,10 +467,19 @@ export function PainelDeStories({
                   </p>
                 )}
 
-                {sugestoes.map(({ tema, motivo }) => (
-                  <article key={tema.id} className="space-y-2 rounded-lg border border-border/70 p-3">
+                {sugestoes.map(({ tema, motivo, daPauta }) => (
+                  <article
+                    key={tema.id}
+                    className={cn(
+                      'space-y-2 rounded-lg border p-3',
+                      daPauta ? 'border-primary/40 bg-primary/5' : 'border-border/70',
+                    )}
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-sm font-semibold">{tema.titulo}</h4>
+                      {daPauta && (
+                        <Badge className="text-[0.65rem]">Combina com o post de hoje</Badge>
+                      )}
                       <Badge variant="outline" className="text-[0.65rem]">
                         {ROTULO_DE_EIXO[tema.eixo]}
                       </Badge>

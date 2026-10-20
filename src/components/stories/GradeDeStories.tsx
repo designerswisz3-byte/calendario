@@ -1,13 +1,21 @@
-import { Plus } from 'lucide-react'
+import { FileText, Plus } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { WEEKDAYS_SHORT } from '@/lib/constants'
 import { buildMonthGrid, isPast, isSameMonth, isToday, toDateKey } from '@/lib/date'
 import { cn } from '@/lib/utils'
 import type { StorySequenciaRow } from '@/types/database'
+import type { PautaDoDia } from '@/lib/stories/pautas'
 
 interface Props {
   reference: Date
   porDia: Map<string, StorySequenciaRow[]>
+  /**
+   * As postagens já marcadas em cada dia, vindas da aba Calendário.
+   *
+   * Aparecem na célula para a decisão de gravar não exigir abrir dia por dia:
+   * o dia que já tem post é o dia em que o story tem mais o que sustentar.
+   */
+  pautasPorDia: Map<string, PautaDoDia[]>
   loading?: boolean
   onAbrirDia: (dia: string) => void
 }
@@ -20,7 +28,13 @@ interface Props {
  * precisa responder "tem sequência pronta aqui?" e, se tiver, qual é o
  * assunto.
  */
-export function GradeDeStories({ reference, porDia, loading, onAbrirDia }: Props) {
+export function GradeDeStories({
+  reference,
+  porDia,
+  pautasPorDia,
+  loading,
+  onAbrirDia,
+}: Props) {
   const semanas = buildMonthGrid(reference)
 
   if (loading) {
@@ -47,6 +61,7 @@ export function GradeDeStories({ reference, porDia, loading, onAbrirDia }: Props
         {semanas.flat().map((data) => {
           const chave = toDateKey(data)
           const sequencias = porDia.get(chave) ?? []
+          const pautas = pautasPorDia.get(chave) ?? []
           const hoje = isToday(data)
           const passado = isPast(data)
           const foraDoMes = !isSameMonth(data, reference)
@@ -56,7 +71,7 @@ export function GradeDeStories({ reference, porDia, loading, onAbrirDia }: Props
               key={chave}
               type="button"
               onClick={() => onAbrirDia(chave)}
-              aria-label={`Dia ${data.getDate()}${hoje ? ' (hoje)' : ''}, ${sequencias.length} sequência(s)`}
+              aria-label={`Dia ${data.getDate()}${hoje ? ' (hoje)' : ''}, ${sequencias.length} sequência(s), ${pautas.length} postagem(ns) no calendário`}
               className={cn(
                 'group flex min-h-[6.5rem] flex-col gap-1 rounded-lg border border-white/25 bg-white/40 p-1.5 text-left transition-all duration-250 hover:border-primary/40 hover:bg-white/65 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]',
                 passado && 'border-slate-900/10 bg-slate-900/[0.07] dark:border-white/[0.06] dark:bg-black/35',
@@ -97,6 +112,19 @@ export function GradeDeStories({ reference, porDia, loading, onAbrirDia }: Props
                 {sequencias.length > 2 && (
                   <span className="pl-1 text-[0.6rem] text-muted-foreground">
                     +{sequencias.length - 2}
+                  </span>
+                )}
+
+                {pautas.length > 0 && (
+                  <span
+                    className="flex items-center gap-1 truncate pl-0.5 text-[0.6rem] leading-tight text-muted-foreground"
+                    title={pautas.map((pauta) => pauta.assunto).join(' · ')}
+                  >
+                    <FileText className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate">
+                      {pautas.length > 1 ? `${pautas.length} posts · ` : ''}
+                      {pautas[0].assunto}
+                    </span>
                   </span>
                 )}
               </div>
