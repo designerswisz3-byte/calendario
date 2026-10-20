@@ -1346,6 +1346,13 @@ create policy "chaves do próprio usuário" on chaves_de_ingestao
 
 create index if not exists chaves_de_ingestao_user_idx on chaves_de_ingestao (user_id);
 
+-- O Supabase dá SELECT em tudo que está em `public` para `anon` e
+-- `authenticated`; a RLS acima já devolve lista vazia, mas o privilégio não
+-- precisa existir. O app nunca lê esta tabela — quem lê são as funções abaixo,
+-- que rodam como dono. Tirar o grant é a segunda tranca: se um dia alguém
+-- criar uma policy permissiva aqui por engano, ainda assim não dá para ler.
+revoke all on table chaves_de_ingestao from anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Gerar a chave
 -- ---------------------------------------------------------------------------
