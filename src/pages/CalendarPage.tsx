@@ -20,6 +20,7 @@ import { EMPTY_FILTERS, FiltersBar, type CalendarFilters } from '@/components/ca
 import { ListView } from '@/components/calendar/ListView'
 import { MonthGrid } from '@/components/calendar/MonthGrid'
 import { MonthProgress } from '@/components/calendar/MonthProgress'
+import { Gaveta } from '@/components/gaveta/Gaveta'
 import { LegendaDeEventos } from '@/components/calendar/LegendaDeEventos'
 import { Teleprompter } from '@/components/calendar/Teleprompter'
 import { toast } from '@/components/ui/use-toast'
@@ -34,7 +35,12 @@ import {
   toDateKey,
   todayKey,
 } from '@/lib/date'
-import { useCalendarItems, useMoveCalendarItem } from '@/hooks/useCalendarItems'
+import {
+  useCalendarItems,
+  useGavetaDoCalendario,
+  useGuardarNaGaveta,
+  useMoveCalendarItem,
+} from '@/hooks/useCalendarItems'
 import { TYPE_LABEL } from '@/lib/constants'
 import { useTags } from '@/hooks/useTags'
 import { useEventos, useImportarCatalogo } from '@/hooks/useEventos'
@@ -74,6 +80,9 @@ export default function CalendarPage() {
   const isCompact = useMediaQuery('(max-width: 767px)')
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  const { data: gaveta = [] } = useGavetaDoCalendario()
+  const guardar = useGuardarNaGaveta()
 
   React.useEffect(() => {
     if (isError) {
@@ -162,12 +171,79 @@ export default function CalendarPage() {
     setDragging((event.active.data.current?.item as CalendarItemWithRelations) ?? null)
   }
 
+  /**
+   * A volta sem arrastar.
+   *
+   * Existe por dois motivos: no celular a grade vira agenda e não tem
+   * arrasto nenhum, e mesmo no desktop arrastar da gaveta até um dia
+   * específico é um gesto chato quando a resposta é "é para hoje".
+   */
+  async function devolverParaHoje(item: CalendarItemWithRelations) {
+    try {
+      await guardar.mutateAsync({ id: item.id, guardar: false, data: todayKey() })
+      toast({ title: 'Devolvido para hoje' })
+    } catch (mutationError) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível devolver o item',
+        description: errorMessage(mutationError),
+      })
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const item = dragging
     setDragging(null)
+    if (!item) return
 
-    const targetKey = event.over?.data.current?.dateKey as string | undefined
-    if (!item || !targetKey || targetKey === item.data) return
+    const alvo = event.over?.data.current
+    const targetKey = alvo?.dateKey as string | undefined
+    const paraGaveta = alvo?.gaveta === true
+
+    /*
+     * Três destinos possíveis, e os dois que importam são os de ida e volta:
+     * soltar na gaveta guarda, soltar num dia devolve para aquele dia. Soltar
+     * no mesmo dia não faz nada — e sair de dentro da gaveta para a gaveta
+     * também não, senão um arrasto sem querer reescreveria `atualizado_em` e
+     * embaralharia a ordem da lista.
+     */
+    if (paraGaveta) {
+      if (item.na_gaveta) return
+      try {
+        await guardar.mutateAsync({ id: item.id, guardar: true })
+        toast({
+          title: 'Guardado nas ideias soltas',
+          description: 'Sai da grade e continua com briefing, roteiro e etiquetas.',
+        })
+      } catch (mutationError) {
+        toast({
+          variant: 'destructive',
+          title: 'Não foi possível guardar o item',
+          description: errorMessage(mutationError),
+        })
+      }
+      return
+    }
+
+    if (!targetKey) return
+
+    if (item.na_gaveta) {
+      try {
+        await guardar.mutateAsync({ id: item.id, guardar: false, data: targetKey })
+        toast({
+          title: `Devolvido para ${formatShortDate(targetKey)}`,
+        })
+      } catch (mutationError) {
+        toast({
+          variant: 'destructive',
+          title: 'Não foi possível devolver o item',
+          description: errorMessage(mutationError),
+        })
+      }
+      return
+    }
+
+    if (targetKey === item.data) return
 
     try {
       // Só a data muda: o vínculo com o conteúdo criado vai junto.
@@ -258,17 +334,15 @@ export default function CalendarPage() {
         ) : (
           <ListView items={filteredMonthItems} onOpenDay={setOpenDayKey} />
         )
-      ) : isCompact ? (
-        isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-24 rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <AgendaView dayKeys={agendaDayKeys} itemsByDay={itemsByDay} onOpenDay={setOpenDayKey} />
-        )
       ) : (
+        /*
+         * O DndContext envolve as duas vistas, não só a grade.
+         *
+         * No celular não existe arrasto (a agenda não tem card arrastável),
+         * mas a GAVETA existe nas duas — e ela precisa do contexto para o alvo
+         * de soltura funcionar. Sem isso, a pessoa no celular não teria como
+         * nem ver o que guardou.
+         */
         <DndContext
           sensors={sensors}
           collisionDetection={pointerWithin}
@@ -276,13 +350,64 @@ export default function CalendarPage() {
           onDragEnd={handleDragEnd}
           onDragCancel={() => setDragging(null)}
         >
-          <MonthGrid
-            reference={reference}
-            itemsByDay={itemsByDay}
-            eventosPorDia={eventosDoDia}
-            loading={isLoading}
-            onOpenDay={setOpenDayKey}
-          />
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+            <div className="min-w-0 flex-1">
+              {isCompact ? (
+                isLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <Skeleton key={index} className="h-24 rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <AgendaView
+                    dayKeys={agendaDayKeys}
+                    itemsByDay={itemsByDay}
+                    onOpenDay={setOpenDayKey}
+                  />
+                )
+              ) : (
+                <MonthGrid
+                  reference={reference}
+                  itemsByDay={itemsByDay}
+                  eventosPorDia={eventosDoDia}
+                  loading={isLoading}
+                  onOpenDay={setOpenDayKey}
+                />
+              )}
+            </div>
+
+            <Gaveta
+              id="gaveta-calendario"
+              titulo="Ideias soltas"
+              explicacao="Arraste para cá o item que você não vai usar no dia. Ele sai da grade e fica guardado com briefing, roteiro e etiquetas. Para usar depois, arraste de volta para um dia."
+              quantidade={gaveta.length}
+            >
+              {gaveta.map((item) => (
+                <div key={item.id} className="space-y-0.5">
+                  {/*
+                    * Sem onClick: a gaveta é guarda, não é edição. Abrir o
+                    * painel do dia antigo mostraria um dia que não tem este
+                    * item (ele saiu da grade). Para mexer na ideia, devolva
+                    * primeiro — arrastando para um dia ou pelo botão.
+                    */}
+                  <CalendarItemCard item={item} />
+                  <div className="flex items-center gap-1 pl-1">
+                    <span className="text-[0.6rem] text-muted-foreground">
+                      de {formatShortDate(item.data)}
+                    </span>
+                    <button
+                      type="button"
+                      className="ml-auto rounded px-1 text-[0.6rem] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                      onClick={() => devolverParaHoje(item)}
+                    >
+                      usar hoje
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </Gaveta>
+          </div>
           <DragOverlay dropAnimation={null}>
             {dragging && (
               <div className="w-44 rotate-2 opacity-95">

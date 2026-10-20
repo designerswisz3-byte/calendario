@@ -75,6 +75,10 @@ export function useCalendarItems(reference: Date) {
       const { data, error } = await supabase
         .from('calendar_items')
         .select(SELECT_WITH_RELATIONS)
+        // O que está na gaveta não aparece na grade — é o ponto da gaveta. Sem
+        // este filtro a ideia guardada continuaria ocupando o dia e contando no
+        // progresso do mês, que é o problema que ela veio resolver.
+        .eq('na_gaveta', false)
         .gte('data', toDateKey(rangeStart))
         .lte('data', toDateKey(rangeEnd))
         .order('data', { ascending: true })
@@ -129,6 +133,76 @@ async function syncTags(calendarItemId: string, tagIds: string[]) {
       .in('tag_id', toDelete)
     if (error) throw error
   }
+}
+
+/**
+ * A gaveta de ideias soltas.
+ *
+ * Sem recorte de data: a graça é justamente guardar a ideia FORA do calendário.
+ * Ordenada pela última mexida, então o que voltou da grade agora fica no topo,
+ * onde a pessoa está olhando.
+ */
+export function useGavetaDoCalendario() {
+  const { user } = useAuth()
+
+  return useQuery({
+    queryKey: queryKeys.gavetaDoCalendario(),
+    enabled: Boolean(user),
+    queryFn: async (): Promise<CalendarItemWithRelations[]> => {
+      const { data, error } = await supabase
+        .from('calendar_items')
+        .select(SELECT_WITH_RELATIONS)
+        .eq('na_gaveta', true)
+        .order('atualizado_em', { ascending: false })
+      if (error) throw error
+      return ((data ?? []) as unknown as RawRow[]).map(normalize)
+    },
+  })
+}
+
+/**
+ * Guardar na gaveta e tirar da gaveta.
+ *
+ * Tirar exige data: o item volta para um dia concreto — o dia em que foi
+ * solto, ou hoje quando a volta foi por botão. Sem data o item sumiria das
+ * duas telas, e a ideia estaria perdida de um jeito pior do que apagada,
+ * porque ninguém saberia que ela existe.
+ */
+export function useGuardarNaGaveta() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      guardar,
+      data,
+    }: {
+      id: string
+      guardar: boolean
+      data?: string
+    }) => {
+      const patch: { na_gaveta: boolean; data?: string } = { na_gaveta: guardar }
+      if (!guardar && data) patch.data = data
+
+      // `.select('id')` pelo mesmo motivo do resto do projeto: UPDATE que não
+      // acerta linha nenhuma volta sem erro, e a tela diria que guardou.
+      const { data: linhas, error } = await supabase
+        .from('calendar_items')
+        .update(patch)
+        .eq('id', id)
+        .select('id')
+      if (error) throw error
+      if (!linhas || linhas.length === 0) {
+        throw new Error(
+          'O banco aceitou a gravação mas não alterou nenhuma linha. Confirme que a ' +
+            'migração da gaveta (coluna na_gaveta) rodou.',
+        )
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calendar-items'] })
+    },
+  })
 }
 
 export function useCreateCalendarItem() {

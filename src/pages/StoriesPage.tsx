@@ -1,8 +1,20 @@
 import * as React from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 import { ChevronLeft, ChevronRight, Clapperboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
+import { CartaoDeSequencia } from '@/components/stories/CartaoDeSequencia'
+import { Gaveta } from '@/components/gaveta/Gaveta'
 import { GradeDeStories } from '@/components/stories/GradeDeStories'
 import {
   PainelDeStories,
@@ -15,6 +27,7 @@ import {
   buildMonthGrid,
   endOfMonth,
   formatMonthTitle,
+  formatShortDate,
   startOfMonth,
   toDateKey,
   todayKey,
@@ -27,6 +40,8 @@ import { useNoticias } from '@/hooks/useNoticias'
 import {
   useCriarSequencia,
   useExcluirSequencia,
+  useGavetaDeStories,
+  useGuardarSequencia,
   useSalvarSequencia,
   useStoriesDoMes,
 } from '@/hooks/useStories'
@@ -51,6 +66,10 @@ export default function StoriesPage() {
   // A mesma query do calendário editorial — o cache é compartilhado por mês,
   // então abrir Stories depois do Calendário não vai ao banco de novo.
   const { data: postagens = [] } = useCalendarItems(referencia)
+  const { data: gaveta = [] } = useGavetaDeStories()
+  const guardar = useGuardarSequencia()
+  const [arrastando, setArrastando] = React.useState<StorySequenciaRow | null>(null)
+  const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const criar = useCriarSequencia()
   const salvar = useSalvarSequencia()
   const excluir = useExcluirSequencia()
@@ -137,6 +156,72 @@ export default function StoriesPage() {
       cancelado = true
     }
   }, [rascunho?.imagemCaminho])
+
+  /**
+   * Guardar e devolver, pelo arrasto.
+   *
+   * Mesma regra do calendário: soltar na gaveta guarda, soltar num dia
+   * devolve. A sequência guardada mantém os stories escritos, o tema, o arco e
+   * a imagem — é a mesma linha, só fora da grade.
+   */
+  async function aoSoltar(evento: DragEndEvent) {
+    const sequencia = arrastando
+    setArrastando(null)
+    if (!sequencia) return
+
+    const alvo = evento.over?.data.current
+    const paraGaveta = alvo?.gaveta === true
+    const dia = alvo?.dateKey as string | undefined
+
+    try {
+      if (paraGaveta) {
+        if (sequencia.na_gaveta) return
+        await guardar.mutateAsync({ id: sequencia.id, guardar: true })
+        toast({ title: 'Guardada nas ideias soltas' })
+        return
+      }
+      if (!dia) return
+      if (sequencia.na_gaveta) {
+        await guardar.mutateAsync({ id: sequencia.id, guardar: false, data: dia })
+        toast({ title: `Devolvida para ${formatShortDate(dia)}` })
+        return
+      }
+      if (dia === sequencia.data) return
+      await salvar.mutateAsync({ id: sequencia.id, data: dia })
+    } catch (erro) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível mover a sequência',
+        description: errorMessage(erro),
+      })
+    }
+  }
+
+  async function guardarSequencia(id: string) {
+    try {
+      await guardar.mutateAsync({ id, guardar: true })
+      toast({ variant: 'success', title: 'Guardada nas ideias soltas' })
+    } catch (erro) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível guardar',
+        description: errorMessage(erro),
+      })
+    }
+  }
+
+  async function devolverParaHoje(id: string) {
+    try {
+      await guardar.mutateAsync({ id, guardar: false, data: todayKey() })
+      toast({ title: 'Devolvida para hoje' })
+    } catch (erro) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível devolver',
+        description: errorMessage(erro),
+      })
+    }
+  }
 
   function fechar() {
     setDiaAberto(null)
@@ -263,16 +348,63 @@ export default function StoriesPage() {
         </Card>
       )}
 
-      <GradeDeStories
-        reference={referencia}
-        porDia={porDia}
-        pautasPorDia={pautasPorDia}
-        loading={isLoading}
-        onAbrirDia={(dia) => {
-          setDiaAberto(dia)
-          setRascunho(null)
-        }}
-      />
+      <DndContext
+        sensors={sensores}
+        collisionDetection={pointerWithin}
+        onDragStart={(evento: DragStartEvent) =>
+          setArrastando((evento.active.data.current?.sequencia as StorySequenciaRow) ?? null)
+        }
+        onDragEnd={aoSoltar}
+        onDragCancel={() => setArrastando(null)}
+      >
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+          <div className="min-w-0 flex-1">
+            <GradeDeStories
+              reference={referencia}
+              porDia={porDia}
+              pautasPorDia={pautasPorDia}
+              loading={isLoading}
+              onAbrirDia={(dia) => {
+                setDiaAberto(dia)
+                setRascunho(null)
+              }}
+            />
+          </div>
+
+          <Gaveta
+            id="gaveta-stories"
+            titulo="Ideias soltas"
+            explicacao="Arraste para cá a sequência que você não vai gravar no dia. Ela sai da grade e fica guardada com os stories escritos, o tema e a imagem. Para usar depois, arraste de volta para um dia."
+            quantidade={gaveta.length}
+          >
+            {gaveta.map((sequencia) => (
+              <div key={sequencia.id} className="space-y-0.5">
+                <CartaoDeSequencia sequencia={sequencia} />
+                <div className="flex items-center gap-1 pl-1">
+                  <span className="text-[0.6rem] text-muted-foreground">
+                    de {formatShortDate(sequencia.data)}
+                  </span>
+                  <button
+                    type="button"
+                    className="ml-auto rounded px-1 text-[0.6rem] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    onClick={() => void devolverParaHoje(sequencia.id)}
+                  >
+                    usar hoje
+                  </button>
+                </div>
+              </div>
+            ))}
+          </Gaveta>
+        </div>
+
+        <DragOverlay dropAnimation={null}>
+          {arrastando && (
+            <div className="w-44 rotate-2 opacity-95">
+              <CartaoDeSequencia sequencia={arrastando} draggable={false} />
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       <PainelDeStories
         dia={diaAberto}
@@ -287,6 +419,7 @@ export default function StoriesPage() {
         onAbrirRascunho={setRascunho}
         onAlterarRascunho={alterar}
         onSalvar={aoSalvar}
+        onGuardar={(id) => void guardarSequencia(id)}
         onExcluir={async (id) => {
           try {
             await excluir.mutateAsync(id)

@@ -1,5 +1,14 @@
 import * as React from 'react'
-import { FileText, Lightbulb, Loader2, PenLine, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
+import {
+  Archive,
+  FileText,
+  Lightbulb,
+  Loader2,
+  PenLine,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -64,6 +73,8 @@ interface Props {
   onAlterarRascunho: (campos: Partial<RascunhoDeSequencia>) => void
   onSalvar: () => void
   onExcluir: (id: string) => void
+  /** Guardar na gaveta de ideias soltas, sem arrastar. */
+  onGuardar: (id: string) => void
   onImagem: (arquivo: File) => void
   onRemoverImagem: () => void
 }
@@ -94,6 +105,7 @@ export function PainelDeStories({
   onAlterarRascunho,
   onSalvar,
   onExcluir,
+  onGuardar,
   onImagem,
   onRemoverImagem,
 }: Props) {
@@ -378,6 +390,18 @@ export function PainelDeStories({
                       >
                         <PenLine className="mr-1.5 h-3.5 w-3.5" />
                         Abrir
+                      </Button>
+                      {/* Guardar antes de excluir: as duas dizem "não vou usar
+                          isto hoje", e só uma perde o trabalho já escrito. */}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label={`Guardar ${sequencia.titulo} nas ideias soltas`}
+                        title="Guardar nas ideias soltas"
+                        onClick={() => onGuardar(sequencia.id)}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         size="icon"

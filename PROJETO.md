@@ -175,6 +175,30 @@ sem isso o carrossel misto não saberia o que renderizar em cada slide.
 Sem limite de caracteres. **Não tem política de INSERT** — e isso é intencional
 (ver seção 6).
 
+### `na_gaveta` — a terceira saída para uma ideia
+
+Coluna booleana em `calendar_items` e em `stories_sequencias`. Item com
+`na_gaveta = true` some da grade e aparece na gaveta de ideias soltas, ao lado
+do calendário.
+
+O caso que ela resolve: a ideia nasceu com data, o dia chegou e ela não foi
+usada. Antes havia duas saídas, as duas ruins — apagar (perde a ideia) ou
+deixar o item morto na grade (suja o mês e estraga a contagem de progresso).
+
+Por que coluna e não tabela nova: a ideia guardada continua sendo o MESMO item,
+com briefing, roteiro, etiquetas, tipo e o conteúdo já criado. Outra tabela
+significaria copiar tudo isso e recriar os vínculos na volta — e a volta é o
+caminho que mais importa.
+
+Por que `data` continua obrigatória: vira a memória de quando a ideia foi
+pensada, e é o que a tela mostra ("de 22/10"). Deixar a coluna anulável custaria
+um `if` em cada lugar que desenha a grade, para ganhar nada.
+
+As duas queries de grade filtram `na_gaveta = false` — sem isso a ideia
+guardada continuaria ocupando o dia, que é exatamente o problema. O índice é
+parcial (`where na_gaveta`): a gaveta é lida inteira a cada abertura e é uma
+fração pequena da tabela.
+
 ### `stories_sequencias` — o calendário paralelo
 
 `id`, `user_id`, `data`, `titulo`, `tema_id`, `arco_id`, `stories` (jsonb),
@@ -564,6 +588,34 @@ justamente o que pede atenção.
 
 O card se chama pela **primeira linha do briefing**, sempre — inclusive depois
 de o conteúdo ser criado. O nome do expert é só reserva para item sem briefing.
+
+### A gaveta de ideias soltas
+
+Fica **ao lado da grade**, nas duas abas, e não numa tela separada. O movimento
+é de ida e volta — a ideia guardada em novembro é a pauta de janeiro —, e isso
+só acontece se ela estiver visível enquanto o mês é planejado. Gaveta em outra
+aba é gaveta que ninguém abre.
+
+Três gestos:
+
+| Gesto | O que faz |
+| --- | --- |
+| Arrastar da grade para a gaveta | guarda; sai do dia, mantém tudo |
+| Arrastar da gaveta para um dia | devolve para aquele dia |
+| Botão (arquivo no painel do dia, "usar hoje" na gaveta) | o mesmo, sem arrastar |
+
+Os botões não são enfeite: no celular a grade vira agenda e **não existe
+arrasto nenhum**. Sem eles, metade do uso ficaria de fora. Por isso o
+`DndContext` envolve as duas vistas — a gaveta precisa do contexto para ser
+alvo de soltura, mesmo quando nada é arrastável.
+
+O botão de guardar fica **ao lado do de excluir**, de propósito: as duas ações
+respondem "não vou usar isto hoje", e a diferença é que uma perde a ideia. Ter
+as duas lado a lado é o que faz a pessoa parar de apagar.
+
+O card na gaveta **não abre ao clique**. Abrir o painel do dia antigo mostraria
+um dia que não tem mais aquele item. A gaveta é guarda; para mexer na ideia,
+devolva primeiro.
 
 ### Datas no calendário
 
@@ -1073,6 +1125,13 @@ codificavam o defeito. Uma exigia que a curiosidade começasse em "Por trás
 d…", a outra que todo story 7 trouxesse as opções do compromisso — e as duas
 passavam exatamente porque existia uma única redação possível. Teste que fixa a
 frase impede a variedade de nascer; o que vale fixar é o **movimento**.
+
+**Na gaveta**, 23 asserções no navegador arrastando de verdade (mouse com
+passos — `dnd-kit` não reconhece um salto). Elas pegaram um defeito do próprio
+teste que valia por um produto: o alvo `Dia 27` casa com DUAS células na grade
+de outubro de 2026, que começa em 27 de setembro. O teste arrastou a ideia para
+setembro e deu certo. Em grade de calendário, seletor por número de dia precisa
+de um dia que só exista uma vez no mês desenhado.
 
 Também vale registrar um susto do harness: a imagem de apoio chegava quebrada
 na tela, e parecia bug do app. Era o stub de Storage guardando o envelope

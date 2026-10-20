@@ -24,6 +24,8 @@ export type CalendarItemRow = {
   notas: string | null
   /** Roteiro de gravação — é o texto que alimenta o teleprompter. */
   roteiro: string | null
+  /** Guardado na gaveta de ideias soltas: sai da grade, mantém tudo o mais. */
+  na_gaveta: boolean
   criado_em: string
   atualizado_em: string
 }
@@ -306,6 +308,8 @@ export type StorySequenciaRow = {
   imagem_descricao: string
   observacao: string
   publicado: boolean
+  /** Guardada na gaveta de ideias soltas: sai da grade, mantém tudo o mais. */
+  na_gaveta: boolean
   criado_em: string
   atualizado_em: string
 }
@@ -321,10 +325,13 @@ export interface Database {
     Tables: {
       calendar_items: {
         Row: CalendarItemRow
-        Insert: Omit<CalendarItemRow, 'id' | 'criado_em' | 'atualizado_em'> & {
+        // `na_gaveta` sai do Omit porque tem default no banco: item nasce na
+        // grade, nunca na gaveta.
+        Insert: Omit<CalendarItemRow, 'id' | 'criado_em' | 'atualizado_em' | 'na_gaveta'> & {
           id?: string
           criado_em?: string
           atualizado_em?: string
+          na_gaveta?: boolean
         }
         Update: Partial<Omit<CalendarItemRow, 'id' | 'user_id'>>
         Relationships: []
@@ -403,6 +410,7 @@ export interface Database {
           user_id: string
           criado_em?: string
           atualizado_em?: string
+          na_gaveta?: boolean
         }
         Update: Partial<Omit<StorySequenciaRow, 'id' | 'user_id'>>
         Relationships: []

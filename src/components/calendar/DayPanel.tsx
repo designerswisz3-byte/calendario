@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Archive,
   CalendarPlus,
   Clock,
   ExternalLink,
@@ -38,6 +39,7 @@ import { formatFullDay, formatTime, parseDateKey } from '@/lib/date'
 import {
   useCreateCalendarItem,
   useDeleteCalendarItem,
+  useGuardarNaGaveta,
   useUpdateCalendarItem,
   type CalendarItemInput,
 } from '@/hooks/useCalendarItems'
@@ -166,6 +168,7 @@ export function DayPanel({ dateKey, items, eventos, onOpenChange, onAbrirTelepro
   const createItem = useCreateCalendarItem()
   const updateItem = useUpdateCalendarItem()
   const deleteItem = useDeleteCalendarItem()
+  const guardar = useGuardarNaGaveta()
 
   const [adding, setAdding] = React.useState(false)
   /** Qual evento está virando pauta agora, para o botão certo girar. */
@@ -269,6 +272,30 @@ export function DayPanel({ dateKey, items, eventos, onOpenChange, onAbrirTelepro
       toast({ variant: 'success', title: 'Item excluído' })
     } catch (error) {
       toast({ variant: 'destructive', title: 'Não foi possível excluir', description: errorMessage(error) })
+    }
+  }
+
+  /**
+   * Guardar sem arrastar.
+   *
+   * O arrasto é o gesto rápido de quem está olhando o mês; este botão é para
+   * quem já abriu o item e concluiu ali que não vai usar — e para o celular,
+   * onde arrastar não existe.
+   */
+  async function handleGuardar(item: CalendarItemWithRelations) {
+    try {
+      await guardar.mutateAsync({ id: item.id, guardar: true })
+      toast({
+        variant: 'success',
+        title: 'Guardado nas ideias soltas',
+        description: 'Saiu da grade. Briefing, roteiro e etiquetas foram junto.',
+      })
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível guardar',
+        description: errorMessage(error),
+      })
     }
   }
 
@@ -397,6 +424,21 @@ export function DayPanel({ dateKey, items, eventos, onOpenChange, onAbrirTelepro
                       aria-label="Editar planejamento"
                     >
                       <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    {/*
+                      * Guardar fica ANTES de excluir, e não depois: as duas
+                      * respondem "não vou usar isto hoje", e a diferença é que
+                      * uma perde a ideia. Ter o botão de guardar ao lado do de
+                      * apagar é o que faz a pessoa parar de apagar.
+                      */}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => void handleGuardar(item)}
+                      aria-label="Guardar nas ideias soltas"
+                      title="Guardar nas ideias soltas"
+                    >
+                      <Archive className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
