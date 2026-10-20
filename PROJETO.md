@@ -221,6 +221,21 @@ filtrada em 4 e 5, e não em "todas", porque ela existe para o Rapha estar
 atualizado em cinco minutos — abrir numa lista completa devolveria o problema
 que a curadoria veio resolver.
 
+A **editoria** (moda, economia, política, empreendedorismo) é a primeira
+etiqueta de `tags`, não uma coluna. Notícia sem editoria é de moda — não é
+chute: a coleta era só de moda até outubro de 2026, então toda linha antiga É
+de moda, e nenhuma precisou ser reclassificada.
+
+### `chaves_de_ingestao` — a porta estreita da coleta
+
+`id`, `user_id`, `rotulo`, `token_hash`, `criado_em`, `ultimo_uso`, `usos`.
+Único por `(user_id, rotulo)`: regerar com o mesmo rótulo troca o token e
+derruba o anterior, que é como se faz rotação sem acumular chave velha.
+
+Guarda só o **hash** (sha256). O token em claro existe uma vez, no retorno de
+`criar_chave_de_ingestao` — o banco não consegue mostrá-lo de novo nem para o
+dono. Para que serve e por que não a `service_role`: §8, "A coleta diária".
+
 ### `relatorio_perfis` e `relatorio_metricas_diarias` — o arquivo de métricas
 
 `relatorio_perfis`: `id`, `user_id`, `rede`, `handle` (sem "@"), `nome`,
@@ -358,12 +373,46 @@ Grade própria, mais leve que a do calendário editorial: sem arrastar, sem tags
 sem status. A célula só responde "tem sequência aqui, e sobre o quê".
 
 Clicar num dia abre três assuntos, e o botão **Outras ideias** troca os três
-por outros. Como as vagas são preenchidas:
+por outros. Como as vagas são preenchidas, em ordem de prioridade:
 
+- **A vaga da pauta** — quando existe postagem marcada NAQUELE dia na aba
+  Calendário, o tema que casa com ela entra primeiro, com a etiqueta "Combina
+  com o post de hoje".
 - **Uma vaga é do contexto** — o tema relevante que está mais à frente na
   rotação do dia. Relevante = casa com as datas do calendário em volta daquele
   dia (±21 dias) e com as notícias recentes.
-- **As outras duas vêm da rotação pura**, que anda um passo largo por dia.
+- **O resto vem da rotação pura**, que anda um passo largo por dia.
+
+A ordem não é arbitrária: o post do dia já foi decidido, e o story existe para
+sustentá-lo. Um post sobre ruptura de estoque no dia 12 e uma sequência sobre
+embalagem no mesmo dia 12 fazem a audiência não lembrar de nenhum dos dois.
+
+#### O laço com o Calendário
+
+`calendar_items` não tem título — tem briefing (`notas`), roteiro e etiquetas.
+O assunto curto, que vira o título da sequência, é a **primeira linha do
+briefing**, que é como ele escreve a pauta. O que o motor lê para escolher o
+ângulo é o **briefing inteiro**: o ângulo costuma estar no meio, não no começo.
+
+O casamento texto → tema (`melhorTemaPara`) foi refeito para isso, porque a
+etiqueta "combina com o post de hoje" só vale se for verdade:
+
+- `contexto` conta por **expressão**, não por palavra: "mercado livre" é um
+  acerto, não dois. Sem isso, "post sobre devolução alta no Mercado Livre" caía
+  em precificação por canal.
+- cada palavra pesa pela **raridade** no banco: "coleção" está em meio banco e
+  vale pouco; "bastidor" está num tema só e vale tudo.
+- casamento por **raiz de 6 letras** resolve "embalando"/"embalagem". Seis, e
+  não cinco, porque "produção" e "produto" compartilham cinco e são assuntos
+  diferentes.
+- a vaga da pauta exige **nota mínima** (3,5). Medido: casamento real pontua de
+  4,7 a 7,7; coincidência boba — "dicas de produtividade pessoal" roçando em
+  "produto e pessoas" — pontua 2,8. Abaixo da régua, sem etiqueta: melhor não
+  ter vaga de pauta do que ter uma etiqueta mentindo.
+
+O botão "Gerar stories deste post" usa o mesmo motor e sempre devolve alguma
+coisa (cai na sugestão do dia quando nada casa) — é a diferença entre o botão,
+que não pode travar, e a etiqueta, que não pode mentir.
 
 Esse desenho substituiu um que não funcionava, e o erro vale registrar porque
 ele é fácil de repetir: a versão anterior **somava** um bônus de contexto à
@@ -752,9 +801,10 @@ Supabase é o ponto de encontro.
 
 As três peças:
 
-1. **Routine diária** `trig_01LCPbNiHyETcnQ5dADJd7PU` — "Coleta diária de
-   notícias — e-commerce de moda", `CRON_TZ=America/Sao_Paulo 52 6 * * 1-5`.
-   Dispara uma sessão nova a cada dia útil, às 06:52 de Brasília.
+1. **Routine diária** `trig_01LCPbNiHyETcnQ5dADJd7PU` — "Coleta diária —
+   moda, economia, política e empreendedorismo",
+   `CRON_TZ=America/Sao_Paulo 52 6 * * 1-5`. Dispara uma sessão nova a cada dia
+   útil, às 06:52 de Brasília.
 
    O horário não é 7:00 em ponto de propósito: a maioria dos agendamentos cai
    na hora cheia, e fila de servidor no minuto 0 atrasa a execução. 06:52 é o
@@ -776,27 +826,53 @@ As três peças:
    qualquer outro agendador que tenha o checkout. Faz o mesmo upsert, com
    `--listar N` para a deduplicação.
 
-Variáveis que a sessão lê do ambiente — e que só existem como **segredo do
-ambiente**, nunca em arquivo versionado e nunca no front:
+#### Por que a automação ficou travada — e o que destravou
 
-| Variável | O que é |
+A primeira versão pedia três variáveis de ambiente: `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY` e `SUPABASE_USER_ID`. Nenhuma chegava na sessão
+disparada — testado em 13/10/2026 por duas sessões novas e independentes, as
+duas sem nenhuma delas. Depois ficou visível no próprio objeto da rotina: o
+`session_request` dela carrega `environment_variables: {}`.
+
+Duas coisas estavam erradas, e a segunda é a que importa:
+
+1. **Lugar errado.** "Network secrets" é credencial de saída para o proxy, não
+   variável de ambiente do shell. (Eu mandei ele salvar ali.)
+2. **Mecanismo errado para o problema.** Mesmo funcionando, aquele desenho
+   colocava a `service_role` — a chave que ignora a RLS inteira, lê e apaga
+   qualquer tabela — dentro de toda sessão que rodasse naquele ambiente. Para
+   inserir cinco linhas por dia em duas tabelas.
+
+A saída foi uma **porta estreita**, em `20260914001400_ingestao.sql`:
+
+| Peça | O que faz |
 | --- | --- |
-| `SUPABASE_URL` | `https://<projeto>.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | chave de serviço. **Ignora a RLS.** |
-| `SUPABASE_USER_ID` | uuid do dono das linhas em `auth.users` |
+| `chaves_de_ingestao` | guarda o **hash** do token (sha256), nunca o token |
+| `criar_chave_de_ingestao(rotulo)` | gera o token e mostra UMA vez; regerar com o mesmo rótulo derruba o anterior |
+| `ingerir_noticias(token, linhas)` | upsert em `noticias` por `(user_id, url)` |
+| `ingerir_eventos(token, linhas)` | upsert em `eventos` por `(user_id, data, titulo)` |
+| `urls_de_noticias(token, dias)` | devolve só as URLs guardadas — o mínimo para não repetir |
 
-**Modo entrega é o modo em uso hoje.** As variáveis acima não chegam nas
-sessões disparadas — testado em 13/10/2026 por duas sessões novas e
-independentes, as duas sem nenhuma delas. A hipótese em aberto é que o campo
-onde foram salvas ("Network secrets") não vira variável de ambiente no shell.
+As funções são `security definer` com `search_path` fixo, e quem chama é a
+chave `anon` — a mesma que já está no bundle do site e que, sozinha, não grava
+nada (a RLS barra). Quem autoriza a escrita é o token, dentro da função.
 
-Em vez de deixar a rotina esperando configuração, ela tem dois modos de
-primeira classe:
+O que isso muda na prática: se o token vazar, o estrago é alguém sujar a lista
+de notícias dele, e um `delete` resolve. Com a `service_role` no lugar dele, o
+estrago seria o banco inteiro. É a diferença entre perder a chave do depósito e
+perder a chave do cofre.
+
+E como nenhum dos três valores é mais uma chave mestra — URL e `anon` já são
+públicas, o token só insere —, **os três passaram a morar no prompt da própria
+rotina**, que é um mecanismo que comprovadamente funciona. A automação deixou
+de depender das variáveis de ambiente que nunca chegaram.
+
+A rotina continua com dois modos de primeira classe:
 
 | Modo | Quando | O que faz |
 | --- | --- | --- |
 | **Entrega** | falta alguma variável | pesquisa, cura e termina com o JSON pronto num bloco de código; o Rapha cola em Notícias → Importar coleta |
-| **Publicação** | as três existem | grava direto, sem ninguém no meio |
+| **Publicação** | o bloco de credenciais está preenchido | grava direto pela porta estreita, sem ninguém no meio |
 
 O modo entrega **não é fallback**, e o prompt diz isso com todas as letras: texto
 com cara de erro todo dia de manhã treina a pessoa a ignorar a notificação. A
@@ -806,8 +882,35 @@ saída é formatada para celular — destaque do dia, contagem, e o JSON como
 O preço do modo entrega é a deduplicação: sem credencial não dá para consultar
 o que já foi coletado, e a sessão não lembra de ontem. Sobra a janela de 48h
 como defesa. Repetição não estraga o banco — a importação é por URL e atualiza
-em vez de duplicar — mas polui a leitura, e é o primeiro motivo real para
-resolver as variáveis.
+em vez de duplicar — mas polui a leitura, e era o primeiro motivo real para
+resolver as credenciais. Em modo publicação isso some: `urls_de_noticias`
+devolve o que já entrou nos últimos 30 dias.
+
+#### As quatro frentes
+
+A coleta começou só em moda e cresceu para **economia, política e
+empreendedorismo**, porque decisão de estoque e de preço não é tomada só com
+notícia do setor: juros, câmbio e tributação mudam a conta antes de qualquer
+tendência.
+
+| Frente | Cota diária | Filtro |
+| --- | --- | --- |
+| Moda e e-commerce | 3 a 5 | marketplace, importação, concorrência, logística, devolução |
+| Economia | 1 a 3 | Selic, câmbio, inflação, varejo restrito, inadimplência — só o que mexe na conta dele |
+| Política | 0 a 2 | **só** o que vira regra ou custo: tributária, ICMS, trabalhista, acordo comercial |
+| Empreendedorismo | 0 a 2 | gestão e processo com caso real e número |
+
+O filtro de política é o mais duro, e é de posicionamento, não de curadoria:
+**disputa partidária, eleição e declaração polêmica não entram nunca.** Ele é
+dono de operação que precisa saber o que muda na conta — não comentarista
+político. Conteúdo partidário no perfil dele custa audiência e não traz
+nenhuma.
+
+A editoria **não virou coluna** no banco: é a primeira etiqueta de `tags`.
+Coluna nova exigiria migração e, pior, obrigaria a reclassificar as notícias
+que já estão lá — que são todas de moda e continuam certas sem tocar em nada.
+A tela conta e filtra por editoria (`editoriaDe`, em `src/lib/noticias.ts`), e
+a fileira de frentes só aparece quando existe mais de uma na base.
 
 Às segundas a mesma sessão também procura calendário novo de feira. Em modo
 publicação ela grava o evento **direto na tabela `eventos`** — a data aparece na
@@ -853,6 +956,19 @@ migrações, e é **idempotente**.
 >        to_regclass('public.calendar_items') as calendario,
 >        (select count(*) from storage.buckets where id in ('media','canvas')) as buckets;
 > ```
+
+**Para a coleta diária gravar sozinha**, rode também
+`supabase/porta-de-ingestao.sql` (é o mesmo conteúdo da migração
+`20260914001400`, num arquivo separado para colar sem procurar). Depois, a
+última linha dele, sozinha:
+
+```sql
+select criar_chave_de_ingestao('rotina de notícias');
+```
+
+Ela devolve o token **uma vez** — o banco guarda só o hash. Cole-o, junto com a
+URL do projeto e a chave `anon`, no bloco de credenciais do prompt da rotina
+diária. Perdeu o token? Rode de novo: o anterior para de valer na hora.
 
 ### 2. Frontend
 Na Vercel → Settings → Environment Variables:
@@ -915,7 +1031,7 @@ editor montando vazio ao trocar de nota, e o cache servindo a nota velha.
 3. A faixa de evento de vários dias afinava nos dias do meio (rótulo vazio sem
    altura mínima), e a feira de seis dias parecia três eventos soltos.
 
-**Nos Stories**, 73 asserções de motor puro e 97 no navegador contra o banco
+**Nos Stories**, 99 asserções de motor puro e 116 no navegador contra o banco
 real. Pegaram seis coisas:
 
 1. A rotação das sugestões cobria só **13 dos 21 temas** em um mês. A semente

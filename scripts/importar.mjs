@@ -17,6 +17,11 @@
  * É o que permite a coleta diária pular o que já entrou ontem, em vez de
  * depender só do upsert para não repetir.
  *
+ * Hoje a coleta diária NÃO usa mais este caminho: ela grava pela porta estreita
+ * (`supabase/porta-de-ingestao.sql`), com um token que só sabe inserir notícia
+ * e evento. Este script continua aqui para uso manual de quem tem o checkout e
+ * a chave de serviço — e para o `--listar`, que é útil na mão.
+ *
  * Variáveis de ambiente (NUNCA no repositório):
  *   SUPABASE_URL                → https://<projeto>.supabase.co
  *   SUPABASE_SERVICE_ROLE_KEY   → chave de serviço. Ela IGNORA a RLS: só pode

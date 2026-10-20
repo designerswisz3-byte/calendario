@@ -19,6 +19,7 @@
 --   11. 20260914001100 — Relatório: métricas de perfil arquivadas mês a mês.
 --   12. 20260914001200 — Eventos do setor + datas do ano, e a curadoria de notícias.
 --   13. 20260914001300 — Stories: o calendário paralelo.
+--   14. 20260914001400 — Porta estreita de ingestão: a rotina grava notícias e eventos sem a chave mestra.
 --
 -- Se alguma parte de Storage falhar com "must be owner of table objects", rode
 -- as demais por aqui e crie os buckets pela interface (Storage > New bucket):
@@ -1296,3 +1297,241 @@ drop trigger if exists stories_sequencias_set_atualizado_em on stories_sequencia
 create trigger stories_sequencias_set_atualizado_em
   before update on stories_sequencias
   for each row execute function set_atualizado_em();
+
+
+-- ==========================================================================
+-- 20260914001400_ingestao.sql
+-- ==========================================================================
+
+-- Porta estreita de ingestão: a rotina grava notícias e eventos sem a chave mestra.
+--
+-- O problema que isto resolve
+-- ---------------------------------------------------------------------------
+-- A coleta diária roda numa sessão agendada, fora do navegador. Para gravar em
+-- `noticias` ela precisa de credencial — e a RLS destas tabelas é `auth.uid() =
+-- user_id`, que só existe para quem está logado no app. A saída óbvia era a
+-- `service_role`, e ela é o oposto de estreita: ignora a RLS inteira, lê e
+-- apaga qualquer tabela, e quem a tem é dono do banco.
+--
+-- Aqui a rotina recebe um token que só sabe fazer uma coisa: inserir linha em
+-- `noticias` e em `eventos`, do dono daquele token. Não lê nada, não apaga
+-- nada, não enxerga outra tabela. Se vazar, o estrago é alguém sujar a lista de
+-- notícias dele — recuperável com um delete. É a diferença entre perder a
+-- chave do depósito e perder a chave do cofre.
+
+create table if not exists chaves_de_ingestao (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+
+  -- Para que serve esta chave. Serve também de identidade: regerar com o mesmo
+  -- rótulo troca o token e derruba o antigo, que é como se faz rotação.
+  rotulo text not null default 'rotina',
+
+  -- Só o hash. O token em claro existe uma vez, na hora em que é gerado; o
+  -- banco nunca consegue mostrá-lo de novo, nem para o dono.
+  token_hash text not null unique,
+
+  criado_em timestamptz not null default now(),
+  ultimo_uso timestamptz,
+  usos integer not null default 0,
+
+  unique (user_id, rotulo)
+);
+
+alter table chaves_de_ingestao enable row level security;
+
+drop policy if exists "chaves do próprio usuário" on chaves_de_ingestao;
+create policy "chaves do próprio usuário" on chaves_de_ingestao
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists chaves_de_ingestao_user_idx on chaves_de_ingestao (user_id);
+
+-- ---------------------------------------------------------------------------
+-- Gerar a chave
+-- ---------------------------------------------------------------------------
+-- Roda no SQL Editor do Supabase, onde `auth.uid()` é nulo — por isso o dono é
+-- resolvido pelo e-mail, ou pelo único usuário quando só existe um. Devolve o
+-- token UMA vez: é para copiar e colar no agendador, não para guardar aqui.
+
+create or replace function criar_chave_de_ingestao(
+  rotulo_da_chave text default 'rotina',
+  email_do_dono text default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  dono uuid;
+  quantos integer;
+  token text := gen_random_uuid()::text || gen_random_uuid()::text;
+begin
+  if email_do_dono is null then
+    select count(*) into quantos from auth.users;
+    if quantos <> 1 then
+      raise exception 'há % usuários; informe o e-mail: select criar_chave_de_ingestao(''rotina'', ''voce@exemplo.com'')', quantos;
+    end if;
+    select id into dono from auth.users;
+  else
+    select id into dono from auth.users where lower(email) = lower(email_do_dono);
+    if dono is null then raise exception 'nenhum usuário com o e-mail %', email_do_dono; end if;
+  end if;
+
+  insert into chaves_de_ingestao (user_id, rotulo, token_hash)
+  values (dono, rotulo_da_chave, encode(sha256(convert_to(token, 'UTF8')), 'hex'))
+  on conflict (user_id, rotulo) do update
+    set token_hash = excluded.token_hash, criado_em = now(), ultimo_uso = null, usos = 0;
+
+  return token;
+end;
+$$;
+
+-- Só o editor SQL e o dono logado geram chave. O `anon` (a chave pública que
+-- está no bundle do app) não pode: senão qualquer visitante faria a sua.
+revoke all on function criar_chave_de_ingestao(text, text) from public, anon;
+grant execute on function criar_chave_de_ingestao(text, text) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Usar a chave
+-- ---------------------------------------------------------------------------
+
+create or replace function dono_do_token(token text)
+returns uuid
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select user_id from chaves_de_ingestao
+   where token_hash = encode(sha256(convert_to(token, 'UTF8')), 'hex')
+$$;
+
+revoke all on function dono_do_token(text) from public, anon, authenticated;
+
+-- A coleta precisa saber o que já entrou, senão repete a notícia de ontem com
+-- outro link. Devolve só as URLs — nem título, nem texto: o mínimo que serve
+-- para não repetir é o máximo que esta porta precisa abrir.
+create or replace function urls_de_noticias(token text, dias integer default 30)
+returns setof text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare dono uuid := dono_do_token(token);
+begin
+  if dono is null then
+    raise exception 'token de ingestão inválido' using errcode = '28000';
+  end if;
+  return query
+    select n.url from noticias n
+     where n.user_id = dono
+       and n.coletado_em >= now() - make_interval(days => greatest(dias, 1));
+end;
+$$;
+
+grant execute on function urls_de_noticias(text, integer) to anon, authenticated, service_role;
+
+create or replace function ingerir_noticias(token text, linhas jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  dono uuid := dono_do_token(token);
+  gravadas integer;
+begin
+  -- Token de 72 caracteres aleatórios: adivinhar por HTTP não é um caminho.
+  -- Mesmo assim, erro genérico — mensagem de erro que explica demais vira pista.
+  if dono is null then
+    raise exception 'token de ingestão inválido' using errcode = '28000';
+  end if;
+
+  insert into noticias (
+    user_id, titulo, resumo, por_que_importa, url, fonte, publicado_em, relevancia, tags
+  )
+  select
+    dono,
+    item.titulo,
+    coalesce(item.resumo, ''),
+    coalesce(item.por_que_importa, ''),
+    item.url,
+    coalesce(item.fonte, ''),
+    item.publicado_em,
+    coalesce(item.relevancia, 3),
+    coalesce(item.tags, '{}')
+  from jsonb_to_recordset(linhas) as item(
+    titulo text, resumo text, por_que_importa text, url text,
+    fonte text, publicado_em date, relevancia smallint, tags text[]
+  )
+  -- A mesma notícia coletada duas vezes é a mesma notícia: atualiza o texto em
+  -- vez de duplicar a linha na lista dele.
+  on conflict (user_id, url) do update set
+    titulo = excluded.titulo,
+    resumo = excluded.resumo,
+    por_que_importa = excluded.por_que_importa,
+    fonte = excluded.fonte,
+    publicado_em = excluded.publicado_em,
+    relevancia = excluded.relevancia,
+    tags = excluded.tags,
+    atualizado_em = now();
+
+  get diagnostics gravadas = row_count;
+  update chaves_de_ingestao set ultimo_uso = now(), usos = usos + 1
+   where user_id = dono and token_hash = encode(sha256(convert_to(token, 'UTF8')), 'hex');
+  return gravadas;
+end;
+$$;
+
+create or replace function ingerir_eventos(token text, linhas jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  dono uuid := dono_do_token(token);
+  gravados integer;
+begin
+  if dono is null then
+    raise exception 'token de ingestão inválido' using errcode = '28000';
+  end if;
+
+  insert into eventos (
+    user_id, data, data_fim, titulo, categoria, escopo, local,
+    por_que_importa, ideia_de_post, fonte_url
+  )
+  select
+    dono, item.data, item.data_fim, item.titulo,
+    coalesce(item.categoria, 'comercial'),
+    coalesce(item.escopo, 'brasil'),
+    item.local,
+    coalesce(item.por_que_importa, ''),
+    coalesce(item.ideia_de_post, ''),
+    item.fonte_url
+  from jsonb_to_recordset(linhas) as item(
+    data date, data_fim date, titulo text, categoria text, escopo text,
+    local text, por_que_importa text, ideia_de_post text, fonte_url text
+  )
+  on conflict (user_id, data, titulo) do update set
+    data_fim = excluded.data_fim,
+    categoria = excluded.categoria,
+    escopo = excluded.escopo,
+    local = excluded.local,
+    por_que_importa = excluded.por_que_importa,
+    ideia_de_post = excluded.ideia_de_post,
+    fonte_url = excluded.fonte_url,
+    atualizado_em = now();
+
+  get diagnostics gravados = row_count;
+  update chaves_de_ingestao set ultimo_uso = now(), usos = usos + 1
+   where user_id = dono and token_hash = encode(sha256(convert_to(token, 'UTF8')), 'hex');
+  return gravados;
+end;
+$$;
+
+-- É o `anon` quem chama: a rotina não tem login, tem token. A chave `anon` já é
+-- pública (está no bundle do app) e sozinha não grava nada — quem autoriza a
+-- escrita é o token, dentro da função.
+grant execute on function ingerir_noticias(text, jsonb) to anon, authenticated, service_role;
+grant execute on function ingerir_eventos(text, jsonb) to anon, authenticated, service_role;

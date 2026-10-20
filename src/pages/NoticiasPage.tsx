@@ -8,7 +8,14 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/use-toast'
 import { CartaoDeNoticia } from '@/components/noticias/CartaoDeNoticia'
 import { ImportarColeta } from '@/components/noticias/ImportarColeta'
-import { briefingDaNoticia } from '@/lib/noticias'
+import {
+  EDITORIAS,
+  ROTULO_DE_EDITORIA,
+  briefingDaNoticia,
+  editoriaDe,
+  type Editoria,
+} from '@/lib/noticias'
+import { cn } from '@/lib/utils'
 import { errorMessage } from '@/lib/supabase'
 import { formatShortDate, todayKey } from '@/lib/date'
 import {
@@ -21,6 +28,8 @@ import { useCreateCalendarItem } from '@/hooks/useCalendarItems'
 import type { NoticiaEntrada, NoticiaRow } from '@/types/database'
 
 type Filtro = 'relevantes' | 'nao_lidas' | 'todas'
+
+const TODAS_AS_EDITORIAS = 'tudo'
 
 export default function NoticiasPage() {
   const navigate = useNavigate()
@@ -38,14 +47,37 @@ export default function NoticiasPage() {
    * resolver — e é exatamente assim que um leitor de notícias vira culpa.
    */
   const [filtro, setFiltro] = React.useState<Filtro>('relevantes')
+  /*
+   * A editoria é um filtro à parte, não mais uma aba.
+   *
+   * São duas perguntas diferentes: "o que eu preciso ler hoje" (relevância) e
+   * "sobre o que" (editoria). Juntar as duas numa fileira só de abas daria
+   * doze botões e nenhuma resposta rápida.
+   */
+  const [editoria, setEditoria] = React.useState<Editoria | typeof TODAS_AS_EDITORIAS>(
+    TODAS_AS_EDITORIAS,
+  )
   const [abrindoImportacao, setAbrindoImportacao] = React.useState(false)
   const [criandoPauta, setCriandoPauta] = React.useState<string | null>(null)
 
+  const porEditoria = React.useMemo(() => {
+    const contagem = new Map<Editoria, number>()
+    for (const noticia of noticias) {
+      const qual = editoriaDe(noticia)
+      contagem.set(qual, (contagem.get(qual) ?? 0) + 1)
+    }
+    return contagem
+  }, [noticias])
+
   const visiveis = React.useMemo(() => {
-    if (filtro === 'todas') return noticias
-    if (filtro === 'nao_lidas') return noticias.filter((n) => !n.lida)
-    return noticias.filter((n) => n.relevancia >= 4)
-  }, [noticias, filtro])
+    const daEditoria =
+      editoria === TODAS_AS_EDITORIAS
+        ? noticias
+        : noticias.filter((n) => editoriaDe(n) === editoria)
+    if (filtro === 'todas') return daEditoria
+    if (filtro === 'nao_lidas') return daEditoria.filter((n) => !n.lida)
+    return daEditoria.filter((n) => n.relevancia >= 4)
+  }, [noticias, filtro, editoria])
 
   /** Agrupadas por dia de publicação, do mais recente para o mais antigo. */
   const porDia = React.useMemo(() => {
@@ -136,6 +168,43 @@ export default function NoticiasPage() {
         </div>
       </header>
 
+      {/*
+        * As frentes só aparecem quando há mais de uma na base: enquanto a
+        * coleta for só de moda, uma fileira de botões com três zeros seria
+        * ruído na tela.
+        */}
+      {porEditoria.size > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setEditoria(TODAS_AS_EDITORIAS)}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs transition-colors',
+              editoria === TODAS_AS_EDITORIAS
+                ? 'border-primary bg-primary/10 font-medium text-primary'
+                : 'border-border/70 text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Tudo ({noticias.length})
+          </button>
+          {EDITORIAS.filter((qual) => (porEditoria.get(qual) ?? 0) > 0).map((qual) => (
+            <button
+              key={qual}
+              type="button"
+              onClick={() => setEditoria(qual)}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs transition-colors',
+                editoria === qual
+                  ? 'border-primary bg-primary/10 font-medium text-primary'
+                  : 'border-border/70 text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {ROTULO_DE_EDITORIA[qual]} ({porEditoria.get(qual)})
+            </button>
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -163,7 +232,14 @@ export default function NoticiasPage() {
               ? 'Nenhuma notícia com relevância 4 ou 5 na base. Isso é uma resposta: o dia foi calmo.'
               : 'Tudo lido.'}
           </p>
-          <Button variant="ghost" className="mt-3" onClick={() => setFiltro('todas')}>
+          <Button
+            variant="ghost"
+            className="mt-3"
+            onClick={() => {
+              setFiltro('todas')
+              setEditoria(TODAS_AS_EDITORIAS)
+            }}
+          >
             Ver todas
           </Button>
         </Card>

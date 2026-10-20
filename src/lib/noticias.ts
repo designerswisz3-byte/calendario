@@ -130,6 +130,55 @@ export function briefingDaNoticia(noticia: NoticiaRow): string {
   return partes.join('\n')
 }
 
+/* --------------------------------------------------------------- editoria -- */
+
+/**
+ * As quatro frentes que ele precisa acompanhar.
+ *
+ * A coleta começou só em moda e cresceu para economia, política e
+ * empreendedorismo — porque decisão de estoque e de preço não é tomada só com
+ * notícia do setor: juros, câmbio, tributação e regra nova de marketplace
+ * mudam a conta antes de qualquer tendência de moda.
+ *
+ * A editoria não virou coluna no banco de propósito: ela é a primeira etiqueta
+ * da notícia. Coluna nova exigiria migração e, mais importante, obrigaria a
+ * reclassificar as notícias que já estão lá — que são todas de moda e
+ * continuam certas sem tocar em nada.
+ */
+export const EDITORIAS = ['moda', 'economia', 'politica', 'empreendedorismo'] as const
+
+export type Editoria = (typeof EDITORIAS)[number]
+
+export const ROTULO_DE_EDITORIA: Record<Editoria, string> = {
+  moda: 'Moda e e-commerce',
+  economia: 'Economia',
+  politica: 'Política',
+  empreendedorismo: 'Empreendedorismo',
+}
+
+const semAcento = (texto: string) =>
+  texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+
+/**
+ * Em qual frente a notícia entra.
+ *
+ * Procura a editoria entre as etiquetas; sem nenhuma, cai em "moda". O padrão
+ * não é chute: a coleta era só de moda até agora, então toda notícia sem
+ * editoria É de moda.
+ */
+export function editoriaDe(noticia: Pick<NoticiaRow, 'tags'>): Editoria {
+  for (const tag of noticia.tags) {
+    const limpa = semAcento(tag)
+    const achada = EDITORIAS.find((editoria) => editoria === limpa)
+    if (achada) return achada
+  }
+  return 'moda'
+}
+
 export const ROTULO_DE_RELEVANCIA: Record<number, string> = {
   1: 'Ruído',
   2: 'Contexto',
