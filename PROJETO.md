@@ -959,12 +959,17 @@ migrações, e é **idempotente**.
 
 **Para a coleta diária gravar sozinha**, rode também
 `supabase/porta-de-ingestao.sql` (é o mesmo conteúdo da migração
-`20260914001400`, num arquivo separado para colar sem procurar). Depois, a
-última linha dele, sozinha:
+`20260914001400`, num arquivo separado para colar sem procurar). Depois, num
+editor limpo, **digitando a linha** — ela fica comentada no arquivo de
+propósito, para que reexecutar o arquivo inteiro não rotacione o token sem
+querer:
 
 ```sql
 select criar_chave_de_ingestao('rotina de notícias');
 ```
+
+> Com `--` na frente ela é comentário, e o SQL Editor responde *"Success. No
+> rows returned"* — que é o editor dizendo "não rodei nada". Já aconteceu.
 
 Ela devolve o token **uma vez** — o banco guarda só o hash. Cole-o, junto com a
 URL do projeto e a chave `anon`, no bloco de credenciais do prompt da rotina

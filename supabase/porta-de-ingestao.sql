@@ -239,6 +239,15 @@ grant execute on function ingerir_eventos(text, jsonb) to anon, authenticated, s
 
 
 -- ============================================================================
--- RODE ESTA LINHA SOZINHA, depois de tudo acima. Copie o que ela devolver.
+-- AGORA GERE O TOKEN
 -- ============================================================================
--- select criar_chave_de_ingestao('rotina de notícias');
+-- Apague tudo do editor, digite a linha abaixo SEM os dois tracinhos e rode:
+--
+--     select criar_chave_de_ingestao('rotina de notícias');
+--
+-- Com os tracinhos ela é comentário e o editor responde "Success. No rows
+-- returned" — que é o editor dizendo "não rodei nada".
+--
+-- O retorno é uma célula com um texto de 72 caracteres: esse é o token. Ele
+-- aparece UMA vez; o banco guarda só o hash. Perdeu? Rode de novo — o token
+-- anterior para de valer na hora.
