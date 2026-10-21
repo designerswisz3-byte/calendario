@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/use-toast'
+import { todayKey } from '@/lib/date'
 import { CartaoDeMetrica } from '@/components/relatorio/CartaoDeMetrica'
 import { GraficoDePeriodos } from '@/components/relatorio/GraficoDePeriodos'
 import { TabelaDePeriodos } from '@/components/relatorio/TabelaDePeriodos'
@@ -177,6 +178,34 @@ export default function RelatorioPage() {
     )
   }
 
+  /**
+   * Quando a coleta passou por aqui pela última vez.
+   *
+   * A aba passou a ser alimentada por uma rotina que roda algumas vezes ao
+   * dia. Sem dizer isso na tela, um número velho e um número fresco têm a
+   * mesma cara — e quem olha não sabe se está vendo o dia de hoje crescendo ou
+   * um painel que parou de atualizar há uma semana.
+   */
+  const coleta = React.useMemo(() => {
+    const automaticas = (metricas ?? []).filter((m) => m.fonte === 'instagram_api')
+    if (automaticas.length === 0) return null
+    const ultima = automaticas.reduce(
+      (maior, m) => (m.atualizado_em > maior ? m.atualizado_em : maior),
+      automaticas[0].atualizado_em,
+    )
+    const minutos = Math.max(0, Math.round((Date.now() - Date.parse(ultima)) / 60_000))
+    const quando =
+      minutos < 60
+        ? `há ${minutos} min`
+        : minutos < 60 * 36
+          ? `há ${Math.round(minutos / 60)} h`
+          : `há ${Math.round(minutos / 1440)} dias`
+    // O dia corrente é sempre parcial: a Meta fecha a conta à meia-noite.
+    const hoje = todayKey()
+    const temHoje = automaticas.some((m) => m.dia === hoje)
+    return { quando, temHoje, atrasada: minutos > 60 * 30 }
+  }, [metricas])
+
   /* ----------------------------------------------------------------- tela -- */
 
   return (
@@ -224,6 +253,16 @@ export default function RelatorioPage() {
           Exportar PDF
         </Button>
       </header>
+
+      {coleta && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          <span className={coleta.atrasada ? 'text-amber-600 dark:text-amber-400' : ''}>
+            Coleta automática {coleta.quando}
+          </span>
+          {coleta.temHoje && ' · o dia de hoje ainda está em andamento e fecha à meia-noite'}
+          {coleta.atrasada && ' · confira a rotina de métricas'}
+        </p>
+      )}
 
       {carregandoMetricas ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

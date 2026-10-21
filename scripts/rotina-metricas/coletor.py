@@ -185,7 +185,13 @@ def main():
     if DIAS < 1 or DIAS > MAX_DIAS:
         raise SystemExit(f"DIAS precisa estar entre 1 e {MAX_DIAS} (limite da Meta)")
 
-    ate = date.today() - timedelta(days=1)
+    # Vai até HOJE, não até ontem.
+    #
+    # A Meta devolve o dia corrente parcial, e é isso que faz valer rodar
+    # algumas vezes ao dia: o painel acompanha o dia crescendo em vez de ficar
+    # parado até a manhã seguinte. O upsert por (perfil, dia) cuida do resto —
+    # a corrida das 19h sobrescreve a das 13h, e a de amanhã fecha o número.
+    ate = date.today()
     de = ate - timedelta(days=DIAS - 1)
 
     contas = [

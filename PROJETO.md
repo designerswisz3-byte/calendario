@@ -846,8 +846,8 @@ a cobertura de cada período em vez de preencher o buraco.
 
 ### Métricas do Instagram: a coleta do Relatório
 
-**Rotina diária** `trig_01UrGTx4LJYk74pyWikgQsLD` — "Métricas do Instagram no
-Relatório", todo dia às 07:08 de Brasília. Ela instala a CLI, autentica com a
+**Rotina** `trig_01UrGTx4LJYk74pyWikgQsLD` — "Métricas do Instagram no
+Relatório", **três vezes por dia** (07:08, 13:08 e 19:08 de Brasília). Ela instala a CLI, autentica com a
 chave, roda o coletor e grava pela porta estreita (`rpc/ingerir_metricas`).
 Nada de importar à mão.
 
@@ -863,9 +863,16 @@ naquela marca entra na coleta sem mexer em nada. As contas das outras marcas do
 workspace nem entram na lista — é o filtro que garante que a coleta não as
 toque.
 
-**Janela**: repuxa 7 dias a cada corrida, não só ontem. A Meta fecha a janela
-do dia com atraso, e quem grava só "ontem" congela um número provisório para
-sempre. O upsert é por `(perfil, dia)`, então repuxar atualiza.
+**Janela**: 7 dias **até hoje**, a cada corrida. Duas razões, e as duas
+importam. A Meta fecha a janela do dia com atraso, então gravar só "ontem"
+congelaria um número provisório. E o dia corrente vem parcial de propósito: é
+ele que cresce entre uma corrida e outra — é isso que faz valer rodar três
+vezes ao dia em vez de uma. O upsert é por `(perfil, dia)`: a corrida das 19h
+sobrescreve a das 13h, e a da manhã seguinte fecha o número.
+
+A tela diz quando foi a última coleta ("Coleta automática há 2 h") e avisa que
+o dia de hoje ainda está em andamento. Sem isso, um número velho e um número
+fresco têm a mesma cara, e ninguém sabe se o painel parou de atualizar.
 
 **`ingerir_metricas` usa `coalesce(novo, antigo)`** em cada coluna: nulo
 significa "esta coleta não trouxe este campo", não "o valor é nulo".
