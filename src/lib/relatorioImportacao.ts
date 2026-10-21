@@ -29,6 +29,13 @@ const APELIDOS: Record<keyof Omit<RelatorioMetricaEntrada, 'dia'>, string[]> = {
     'sub_increase_24h',
     'novos_seguidores',
   ],
+  seguidores_perdidos: [
+    'seguidores_perdidos',
+    'perdidos',
+    'unfollows',
+    'unfollowers',
+    'deixaram_de_seguir',
+  ],
   alcance: ['alcance', 'reach', 'accounts_reached'],
   views: ['views', 'visualizacoes', 'impressions', 'impressoes'],
   likes: ['likes', 'curtidas'],
@@ -221,8 +228,9 @@ export function lerMetricas(texto: string): Leitura {
   if (reconhecidas.size === 0) {
     throw new ErroDeImportacao(
       'Achei as datas, mas nenhuma coluna de métrica. Reconheço: seguidores, ' +
-        'alcance, views, likes, comentarios, salvamentos, compartilhamentos, ' +
-        'interacoes, cliques_no_link, publicacoes.',
+        'seguidores_ganhos, seguidores_perdidos, alcance, views, likes, ' +
+        'comentarios, salvamentos, compartilhamentos, interacoes, ' +
+        'cliques_no_link, publicacoes.',
     )
   }
 

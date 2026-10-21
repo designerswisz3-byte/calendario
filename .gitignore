@@ -18,3 +18,4 @@ public/fonts
 
 # harness local de teste (Postgres + PostgREST + Playwright), nunca versionado
 harness.local/
+__pycache__/

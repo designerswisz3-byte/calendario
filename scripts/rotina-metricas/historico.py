@@ -1,121 +1,83 @@
 #!/usr/bin/env python3
 """Traz o histórico do Instagram para o Relatório, de uma vez.
 
-A coleta diária cuida do presente (7 dias até hoje). Este aqui é o mutirão
-inicial: varre meses para trás e preenche o arquivo, para o "mês a mês" ter
-mais de um mês e o comparativo significar alguma coisa.
+A coleta da rotina cuida do presente (7 dias até hoje). Este aqui é o mutirão:
+varre meses para trás e preenche o arquivo, para o "mês a mês" ter mais de um
+mês e o comparativo significar alguma coisa.
 
     python3 scripts/rotina-metricas/historico.py --meses 13
+    python3 scripts/rotina-metricas/historico.py --de 2025-09-01 --ate 2025-12-31
 
 Precisa das mesmas variáveis do coletor (SUPABASE_URL, SUPABASE_ANON_KEY,
-INGESTAO_TOKEN) e da CLI da InsightfulPipe autenticada.
+INGESTAO_TOKEN) e da CLI da InsightfulPipe autenticada. As funções vêm de
+`coletor.py`, ao lado: uma regra de coleta em dois arquivos é uma regra que vai
+divergir.
 
-DUAS CAMADAS, e a razão é o custo de requisição:
-
-- Até 60 dias atrás: tudo. Alcance, novos seguidores, views, likes,
-  comentários, compartilhamentos, interações, cliques e publicações. As seis
-  últimas só existem como total de um intervalo na API da Meta, então cada DIA
-  é uma requisição — 30 por mês.
-- Antes disso: o que vem em série temporal (alcance e novos seguidores) mais a
-  contagem de publicações. Dois pedidos por mês em vez de trinta e dois.
-
-A alternativa seria mil requisições para encher um ano, estourar o limite da
-Meta e derrubar a coleta do dia. O que fica de fora fica NULO, nunca zero — a
-tela mostra "—" e conta como dia sem aquele dado, em vez de desenhar queda.
+POR QUE NÃO TEM MAIS DUAS CAMADAS. A versão anterior pulava as métricas de
+conteúdo no passado distante para economizar requisição, e pedia
+`follower_count`, que a Meta só responde para os últimos 30 dias — se pedido
+para trás disso, ela recusa a JANELA INTEIRA e nem o alcance vinha. Com
+`follows_and_unfollows` isso cai: ele responde para todo o histórico. Então o
+passado passou a ser preenchível por inteiro, e o custo virou tempo, não dado
+faltando. Daí `--dormir` e `--de/--ate`: dá para rodar em pedaços.
 """
 
-import json
 import os
-import subprocess
 import sys
-import urllib.error
-import urllib.request
+import time
 from datetime import date, timedelta
 
-MARCA = int(os.environ.get("BRAND_ID", "6366"))
-MESES = 13
-DETALHE_ATE_DIAS = int(os.environ.get("DETALHE_ATE_DIAS", "60"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-URL = os.environ["SUPABASE_URL"].rstrip("/")
-ANON = os.environ["SUPABASE_ANON_KEY"]
-TOKEN = os.environ["INGESTAO_TOKEN"]
+from coletor import (  # noqa: E402
+    MARCA,
+    cli,
+    consultar,
+    publicacoes_do_periodo,
+    rpc,
+    seguidores_do_dia,
+    COLUNA,
+    METRICAS_DO_DIA,
+)
 
-METRICAS_DO_DIA = ["views", "likes", "comments", "shares", "total_interactions", "profile_links_taps"]
-COLUNA = {
-    "reach": "alcance",
-    "follower_count": "seguidores_ganhos",
-    "views": "views",
-    "likes": "likes",
-    "comments": "comentarios",
-    "shares": "compartilhamentos",
-    "total_interactions": "interacoes",
-    "profile_links_taps": "cliques_no_link",
-}
+# A janela que a Meta aceita num pedido de série temporal.
+PASSO = 30
 
 
-def argumento(nome, padrao):
-    if f"--{nome}" in sys.argv:
-        return sys.argv[sys.argv.index(f"--{nome}") + 1]
+def argumento(nome, padrao=None):
+    bandeira = f"--{nome}"
+    if bandeira in sys.argv:
+        i = sys.argv.index(bandeira)
+        if i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
     return padrao
 
 
-def cli(args):
-    saida = subprocess.run(["insightfulpipe", *args], capture_output=True, text=True, timeout=240)
-    if saida.returncode != 0:
-        raise SystemExit(f"CLI falhou: {saida.stderr.strip()[:400]}")
-    resposta = json.loads(saida.stdout)
-    if resposta.get("status") != "success":
-        raise SystemExit(f"CLI respondeu erro: {json.dumps(resposta)[:400]}")
-    return resposta
-
-
-def consultar(corpo):
-    return cli(["query", "instagram", "-b", json.dumps(corpo)])
-
-
-def rpc(funcao, corpo):
-    pedido = urllib.request.Request(
-        f"{URL}/rest/v1/rpc/{funcao}",
-        data=json.dumps(corpo).encode(),
-        headers={"apikey": ANON, "Authorization": f"Bearer {ANON}", "Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(pedido, timeout=90) as resposta:
-            return json.loads(resposta.read().decode() or "null")
-    except urllib.error.HTTPError as erro:
-        raise SystemExit(f"Supabase recusou ({erro.code}): {erro.read().decode()[:300]}")
-
-
-def pedaco(base, de, ate, detalhado, com_seguidores):
+def pedaco(base, de, ate, dormir, com_publicacoes):
     por_dia = {}
 
     def linha(dia):
         return por_dia.setdefault(dia, {"dia": dia})
 
-    # `follower_count` SÓ existe nos últimos 30 dias — a Meta recusa a janela
-    # inteira se ele for pedido para trás disso, e aí nem o alcance vem. Para o
-    # passado, pede-se só o alcance: o ganho de seguidores de meses atrás fica
-    # nulo, que é a verdade (não temos), e não zero.
-    metricas = ["reach", "follower_count"] if com_seguidores else ["reach"]
-
-    serie = consultar({
-        **base,
-        "action": "get_account_insights",
-        "metrics": metricas,
-        "period": "day",
-        "metric_type": "time_series",
-        "since": de.isoformat(),
-        "until": (ate + timedelta(days=1)).isoformat(),
-    })["data"]
+    serie = consultar(
+        {
+            **base,
+            "action": "get_account_insights",
+            "metrics": ["reach"],
+            "period": "day",
+            "metric_type": "time_series",
+            "since": de.isoformat(),
+            "until": (ate + timedelta(days=1)).isoformat(),
+        }
+    )["data"]
     for metrica in serie:
         for ponto in metrica.get("values", []):
             linha(ponto["end_time"][:10])[COLUNA[metrica["name"]]] = ponto["value"]
 
-    if detalhado:
-        dia = de
-        while dia <= ate:
-            totais = consultar({
+    dia = de
+    while dia <= ate:
+        totais = consultar(
+            {
                 **base,
                 "action": "get_account_insights",
                 "metrics": METRICAS_DO_DIA,
@@ -123,36 +85,55 @@ def pedaco(base, de, ate, detalhado, com_seguidores):
                 "metric_type": "total_value",
                 "since": dia.isoformat(),
                 "until": (dia + timedelta(days=1)).isoformat(),
-            })["data"]
-            for metrica in totais:
-                linha(dia.isoformat())[COLUNA[metrica["name"]]] = (metrica.get("total_value") or {}).get("value")
-            dia += timedelta(days=1)
-            sys.stderr.write(".")
+            }
+        )["data"]
+        for metrica in totais:
+            linha(dia.isoformat())[COLUNA[metrica["name"]]] = (
+                metrica.get("total_value") or {}
+            ).get("value")
 
-    midias = consultar({
-        **base,
-        "action": "get_media",
-        "fields": ["id", "timestamp"],
-        "auto_paginate": True,
-        "since": de.isoformat(),
-        "until": (ate + timedelta(days=1)).isoformat(),
-    })["data"]
-    publicadas = {}
-    for midia in midias or []:
-        d = str(midia.get("timestamp", ""))[:10]
-        publicadas[d] = publicadas.get(d, 0) + 1
-    for d, valores in por_dia.items():
-        valores["publicacoes"] = publicadas.get(d, 0)
+        ganhos, perdidos = seguidores_do_dia(base, dia)
+        linha(dia.isoformat())["seguidores_ganhos"] = ganhos
+        linha(dia.isoformat())["seguidores_perdidos"] = perdidos
 
-    return sorted(por_dia.values(), key=lambda x: x["dia"])
+        sys.stderr.write(".")
+        sys.stderr.flush()
+        dia += timedelta(days=1)
+        if dormir:
+            time.sleep(dormir)
+
+    publicacoes = (
+        publicacoes_do_periodo(base, de, ate) if com_publicacoes else []
+    )
+    contagem = {}
+    for pub in publicacoes:
+        contagem[pub["dia"]] = contagem.get(pub["dia"], 0) + 1
+    if com_publicacoes:
+        for d, valores in por_dia.items():
+            valores["publicacoes"] = contagem.get(d, 0)
+
+    return sorted(por_dia.values(), key=lambda x: x["dia"]), publicacoes
 
 
 def main():
-    meses = int(argumento("meses", MESES))
     hoje = date.today()
+    com_publicacoes = "--sem-publicacoes" not in sys.argv
+    dormir = float(argumento("dormir", "0") or 0)
+
+    if argumento("de"):
+        de_total = date.fromisoformat(argumento("de"))
+        ate_total = date.fromisoformat(argumento("ate", hoje.isoformat()))
+    else:
+        meses = int(argumento("meses", "13"))
+        ate_total = hoje
+        de_total = hoje - timedelta(days=30 * meses - 1)
+
+    if de_total > ate_total:
+        raise SystemExit("--de precisa ser anterior a --ate")
 
     contas = [
-        c for c in cli(["accounts", "--platform", "instagram"])["sources"]
+        c
+        for c in cli(["accounts", "--platform", "instagram"])["sources"]
         if c.get("brand_id") == MARCA and c.get("status") == "active"
     ]
     if not contas:
@@ -166,40 +147,70 @@ def main():
             "account_id": conta["account_id"],
             "instagram_account_id": conta["account_id"],
         }
-        perfil = consultar({**base, "action": "get_profile", "fields": ["id", "username", "name", "followers_count"]})["data"]
+        perfil = consultar(
+            {**base, "action": "get_profile", "fields": ["id", "username", "name", "followers_count"]}
+        )["data"]
         if perfil["username"] != conta["username"]:
-            raise SystemExit(f"a conta responde como @{perfil['username']}, e não @{conta['username']}")
+            raise SystemExit(
+                f"a conta responde como @{perfil['username']}, e não @{conta['username']}"
+            )
 
-        print(f"@{perfil['username']} — varrendo {meses} meses", file=sys.stderr)
-        total = 0
-        # Do mais antigo para o mais novo: se a cota acabar no meio, o que
-        # sobrou é o passado distante, e não o mês que ele está olhando.
-        for passo in range(meses - 1, -1, -1):
-            ate = hoje - timedelta(days=30 * passo)
-            de = ate - timedelta(days=29)
-            detalhado = (hoje - de).days <= DETALHE_ATE_DIAS
-            linhas = pedaco(base, de, ate, detalhado, com_seguidores=(hoje - de).days <= 29)
-            if not linhas:
-                continue
-            gravados = rpc("ingerir_metricas", {
-                "token": TOKEN,
+        print(
+            f"@{perfil['username']} — {de_total} a {ate_total}",
+            file=sys.stderr,
+        )
+        dias_gravados = posts_gravados = 0
+
+        # Do mais antigo para o mais novo: se a cota da Meta acabar no meio, o
+        # que sobrou é o passado distante, e não o mês que ele está olhando.
+        inicio = de_total
+        while inicio <= ate_total:
+            fim = min(inicio + timedelta(days=PASSO - 1), ate_total)
+            linhas, publicacoes = pedaco(base, inicio, fim, dormir, com_publicacoes)
+            if linhas:
+                gravados = rpc(
+                    "ingerir_metricas",
+                    {
+                        "token": os.environ["INGESTAO_TOKEN"],
+                        "rede_do_perfil": "instagram",
+                        "handle_do_perfil": perfil["username"],
+                        "nome_do_perfil": perfil.get("name") or "",
+                        "linhas": linhas,
+                    },
+                )
+                dias_gravados += gravados or 0
+            if publicacoes:
+                posts = rpc(
+                    "ingerir_publicacoes",
+                    {
+                        "token": os.environ["INGESTAO_TOKEN"],
+                        "rede_do_perfil": "instagram",
+                        "handle_do_perfil": perfil["username"],
+                        "linhas": publicacoes,
+                    },
+                )
+                posts_gravados += posts or 0
+            print(
+                f"\n  {inicio} a {fim} · {len(linhas)} dia(s) · {len(publicacoes)} post(s)",
+                file=sys.stderr,
+            )
+            inicio = fim + timedelta(days=1)
+
+        # O total de seguidores vale para hoje, e só.
+        rpc(
+            "ingerir_metricas",
+            {
+                "token": os.environ["INGESTAO_TOKEN"],
                 "rede_do_perfil": "instagram",
                 "handle_do_perfil": perfil["username"],
                 "nome_do_perfil": perfil.get("name") or "",
-                "linhas": linhas,
-            })
-            total += gravados or 0
-            print(f"  {de} a {ate} · {gravados} dia(s){' · completo' if detalhado else ''}", file=sys.stderr)
-
-        # O total de seguidores vale para hoje, e só.
-        rpc("ingerir_metricas", {
-            "token": TOKEN,
-            "rede_do_perfil": "instagram",
-            "handle_do_perfil": perfil["username"],
-            "nome_do_perfil": perfil.get("name") or "",
-            "linhas": [{"dia": hoje.isoformat(), "seguidores": perfil["followers_count"]}],
-        })
-        print(f"@{perfil['username']}: {total} dia(s) no arquivo · {perfil['followers_count']} seguidores")
+                "linhas": [{"dia": hoje.isoformat(), "seguidores": perfil["followers_count"]}],
+            },
+        )
+        print(
+            f"@{perfil['username']}: {dias_gravados} dia(s) e {posts_gravados} "
+            f"publicação(ões) no arquivo · {perfil['followers_count']} seguidores"
+        )
 
 
 if __name__ == "__main__":

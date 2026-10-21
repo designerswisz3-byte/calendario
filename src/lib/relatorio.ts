@@ -14,6 +14,7 @@ export interface MetricaDiaria {
   dia: string
   seguidores: number | null
   seguidores_ganhos: number | null
+  seguidores_perdidos: number | null
   alcance: number | null
   views: number | null
   likes: number | null
@@ -42,6 +43,7 @@ export const METRICAS_DE_FLUXO = [
   'cliques_no_link',
   'publicacoes',
   'seguidores_ganhos',
+  'seguidores_perdidos',
 ] as const
 
 export type MetricaDeFluxo = (typeof METRICAS_DE_FLUXO)[number]
@@ -49,6 +51,7 @@ export type MetricaDeFluxo = (typeof METRICAS_DE_FLUXO)[number]
 export const ROTULOS: Record<MetricaDeFluxo | 'seguidores', string> = {
   seguidores: 'Seguidores',
   seguidores_ganhos: 'Seguidores ganhos',
+  seguidores_perdidos: 'Seguidores perdidos',
   alcance: 'Alcance',
   views: 'Views',
   likes: 'Curtidas',
@@ -218,13 +221,22 @@ function fechar(balde: Balde): Periodo {
 
   const fluxos = {} as Record<MetricaDeFluxo, number | null>
   for (const metrica of METRICAS_DE_FLUXO) {
-    const presentes = dias.map((d) => d[metrica]).filter((v): v is number => v !== null)
+    /*
+     * `typeof === 'number'`, e não `!== null`.
+     *
+     * Uma coluna nova só existe no banco depois que a migração roda, e até lá
+     * o `select *` volta sem ela: o campo chega UNDEFINED, não nulo. Com o
+     * teste contra null, undefined passava pelo filtro e entrava na soma como
+     * NaN — o período inteiro virava "NaN" na tela, e a métrica velha ao lado
+     * continuava certa, o que é a pior forma de um painel errar.
+     */
+    const presentes = dias.map((d) => d[metrica]).filter((v): v is number => typeof v === 'number')
     // Nenhum dia com o dado → null, e não 0. A tela mostra "—" em vez de
     // desenhar uma barra zerada que pareceria queda real.
     fluxos[metrica] = presentes.length === 0 ? null : presentes.reduce((s, v) => s + v, 0)
   }
 
-  const comSeguidores = dias.filter((d) => d.seguidores !== null)
+  const comSeguidores = dias.filter((d) => typeof d.seguidores === 'number')
 
   return {
     chave: balde.chave,
@@ -234,7 +246,9 @@ function fechar(balde: Balde): Periodo {
     diasNoPeriodo: diasEntre(balde.inicio, balde.fim),
     // Um dia "tem dado" se qualquer métrica dele foi coletada.
     diasComDado: dias.filter(
-      (d) => d.seguidores !== null || METRICAS_DE_FLUXO.some((m) => d[m] !== null),
+      (d) =>
+        typeof d.seguidores === 'number' ||
+        METRICAS_DE_FLUXO.some((m) => typeof d[m] === 'number'),
     ).length,
     fluxos,
     seguidoresInicio: comSeguidores[0]?.seguidores ?? null,
@@ -331,11 +345,21 @@ function formatarCurto(dia: string) {
   return `${d}/${mes}`
 }
 
+/**
+ * De onde saiu o número de crescimento de seguidores.
+ *
+ * Vai para a tela porque as duas origens respondem a mesma pergunta com
+ * precisão diferente, e quem decide precisa saber qual está lendo.
+ */
+export type OrigemDoGanho = 'fluxo' | 'snapshot' | null
+
 export interface Comparativo {
   atual: Periodo
   anterior: Periodo | null
   fluxos: Record<MetricaDeFluxo, Variacao>
-  seguidoresGanhos: Variacao
+  /** Crescimento LÍQUIDO: quem seguiu menos quem deixou de seguir. */
+  ganhoLiquido: Variacao
+  origemDoGanho: OrigemDoGanho
   /** Diferença de dias coletados entre os dois períodos. */
   diferencaDeCobertura: number
 }
@@ -367,35 +391,66 @@ function montarComparativo(atual: Periodo, anterior: Periodo | null): Comparativ
     )
   }
 
-  const ganhoDe = (p: Periodo | null) => {
-    if (!p) return null
-    /*
-     * A diferença entre dois snapshots é o número que a Meta mostra, e é o
-     * preferido — mas só quando existem DOIS snapshots, em dias diferentes.
-     *
-     * Com um único snapshot no período, início e fim são a mesma linha e a
-     * conta dá zero. Apareceu com dado real: a coleta automática grava o total
-     * de seguidores uma vez por corrida (a API não devolve histórico do
-     * total), então outubro tinha um snapshot só e o painel mostrava "ganho de
-     * 0" ao lado de 58 seguidores ganhos somados — e ainda comparava esse zero
-     * com a soma do mês anterior, resultando em "-100%".
-     */
-    const doisSnapshots =
-      p.seguidoresInicio !== null &&
-      p.seguidoresFim !== null &&
-      p.diaDoPrimeiroSnapshot !== p.diaDoUltimoSnapshot
-
-    if (doisSnapshots) return p.seguidoresFim! - p.seguidoresInicio!
-    return p.fluxos.seguidores_ganhos
-  }
+  const ganhoAtual = crescimentoDe(atual)
+  const ganhoAnterior = crescimentoDe(anterior)
 
   return {
     atual,
     anterior,
     fluxos,
-    seguidoresGanhos: variacao(ganhoDe(atual), ganhoDe(anterior), comparavel),
+    ganhoLiquido: variacao(ganhoAtual.valor, ganhoAnterior.valor, comparavel),
+    origemDoGanho: ganhoAtual.origem,
     diferencaDeCobertura,
   }
+}
+
+/**
+ * Quanto o perfil cresceu no período, de verdade.
+ *
+ * Três tentativas, nesta ordem, e nenhuma delas é "some um e pronto":
+ *
+ * 1. SEGUIU menos DEIXOU DE SEGUIR, somado dia a dia. É o número exato, e é o
+ *    único que não depende de a coleta ter passado em dois dias certos.
+ *
+ * 2. Dois snapshots do total que ATRAVESSAM o período. A API não devolve
+ *    histórico do total de seguidores — a coleta grava o total do dia em que
+ *    rodou. Então dois snapshots podem existir e cobrir 1 dos 31 dias da
+ *    janela: foi exatamente o que produziu "-1 seguidor" num mês em que o
+ *    perfil cresceu 72. Daí a exigência de cobrir pelo menos metade do
+ *    período — abaixo disso o número existe mas não responde à pergunta.
+ *
+ * 3. Nada. Null, e a tela diz que não tem base.
+ *
+ * O que saiu de propósito: usar SÓ os ganhos quando falta a série de perdas.
+ * Ganho bruto não é crescimento, e apresentá-lo como se fosse é o erro que
+ * fazia o painel dizer "+154" num mês de +72.
+ */
+export function crescimentoDe(p: Periodo | null): {
+  valor: number | null
+  origem: OrigemDoGanho
+} {
+  if (!p) return { valor: null, origem: null }
+
+  const ganhos = p.fluxos.seguidores_ganhos
+  const perdidos = p.fluxos.seguidores_perdidos
+  if (ganhos !== null && perdidos !== null) {
+    return { valor: ganhos - perdidos, origem: 'fluxo' }
+  }
+
+  const primeiro = p.diaDoPrimeiroSnapshot
+  const ultimo = p.diaDoUltimoSnapshot
+  if (
+    primeiro !== null &&
+    ultimo !== null &&
+    primeiro !== ultimo &&
+    p.seguidoresInicio !== null &&
+    p.seguidoresFim !== null &&
+    diasEntre(primeiro, ultimo) * 2 >= p.diasNoPeriodo
+  ) {
+    return { valor: p.seguidoresFim - p.seguidoresInicio, origem: 'snapshot' }
+  }
+
+  return { valor: null, origem: null }
 }
 
 /* ---------------------------------------------------------------- formato -- */

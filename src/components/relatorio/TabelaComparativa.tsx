@@ -34,31 +34,32 @@ export function TabelaComparativa({ comparativo }: Props) {
           </tr>
         </thead>
         <tbody>
+          {/*
+            * A primeira linha é o crescimento LÍQUIDO, com nome próprio.
+            *
+            * Mais abaixo vêm "Seguidores ganhos" e "Seguidores perdidos", que
+            * são as duas parcelas dele. Três linhas em vez de uma porque as
+            * três decidem coisas diferentes: ganhar 154 diz se o conteúdo
+            * atrai, perder 82 diz se ele sustenta, e crescer 72 é o que sobra.
+            */}
           <tr className="border-b border-border/40">
-            <td className="py-2 pr-3">Seguidores ganhos</td>
+            <td className="py-2 pr-3 font-medium">Crescimento líquido</td>
             <td className="py-2 pr-3 text-right tabular-nums">
-              {comparativo.seguidoresGanhos.atual === null
+              {comparativo.ganhoLiquido.atual === null
                 ? '—'
-                : comSinal(comparativo.seguidoresGanhos.atual)}
+                : comSinal(comparativo.ganhoLiquido.atual)}
             </td>
             <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
-              {comparativo.seguidoresGanhos.anterior === null
+              {comparativo.ganhoLiquido.anterior === null
                 ? '—'
-                : comSinal(comparativo.seguidoresGanhos.anterior)}
+                : comSinal(comparativo.ganhoLiquido.anterior)}
             </td>
             <td className="py-2 text-right tabular-nums">
-              <Variacao variacao={comparativo.seguidoresGanhos} />
+              <Variacao variacao={comparativo.ganhoLiquido} />
             </td>
           </tr>
 
-          {/*
-            * `seguidores_ganhos` sai da lista: ele já tem a linha acima, e as
-            * duas podem divergir de propósito. A de cima prefere a diferença
-            * entre dois snapshots de total (que inclui quem saiu); esta seria
-            * a soma das entradas do dia. Mostrar as duas lado a lado, com o
-            * mesmo nome e números diferentes, é como se desconfia de um painel.
-            */}
-          {METRICAS_DE_FLUXO.filter((metrica) => metrica !== 'seguidores_ganhos').map((metrica) => (
+          {METRICAS_DE_FLUXO.map((metrica) => (
             <tr key={metrica} className="border-b border-border/40 last:border-0">
               <td className="py-2 pr-3">{ROTULOS[metrica]}</td>
               <td className="py-2 pr-3 text-right tabular-nums">
@@ -80,7 +81,7 @@ export function TabelaComparativa({ comparativo }: Props) {
   )
 }
 
-function Variacao({ variacao }: { variacao: Comparativo['seguidoresGanhos'] }) {
+function Variacao({ variacao }: { variacao: Comparativo['ganhoLiquido'] }) {
   if (variacao.percentual === null) {
     return <span className="text-xs text-muted-foreground">—</span>
   }

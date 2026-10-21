@@ -191,7 +191,10 @@ export type RelatorioMetricaRow = {
   dia: string
   /** Total de seguidores no dia (estoque — não se soma). */
   seguidores: number | null
+  /** Quantas contas seguiram NESTE dia (fluxo). */
   seguidores_ganhos: number | null
+  /** Quantas contas deixaram de seguir NESTE dia (fluxo). */
+  seguidores_perdidos: number | null
   alcance: number | null
   views: number | null
   likes: number | null
@@ -212,6 +215,7 @@ export type RelatorioMetricaEntrada = { dia: string } & Partial<
     RelatorioMetricaRow,
     | 'seguidores'
     | 'seguidores_ganhos'
+    | 'seguidores_perdidos'
     | 'alcance'
     | 'views'
     | 'likes'
@@ -223,6 +227,43 @@ export type RelatorioMetricaEntrada = { dia: string } & Partial<
     | 'publicacoes'
   >
 >
+
+/**
+ * Uma publicação do Instagram, com as métricas dela.
+ *
+ * O grão é o POST, não o dia: um dia com três publicações precisa dizer qual
+ * das três puxou o alcance. A tabela diária continua respondendo "como foi o
+ * dia"; esta responde "por causa de quê".
+ *
+ * Não guarda thumbnail: a Meta assina as URLs de imagem com validade de horas,
+ * e guardá-las produziria painel com foto quebrada em semanas. `permalink` é
+ * estável.
+ */
+export type RelatorioPublicacaoRow = {
+  id: string
+  perfil_id: string
+  /** O id da mídia na Meta. É por ele que a coleta é idempotente. */
+  midia_id: string
+  publicado_em: string
+  /** `date`: o dia a que o post pertence em horário de Brasília. */
+  dia: string
+  /** IMAGE, VIDEO, CAROUSEL_ALBUM. */
+  tipo: string
+  /** FEED, REELS, STORY. */
+  formato: string
+  legenda: string
+  permalink: string
+  alcance: number | null
+  views: number | null
+  likes: number | null
+  comentarios: number | null
+  salvamentos: number | null
+  compartilhamentos: number | null
+  interacoes: number | null
+  fonte: string
+  criado_em: string
+  atualizado_em: string
+}
 
 /* ------------------------------------------------- eventos e notícias -- */
 
@@ -458,6 +499,31 @@ export interface Database {
           atualizado_em?: string
         }
         Update: Partial<Omit<RelatorioMetricaRow, 'id' | 'perfil_id'>>
+        Relationships: []
+      }
+      relatorio_publicacoes: {
+        Row: RelatorioPublicacaoRow
+        Insert: Omit<
+          RelatorioPublicacaoRow,
+          | 'id'
+          | 'tipo'
+          | 'formato'
+          | 'legenda'
+          | 'permalink'
+          | 'fonte'
+          | 'criado_em'
+          | 'atualizado_em'
+        > & {
+          id?: string
+          tipo?: string
+          formato?: string
+          legenda?: string
+          permalink?: string
+          fonte?: string
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<RelatorioPublicacaoRow, 'id' | 'perfil_id'>>
         Relationships: []
       }
       canvas_boards: {

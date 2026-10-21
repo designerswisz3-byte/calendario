@@ -24,6 +24,7 @@ import {
 import { toast } from '@/components/ui/use-toast'
 import { todayKey } from '@/lib/date'
 import { CartaoDeMetrica } from '@/components/relatorio/CartaoDeMetrica'
+import { DiaDetalhado } from '@/components/relatorio/DiaDetalhado'
 import { GraficoDiario } from '@/components/relatorio/GraficoDiario'
 import { SeletorDePeriodo } from '@/components/relatorio/SeletorDePeriodo'
 import { TabelaComparativa } from '@/components/relatorio/TabelaComparativa'
@@ -51,7 +52,9 @@ import {
   useImportarMetricas,
   useMetricas,
   usePerfis,
+  usePublicacoes,
 } from '@/hooks/useRelatorio'
+import { porDia as publicacoesPorDia } from '@/lib/relatorioPublicacoes'
 import { errorMessage } from '@/lib/supabase'
 import type { RedeSocial, RelatorioMetricaEntrada } from '@/types/database'
 
@@ -85,12 +88,15 @@ export default function RelatorioPage() {
   )
   const [metricaDoGrafico, setMetricaDoGrafico] = React.useState<MetricaDeFluxo>('alcance')
   const [selecionada, setSelecionada] = React.useState<string | null>(null)
+  /* O dia aberto no painel de conteúdo, embaixo do gráfico diário. */
+  const [diaAberto, setDiaAberto] = React.useState<string | null>(null)
   const [abrindoImportacao, setAbrindoImportacao] = React.useState(false)
   const [abrindoPerfil, setAbrindoPerfil] = React.useState(false)
   const [paraImprimir, setParaImprimir] = React.useState<RelatorioParaImprimir | null>(null)
 
   const perfil = perfis?.find((p) => p.id === perfilId) ?? perfis?.[0] ?? null
   const { data: metricas, isLoading: carregandoMetricas } = useMetricas(perfil?.id ?? null)
+  const { data: publicacoes } = usePublicacoes(perfil?.id ?? null)
 
   const periodos = React.useMemo(
     () => agrupar(metricas ?? [], granularidade),
@@ -177,6 +183,12 @@ export default function RelatorioPage() {
   const fontes = React.useMemo(
     () => [...new Set((metricas ?? []).map((m) => m.fonte))].sort(),
     [metricas],
+  )
+
+  /* MESMA REGRA DE ORDEM do bloco acima: hook antes de qualquer `return`. */
+  const postsPorDia = React.useMemo(
+    () => publicacoesPorDia(publicacoes?.linhas ?? []),
+    [publicacoes],
   )
 
   async function aoImportar(dias: RelatorioMetricaEntrada[], fonte: string) {
@@ -331,6 +343,16 @@ export default function RelatorioPage() {
         </p>
       )}
 
+      {publicacoes?.faltaMigracao && (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+          <strong>Falta uma migração.</strong> O arquivo de publicações (
+          <code>relatorio_publicacoes</code>) ainda não existe no banco, então o dia a dia não
+          mostra qual conteúdo saiu em cada data. Rode{' '}
+          <code>supabase/relatorio-publicacoes.sql</code> no SQL Editor — uma vez, sem apagar
+          nada.
+        </p>
+      )}
+
       {modo === 'periodo' && (metricas ?? []).length > 0 && (
         <SeletorDePeriodo
           de={janelaAtiva.de}
@@ -408,20 +430,47 @@ export default function RelatorioPage() {
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {numero(comparativo.atual.seguidoresFim)}
               </p>
+              {/*
+                O crescimento LÍQUIDO, e a origem dele junto.
+                "+154" e "+72" respondem a mesma pergunta com precisão
+                diferente, e quem decide pauta precisa saber qual está lendo:
+                o líquido vem de seguiu menos deixou de seguir, somado dia a
+                dia; o snapshot é a diferença entre dois totais do perfil.
+              */}
               <p className="mt-1 text-xs text-muted-foreground">
-                {comparativo.seguidoresGanhos.atual === null
-                  ? 'Sem snapshot de seguidores no período'
-                  : `Ganho de ${comparativo.seguidoresGanhos.atual > 0 ? '+' : ''}${numero(
-                      comparativo.seguidoresGanhos.atual,
-                    )} no período`}
+                {comparativo.ganhoLiquido.atual === null
+                  ? 'Crescimento do período: sem base (falta a série de ganhos e perdas)'
+                  : `Crescimento líquido no período: ${
+                      comparativo.ganhoLiquido.atual > 0 ? '+' : ''
+                    }${numero(comparativo.ganhoLiquido.atual)}`}
               </p>
+              {comparativo.origemDoGanho === 'snapshot' && (
+                <p className="mt-0.5 text-[0.7rem] text-amber-600 dark:text-amber-400">
+                  Medido pela diferença entre dois totais do perfil, não pela soma de ganhos e
+                  perdas — menos preciso.
+                </p>
+              )}
             </Card>
 
-            <CartaoDeMetrica
-              titulo="Seguidores ganhos"
-              variacao={comparativo.seguidoresGanhos}
-              rotuloAnterior={comparativo.anterior?.rotulo ?? null}
-            />
+            <Card className="p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Ganhos e perdas
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  +{numero(comparativo.fluxos.seguidores_ganhos.atual ?? 0)}
+                </span>
+                <span className="mx-1.5 text-base font-normal text-muted-foreground">/</span>
+                <span className="text-rose-600 dark:text-rose-400">
+                  −{numero(comparativo.fluxos.seguidores_perdidos.atual ?? 0)}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {comparativo.fluxos.seguidores_perdidos.atual === null
+                  ? 'Quem deixou de seguir ainda não está no arquivo'
+                  : 'Quem seguiu / quem deixou de seguir no período'}
+              </p>
+            </Card>
 
             {DESTAQUES.map((metrica) => (
               <CartaoDeMetrica
@@ -466,11 +515,23 @@ export default function RelatorioPage() {
                   ate={janelaAtiva.ate}
                   metrica={metricaDoGrafico}
                   anterior={comparativo.anterior}
+                  publicacoes={publicacoes?.linhas ?? []}
+                  diaSelecionado={diaAberto}
+                  onSelecionarDia={setDiaAberto}
                 />
                 <p className="text-xs text-muted-foreground">
                   Uma barra por dia. Traço vazado = dia sem coleta, nunca zero. A linha tracejada
-                  é a média diária do período anterior de mesmo tamanho.
+                  é a média diária do período anterior de mesmo tamanho. O ponto azul marca o dia
+                  que teve publicação — passe o cursor para ver qual, clique para abrir o dia.
                 </p>
+                {diaAberto && (
+                  <DiaDetalhado
+                    dia={diaAberto}
+                    metricas={(metricas ?? []).find((m) => m.dia === diaAberto) ?? null}
+                    publicacoes={postsPorDia.get(diaAberto) ?? []}
+                    onFechar={() => setDiaAberto(null)}
+                  />
+                )}
               </>
             ) : (
               <>

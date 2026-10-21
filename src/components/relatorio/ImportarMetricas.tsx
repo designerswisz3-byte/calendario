@@ -24,9 +24,9 @@ interface Props {
   onImportar: (dias: RelatorioMetricaEntrada[], fonte: string) => Promise<void>
 }
 
-const EXEMPLO = `dia;seguidores;alcance;views;likes;comentarios;salvamentos;compartilhamentos;publicacoes
-2026-09-01;452;300;1388;40;3;5;2;1
-2026-09-02;455;280;3014;52;4;7;1;2`
+const EXEMPLO = `dia;seguidores;seguidores_ganhos;seguidores_perdidos;alcance;views;likes;comentarios;salvamentos;compartilhamentos;publicacoes
+2026-09-01;452;8;3;300;1388;40;3;5;2;1
+2026-09-02;455;5;2;280;3014;52;4;7;1;2`
 
 /**
  * Entrada de dados do Relatório.

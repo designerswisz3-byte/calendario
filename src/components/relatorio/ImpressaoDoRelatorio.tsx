@@ -4,6 +4,7 @@ import {
   METRICAS_DE_FLUXO,
   ROTULOS,
   comSinal,
+  crescimentoDe,
   numero,
   percentual,
   type Comparativo,
@@ -73,7 +74,7 @@ export function ImpressaoDoRelatorio({ relatorio, onConcluido }: Props) {
   const maisRecentePrimeiro = [...periodos].reverse()
   const incompletos = periodos.filter((p) => p.diasComDado < p.diasNoPeriodo)
 
-  const ganho = comparativo.seguidoresGanhos
+  const ganho = comparativo.ganhoLiquido
 
   return createPortal(
     <div className="area-de-impressao impressao-do-relatorio" aria-hidden>
@@ -101,7 +102,7 @@ export function ImpressaoDoRelatorio({ relatorio, onConcluido }: Props) {
           <dd>
             {numero(atual.seguidoresFim)}
             <div className="relatorio-delta">
-              Ganho {comSinal(ganho.atual)}
+              {ganho.atual === null ? 'Crescimento sem base' : `Líquido ${comSinal(ganho.atual)}`}
               {ganho.anterior !== null && ` · anterior ${comSinal(ganho.anterior)}`}
             </div>
           </dd>
@@ -152,7 +153,10 @@ export function ImpressaoDoRelatorio({ relatorio, onConcluido }: Props) {
             <th>Período</th>
             <th>Dias</th>
             <th>Seguidores</th>
-            <th>Ganho</th>
+            {/* As duas parcelas antes do saldo: é a ordem em que a conta se lê. */}
+            <th>Seguiu</th>
+            <th>Saiu</th>
+            <th>Líquido</th>
             {COLUNAS.map((coluna) => (
               <th key={coluna}>{ROTULOS[coluna]}</th>
             ))}
@@ -160,10 +164,7 @@ export function ImpressaoDoRelatorio({ relatorio, onConcluido }: Props) {
         </thead>
         <tbody>
           {maisRecentePrimeiro.map((periodo) => {
-            const ganhoDoPeriodo =
-              periodo.seguidoresInicio !== null && periodo.seguidoresFim !== null
-                ? periodo.seguidoresFim - periodo.seguidoresInicio
-                : periodo.fluxos.seguidores_ganhos
+            const ganhoDoPeriodo = crescimentoDe(periodo).valor
             return (
               <tr key={periodo.chave}>
                 <td>{periodo.rotulo}</td>
@@ -171,6 +172,8 @@ export function ImpressaoDoRelatorio({ relatorio, onConcluido }: Props) {
                   {periodo.diasComDado}/{periodo.diasNoPeriodo}
                 </td>
                 <td>{numero(periodo.seguidoresFim)}</td>
+                <td>{numero(periodo.fluxos.seguidores_ganhos)}</td>
+                <td>{numero(periodo.fluxos.seguidores_perdidos)}</td>
                 <td>{ganhoDoPeriodo === null ? '—' : comSinal(ganhoDoPeriodo)}</td>
                 {COLUNAS.map((coluna) => (
                   <td key={coluna}>{numero(periodo.fluxos[coluna])}</td>

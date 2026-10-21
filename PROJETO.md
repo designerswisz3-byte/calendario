@@ -266,9 +266,33 @@ dono. Para que serve e por que não a `service_role`: §8, "A coleta de notícia
 `fonte`. Único por `(user_id, rede, handle)`.
 
 `relatorio_metricas_diarias`: `perfil_id`, `dia` (date), `seguidores`,
-`seguidores_ganhos`, `alcance`, `views`, `likes`, `comentarios`,
-`salvamentos`, `compartilhamentos`, `interacoes`, `cliques_no_link`,
-`publicacoes`, `fonte`. Único por `(perfil_id, dia)`.
+`seguidores_ganhos`, `seguidores_perdidos`, `alcance`, `views`, `likes`,
+`comentarios`, `salvamentos`, `compartilhamentos`, `interacoes`,
+`cliques_no_link`, `publicacoes`, `fonte`. Único por `(perfil_id, dia)`.
+
+`relatorio_publicacoes`: `perfil_id`, `midia_id` (o id na Meta), `publicado_em`,
+`dia`, `tipo`, `formato`, `legenda`, `permalink`, `alcance`, `views`, `likes`,
+`comentarios`, `salvamentos`, `compartilhamentos`, `interacoes`, `fonte`. Único
+por `(perfil_id, midia_id)`.
+
+O grão aqui é a PUBLICAÇÃO, e não o dia, porque a tabela diária só guardava a
+*contagem* de posts: um pico de alcance no dia 14 não dizia qual conteúdo o
+causou, que é a única leitura que vira decisão de pauta.
+
+Duas colunas que parecem redundantes e não são:
+
+- **`dia` ao lado de `publicado_em`.** `publicado_em` é UTC; um post das 22h de
+  Brasília é 01h do dia seguinte em UTC. Sem o dia já resolvido no fuso dele,
+  todo post da noite — que é quando ele publica — cairia na barra errada do
+  gráfico, ao lado do alcance de outro dia.
+- **`tipo` e `formato`.** `VIDEO` + `REELS` e `VIDEO` + `FEED` rendem alcance
+  de ordens diferentes; comparar os dois como "vídeo" apaga a única variável
+  que explica a diferença.
+
+O que **não** entra: `thumbnail_url` e `media_url`. A Meta assina essas URLs
+com validade de horas (`oe=` no fim). Guardadas, viram imagem quebrada em
+semanas e o painel passa a parecer defeito. `permalink` é estável e abre o post
+de verdade.
 
 Duas decisões sustentam a aba:
 
@@ -376,6 +400,12 @@ Duas colunas de informação, uma granularidade por vez.
   período) — é ela que diz se o resto da linha pode ser lido.
 - **Exportar PDF** pelo motor de impressão do navegador, como nas Notas.
 
+- **Dia a dia** no modo Período: uma barra por dia, com **ponto azul no dia
+  que teve publicação**. O cursor sobre a barra mostra a métrica do dia e o
+  que saiu nele; o clique abre o dia inteiro embaixo, com cada post, o horário,
+  o link para o Instagram e as métricas da publicação. É o que liga o pico ao
+  conteúdo — sem isso, o pico é curiosidade; com isso, é formato para repetir.
+
 Três proteções contra o número que mente:
 
 - quando os dois períodos comparados têm cobertura diferente em mais de um
@@ -384,6 +414,36 @@ Três proteções contra o número que mente:
   snapshot, nunca a soma (somar seguidores de 30 dias daria 15 mil seguidores
   num perfil de 500);
 - divisão por zero não vira percentual: de 0 para 50 a tela mostra `+50`.
+
+#### O crescimento de seguidores: três tentativas, nessa ordem
+
+O erro mais caro que a aba já teve: ela mostrava **"-1 seguidor"** numa janela
+de 20/09 a 20/10 em que o perfil tinha crescido **+72** (ganhou 154, perdeu
+82). Não era dado faltando — os 390 dias estavam todos lá. Era a regra de
+cálculo.
+
+`crescimentoDe` (em `src/lib/relatorio.ts`) é a regra única, e as três
+tentativas são:
+
+1. **Fluxo**: `seguidores_ganhos − seguidores_perdidos`, somados dia a dia.
+   Exato, e não depende de a coleta ter passado em dois dias específicos.
+2. **Snapshot**, só se os dois totais **atravessarem** o período (cobrirem pelo
+   menos metade dos dias dele). A API não devolve histórico do total de
+   seguidores: a coleta grava o total do dia em que rodou. Então dois snapshots
+   podiam existir e cobrir 1 dos 31 dias da janela — era exatamente isso que
+   produzia o "-1".
+3. **Null.** A tela diz que falta base.
+
+O que saiu de propósito: usar **só os ganhos** quando falta a série de perdas.
+Ganho bruto não é crescimento, e apresentá-lo como se fosse é o que fazia o
+painel dizer "+154" num mês de "+72". Entre um número errado e um "—", o "—" é
+o que preserva a confiança no resto do painel.
+
+Por isso os cartões do topo são três e não um: **Seguidores** (total e
+crescimento líquido, com a origem dita na tela quando é snapshot), **Ganhos e
+perdas** (as duas parcelas, lado a lado) e, na tabela, as três linhas
+separadas. Ganhar 154 diz se o conteúdo atrai; perder 82 diz se ele sustenta;
+crescer 72 é o que sobra — e as três decidem coisas diferentes.
 
 **De onde vêm os dados.** O app roda no navegador, então não pode guardar o
 token de página da Meta — quem abrisse o DevTools teria a conta. A entrada é
@@ -916,24 +976,59 @@ passado distante e não o mês que ele está olhando.
 
 Uma armadilha que custou uma execução: **`follower_count` só existe nos
 últimos 30 dias**. Pedido para trás disso, a Meta recusa a janela INTEIRA — e
-aí nem o alcance vem. O script pede o ganho de seguidores só na janela recente;
-nos meses antigos o campo fica nulo, que é a verdade (não temos), e não zero.
+aí nem o alcance vem.
 
-#### O ganho de seguidores com um snapshot só
+Isso ficou resolvido por outro caminho, e é o que destravou o histórico:
+**`follows_and_unfollows` não tem esse limite**. Medido: ele responde para
+junho de 2026 e antes, enquanto `follower_count` recusa. Então o coletor
+trocou um pelo outro, e `historico.py` perdeu as duas camadas — o passado
+passou a ser preenchível por inteiro, e o custo virou tempo (dois pedidos por
+dia), não dado faltando. Daí `--de/--ate` e `--dormir`: dá para rodar em
+pedaços.
 
-A API não devolve histórico do TOTAL de seguidores — só o ganho de cada dia.
-Então a coleta grava o total uma vez por corrida, no último dia da janela.
+#### Quem seguiu, quem saiu, e por que são duas séries
 
-Isso quebrou o cálculo do período, e só apareceu com dado real: `ganhoDe`
-preferia a diferença entre o primeiro e o último snapshot do período, e com um
-snapshot só os dois eram a MESMA linha — diferença zero. O painel mostrava
-"Ganho de 0 no período" ao lado de 58 seguidores ganhos somados, e comparava
-esse zero com a soma do mês anterior: **-100%**, sem queda nenhuma.
+`follower_count` conta quem ENTROU no dia. Não existe métrica de conta que
+conte quem saiu — mas existe o breakdown:
 
-A regra agora exige dois snapshots **em dias diferentes**; sem isso, vale a
-soma dos ganhos diários. A preferência pela diferença continua certa quando ela
-existe: `follower_count` conta quem ENTROU, e a diferença entre dois totais é o
-líquido — inclui quem saiu.
+    get_account_insights
+      metrics=["follows_and_unfollows"]
+      metric_type=total_value
+      breakdown=follow_type
+    -> FOLLOWER: 4   (seguiu)
+       NON_FOLLOWER: 2  (deixou de seguir)
+
+**Conferido antes de confiar**, em 12 dias seguidos: `FOLLOWER` bate
+exatamente com `follower_count`, dia a dia. É o que autoriza ler
+`NON_FOLLOWER` como "deixou de seguir" em vez de supor.
+
+O número que isso revelou é a razão de a aba existir: de 20/09 a 20/10 o perfil
+**ganhou 154 e perdeu 82**. Quem vê só o 154 acha que cresceu 154; quem vê só o
+total quase parado acha que não aconteceu nada. São duas séries, e cada uma
+responde uma pergunta diferente — a primeira diz se o conteúdo atrai, a segunda
+diz se ele sustenta. A regra de cálculo do líquido está em §4, `/relatorio`.
+
+#### Salvamentos: a coluna que existia e vinha sempre vazia
+
+`salvamentos` estava na tabela, na tela, no PDF e na importação — e nunca tinha
+valor, porque o coletor não pedia. A métrica de conta se chama **`saves`**; no
+nível da mídia, **`saved`**. Uma letra, duas APIs, e a diferença entre um
+cartão com número e um cartão com "—" por um mês.
+
+#### A publicação de cada dia
+
+Além do dia, cada corrida grava uma linha por post: `get_media` para a janela
+(id, timestamp, tipo, formato, legenda, permalink) e um `get_media_insights`
+por mídia (alcance, views, curtidas, comentários, salvamentos,
+compartilhamentos, interações).
+
+Duas defesas, porque isto roda sem ninguém olhando:
+
+- uma mídia que a Meta recuse (post apagado no meio da coleta) não derruba o
+  dia: `tentar()` devolve `None` e a corrida segue;
+- `ingerir_publicacoes` ausente no banco (migração não rodada) vira **aviso**,
+  não fim de corrida — o dia de métrica que já foi gravado não se perde por
+  causa de uma tabela que ainda não existe.
 
 
 

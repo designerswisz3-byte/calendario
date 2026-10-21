@@ -7,6 +7,7 @@ import type {
   RelatorioMetricaEntrada,
   RelatorioMetricaRow,
   RelatorioPerfilRow,
+  RelatorioPublicacaoRow,
 } from '@/types/database'
 
 export function usePerfis() {
@@ -48,6 +49,47 @@ export function useMetricas(perfilId: string | null) {
         .order('dia', { ascending: true })
       if (error) throw error
       return (data ?? []) as RelatorioMetricaRow[]
+    },
+  })
+}
+
+/**
+ * As publicações do perfil, com as métricas de cada uma.
+ *
+ * `select('*')` sem janela, igual às métricas diárias, e pelo mesmo motivo: um
+ * ano de posts é um punhado de linhas, e é isso que deixa qualquer dia do
+ * gráfico saber o que foi publicado nele sem uma ida ao banco por clique.
+ *
+ * A tabela pode AINDA NÃO EXISTIR: ela nasce numa migração posterior à da aba.
+ * Nesse caso a query devolve lista vazia em vez de estourar — o painel inteiro
+ * cair porque uma gaveta nova não foi criada seria uma troca péssima. O erro
+ * continua visível em `faltaMigracao`, para a tela poder dizer o que fazer.
+ */
+export function usePublicacoes(perfilId: string | null) {
+  const { user } = useAuth()
+
+  return useQuery({
+    queryKey: queryKeys.relatorioPublicacoes(perfilId ?? 'nenhum'),
+    enabled: Boolean(user) && Boolean(perfilId),
+    queryFn: async (): Promise<{
+      linhas: RelatorioPublicacaoRow[]
+      faltaMigracao: boolean
+    }> => {
+      const { data, error } = await supabase
+        .from('relatorio_publicacoes')
+        .select('*')
+        .eq('perfil_id', perfilId as string)
+        .order('publicado_em', { ascending: true })
+      if (error) {
+        // PGRST205/42P01: a relação não existe. Qualquer outro erro é real.
+        const faltando =
+          error.code === 'PGRST205' ||
+          error.code === '42P01' ||
+          /relatorio_publicacoes/.test(error.message)
+        if (faltando) return { linhas: [], faltaMigracao: true }
+        throw error
+      }
+      return { linhas: (data ?? []) as RelatorioPublicacaoRow[], faltaMigracao: false }
     },
   })
 }

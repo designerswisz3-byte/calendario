@@ -20,4 +20,6 @@ export const queryKeys = {
   noticias: () => ['noticias'] as const,
   relatorioPerfis: () => ['relatorio', 'perfis'] as const,
   relatorioMetricas: (perfilId: string) => ['relatorio', 'metricas', perfilId] as const,
+  relatorioPublicacoes: (perfilId: string) =>
+    ['relatorio', 'publicacoes', perfilId] as const,
 }

@@ -1,4 +1,4 @@
-import { METRICAS_DE_FLUXO, ROTULOS, numero, type Periodo } from '@/lib/relatorio'
+import { METRICAS_DE_FLUXO, ROTULOS, crescimentoDe, numero, type Periodo } from '@/lib/relatorio'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -38,7 +38,7 @@ export function TabelaDePeriodos({ periodos, selecionado, onSelecionar }: Props)
             <th className="sticky left-0 bg-background px-2 py-2 text-left font-medium">Período</th>
             <th className="px-2 py-2 text-right font-medium">Dias</th>
             <th className="px-2 py-2 text-right font-medium">Seguidores</th>
-            <th className="px-2 py-2 text-right font-medium">Ganho</th>
+            <th className="px-2 py-2 text-right font-medium">Líquido</th>
             {COLUNAS.map((coluna) => (
               <th key={coluna} className="px-2 py-2 text-right font-medium">
                 {ROTULOS[coluna]}
@@ -49,10 +49,7 @@ export function TabelaDePeriodos({ periodos, selecionado, onSelecionar }: Props)
         <tbody>
           {maisRecentePrimeiro.map((periodo) => {
             const parcial = periodo.diasComDado < periodo.diasNoPeriodo
-            const ganho =
-              periodo.seguidoresInicio !== null && periodo.seguidoresFim !== null
-                ? periodo.seguidoresFim - periodo.seguidoresInicio
-                : periodo.fluxos.seguidores_ganhos
+            const ganho = crescimentoDe(periodo).valor
 
             return (
               <tr
