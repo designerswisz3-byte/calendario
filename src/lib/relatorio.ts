@@ -279,6 +279,58 @@ function variacao(
   }
 }
 
+/* ------------------------------------------------- janela personalizada -- */
+
+/**
+ * Um período de qualquer data a qualquer data.
+ *
+ * O mensal e o semanal respondem "como foi este mês". Esta janela responde a
+ * outra pergunta, que é a que aparece quando alguém está decidindo: "como foi
+ * a campanha", "como foram os 40 dias desde que mudei a frequência". Não dá
+ * para montar isso com meses fechados.
+ *
+ * Dias sem coleta dentro da janela não viram zero: `diasComDado` cai, e a tela
+ * mostra a cobertura. É a mesma regra do resto do arquivo.
+ */
+export function janela(
+  dados: MetricaDiaria[],
+  de: string,
+  ate: string,
+  rotulo = `${formatarCurto(de)} a ${formatarCurto(ate)}`,
+): Periodo {
+  const dentro = dados.filter((linha) => linha.dia >= de && linha.dia <= ate)
+  return fechar({ chave: `${de}_${ate}`, rotulo, inicio: de, fim: ate, dias: dentro })
+}
+
+/**
+ * A janela imediatamente anterior, do mesmo tamanho.
+ *
+ * Comparar 14 dias com o mês passado inteiro não diz nada. O par honesto de
+ * uma janela é a janela anterior de mesmo comprimento, colada nela.
+ */
+export function janelaAnterior(de: string, ate: string): { de: string; ate: string } {
+  const dias = diasEntre(de, ate)
+  return { de: somarDias(de, -dias), ate: somarDias(de, -1) }
+}
+
+/** Compara uma janela arbitrária com a anterior de mesmo tamanho. */
+export function compararJanelas(dados: MetricaDiaria[], de: string, ate: string): Comparativo {
+  const atual = janela(dados, de, ate)
+  const antes = janelaAnterior(de, ate)
+  const anterior = janela(dados, antes.de, antes.ate)
+
+  // Janela anterior sem NENHUM dia coletado não é "queda de 100%": é falta de
+  // histórico. Vira null, e a tela mostra "sem base de comparação".
+  const temBase = anterior.diasComDado > 0
+  return montarComparativo(atual, temBase ? anterior : null)
+}
+
+/** 14/09 — curto porque entra no meio de frases e em rótulo de gráfico. */
+function formatarCurto(dia: string) {
+  const [, mes, d] = dia.split('-')
+  return `${d}/${mes}`
+}
+
 export interface Comparativo {
   atual: Periodo
   anterior: Periodo | null
@@ -296,8 +348,11 @@ export function comparar(periodos: Periodo[], chave: string): Comparativo | null
   const i = periodos.findIndex((p) => p.chave === chave)
   if (i < 0) return null
 
-  const atual = periodos[i]
-  const anterior = i > 0 ? periodos[i - 1] : null
+  return montarComparativo(periodos[i], i > 0 ? periodos[i - 1] : null)
+}
+
+/** O comparativo em si, separado para servir às duas formas de recortar. */
+function montarComparativo(atual: Periodo, anterior: Periodo | null): Comparativo {
   const diferencaDeCobertura = anterior ? atual.diasComDado - anterior.diasComDado : 0
   // Um dia de folga passa (fevereiro contra janeiro, mês em curso); mais que
   // isso e a comparação direta deixa de significar performance.

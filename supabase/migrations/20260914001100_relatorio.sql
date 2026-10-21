@@ -110,3 +110,11 @@ drop trigger if exists relatorio_metricas_set_atualizado_em on relatorio_metrica
 create trigger relatorio_metricas_set_atualizado_em
   before update on relatorio_metricas_diarias
   for each row execute function set_atualizado_em();
+
+-- O Supabase concede isto sozinho para tabelas novas em `public`; declarar
+-- explícito torna o arquivo auto-suficiente em qualquer Postgres — e foi o que
+-- faltou quando estas tabelas foram recriadas na bancada de testes: a RLS
+-- estava certa e a tela dizia "nenhum perfil", porque o privilégio de tabela
+-- nem chegava na política.
+grant select, insert, update, delete on relatorio_perfis to anon, authenticated;
+grant select, insert, update, delete on relatorio_metricas_diarias to anon, authenticated;

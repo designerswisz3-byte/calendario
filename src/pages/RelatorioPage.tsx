@@ -24,6 +24,9 @@ import {
 import { toast } from '@/components/ui/use-toast'
 import { todayKey } from '@/lib/date'
 import { CartaoDeMetrica } from '@/components/relatorio/CartaoDeMetrica'
+import { GraficoDiario } from '@/components/relatorio/GraficoDiario'
+import { SeletorDePeriodo } from '@/components/relatorio/SeletorDePeriodo'
+import { TabelaComparativa } from '@/components/relatorio/TabelaComparativa'
 import { GraficoDePeriodos } from '@/components/relatorio/GraficoDePeriodos'
 import { TabelaDePeriodos } from '@/components/relatorio/TabelaDePeriodos'
 import { ImportarMetricas } from '@/components/relatorio/ImportarMetricas'
@@ -32,13 +35,15 @@ import {
   type RelatorioParaImprimir,
 } from '@/components/relatorio/ImpressaoDoRelatorio'
 import {
-  METRICAS_DE_FLUXO,
-  ROTULOS,
   agrupar,
   comparar,
+  compararJanelas,
+  METRICAS_DE_FLUXO,
   numero,
+  ROTULOS,
   type Granularidade,
   type MetricaDeFluxo,
+  type Periodo,
 } from '@/lib/relatorio'
 import {
   useCriarPerfil,
@@ -67,6 +72,17 @@ export default function RelatorioPage() {
 
   const [perfilId, setPerfilId] = React.useState<string | null>(null)
   const [granularidade, setGranularidade] = React.useState<Granularidade>('mensal')
+  /*
+   * O terceiro modo: um período qualquer, de data a data.
+   *
+   * Mensal e semanal respondem "como foi este mês". Este responde a pergunta
+   * de quem está decidindo — "como foram os 40 dias desde que mudei a
+   * frequência" —, que não cabe em meses fechados.
+   */
+  const [modo, setModo] = React.useState<'mensal' | 'semanal' | 'periodo'>('mensal')
+  const [janelaEscolhida, setJanelaEscolhida] = React.useState<{ de: string; ate: string } | null>(
+    null,
+  )
   const [metricaDoGrafico, setMetricaDoGrafico] = React.useState<MetricaDeFluxo>('alcance')
   const [selecionada, setSelecionada] = React.useState<string | null>(null)
   const [abrindoImportacao, setAbrindoImportacao] = React.useState(false)
@@ -93,9 +109,71 @@ export default function RelatorioPage() {
     ? (selecionada as string)
     : (periodos[periodos.length - 1]?.chave ?? null)
 
-  const comparativo = emFoco ? comparar(periodos, emFoco) : null
+  /** O primeiro e o último dia que existem no arquivo deste perfil. */
+  const limites = React.useMemo(() => {
+    const dias = (metricas ?? []).map((m) => m.dia).sort()
+    return dias.length > 0
+      ? { primeiro: dias[0], ultimo: dias[dias.length - 1] }
+      : { primeiro: todayKey(), ultimo: todayKey() }
+  }, [metricas])
+
+  /* Abre nos últimos 28 dias do que existe — não em "hoje", que pode não ter
+     sido coletado ainda, nem no arquivo inteiro, que é leitura de fechamento. */
+  const janelaAtiva = React.useMemo(() => {
+    if (janelaEscolhida) return janelaEscolhida
+    const fim = limites.ultimo
+    const inicio = new Date(`${fim}T00:00:00Z`)
+    inicio.setUTCDate(inicio.getUTCDate() - 27)
+    const de = inicio.toISOString().slice(0, 10)
+    return { de: de < limites.primeiro ? limites.primeiro : de, ate: fim }
+  }, [janelaEscolhida, limites])
+
+  const comparativo =
+    modo === 'periodo'
+      ? compararJanelas(metricas ?? [], janelaAtiva.de, janelaAtiva.ate)
+      : emFoco
+        ? comparar(periodos, emFoco)
+        : null
 
   /** De onde os dias vieram de verdade — pode ser mais de uma fonte. */
+  /*
+   * ATENÇÃO À ORDEM: este bloco fica aqui, com os outros hooks, e não lá
+   * embaixo perto do JSX que o usa.
+   *
+   * A primeira versão ficou depois do `if (!perfil) return`, e a tela quebrava
+   * com "Rendered more hooks than during the previous render" no instante em
+   * que o perfil chegava do banco: o primeiro render saía pelo atalho e
+   * contava menos hooks que o segundo. React não perdoa hook condicional, e a
+   * aba inteira ia para a tela de erro.
+   */
+  /**
+   * Quando a coleta passou por aqui pela última vez.
+   *
+   * A aba passou a ser alimentada por uma rotina que roda algumas vezes ao
+   * dia. Sem dizer isso na tela, um número velho e um número fresco têm a
+   * mesma cara — e quem olha não sabe se está vendo o dia de hoje crescendo ou
+   * um painel que parou de atualizar há uma semana.
+   */
+  const coleta = React.useMemo(() => {
+    const automaticas = (metricas ?? []).filter((m) => m.fonte === 'instagram_api')
+    if (automaticas.length === 0) return null
+    const ultima = automaticas.reduce(
+      (maior, m) => (m.atualizado_em > maior ? m.atualizado_em : maior),
+      automaticas[0].atualizado_em,
+    )
+    const minutos = Math.max(0, Math.round((Date.now() - Date.parse(ultima)) / 60_000))
+    const quando =
+      minutos < 60
+        ? `há ${minutos} min`
+        : minutos < 60 * 36
+          ? `há ${Math.round(minutos / 60)} h`
+          : `há ${Math.round(minutos / 1440)} dias`
+    // O dia corrente é sempre parcial: a Meta fecha a conta à meia-noite.
+    const hoje = todayKey()
+    const temHoje = automaticas.some((m) => m.dia === hoje)
+    return { quando, temHoje, atrasada: minutos > 60 * 30 }
+  }, [metricas])
+
   const fontes = React.useMemo(
     () => [...new Set((metricas ?? []).map((m) => m.fonte))].sort(),
     [metricas],
@@ -120,8 +198,17 @@ export default function RelatorioPage() {
     if (!perfil || !comparativo) return
     setParaImprimir({
       perfil: perfil.handle,
-      granularidade,
-      periodos,
+      granularidade: modo === 'periodo' ? 'periodo' : granularidade,
+      /*
+       * No modo período, o PDF leva as DUAS janelas comparadas, não o arquivo
+       * mensal inteiro. Sair com a tabela de 14 meses embaixo de um
+       * comparativo de 28 dias seria dois relatórios no mesmo papel, e quem
+       * recebe não saberia qual deles responde a pergunta que motivou o envio.
+       */
+      periodos:
+        modo === 'periodo'
+          ? [comparativo.anterior, comparativo.atual].filter((p): p is Periodo => p !== null)
+          : periodos,
       comparativo,
     })
   }
@@ -178,34 +265,6 @@ export default function RelatorioPage() {
     )
   }
 
-  /**
-   * Quando a coleta passou por aqui pela última vez.
-   *
-   * A aba passou a ser alimentada por uma rotina que roda algumas vezes ao
-   * dia. Sem dizer isso na tela, um número velho e um número fresco têm a
-   * mesma cara — e quem olha não sabe se está vendo o dia de hoje crescendo ou
-   * um painel que parou de atualizar há uma semana.
-   */
-  const coleta = React.useMemo(() => {
-    const automaticas = (metricas ?? []).filter((m) => m.fonte === 'instagram_api')
-    if (automaticas.length === 0) return null
-    const ultima = automaticas.reduce(
-      (maior, m) => (m.atualizado_em > maior ? m.atualizado_em : maior),
-      automaticas[0].atualizado_em,
-    )
-    const minutos = Math.max(0, Math.round((Date.now() - Date.parse(ultima)) / 60_000))
-    const quando =
-      minutos < 60
-        ? `há ${minutos} min`
-        : minutos < 60 * 36
-          ? `há ${Math.round(minutos / 60)} h`
-          : `há ${Math.round(minutos / 1440)} dias`
-    // O dia corrente é sempre parcial: a Meta fecha a conta à meia-noite.
-    const hoje = todayKey()
-    const temHoje = automaticas.some((m) => m.dia === hoje)
-    return { quando, temHoje, atrasada: minutos > 60 * 30 }
-  }, [metricas])
-
   /* ----------------------------------------------------------------- tela -- */
 
   return (
@@ -237,10 +296,18 @@ export default function RelatorioPage() {
           </Button>
         </div>
 
-        <Tabs value={granularidade} onValueChange={(v) => setGranularidade(v as Granularidade)}>
+        <Tabs
+          value={modo}
+          onValueChange={(v) => {
+            const escolhido = v as 'mensal' | 'semanal' | 'periodo'
+            setModo(escolhido)
+            if (escolhido !== 'periodo') setGranularidade(escolhido)
+          }}
+        >
           <TabsList>
             <TabsTrigger value="mensal">Mensal</TabsTrigger>
             <TabsTrigger value="semanal">Semanal</TabsTrigger>
+            <TabsTrigger value="periodo">Período</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -262,6 +329,15 @@ export default function RelatorioPage() {
           {coleta.temHoje && ' · o dia de hoje ainda está em andamento e fecha à meia-noite'}
           {coleta.atrasada && ' · confira a rotina de métricas'}
         </p>
+      )}
+
+      {modo === 'periodo' && (metricas ?? []).length > 0 && (
+        <SeletorDePeriodo
+          de={janelaAtiva.de}
+          ate={janelaAtiva.ate}
+          limites={limites}
+          onMudar={(de, ate) => setJanelaEscolhida({ de, ate })}
+        />
       )}
 
       {carregandoMetricas ? (
@@ -360,7 +436,11 @@ export default function RelatorioPage() {
           <Card className="space-y-3 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="mr-auto text-sm font-semibold">
-                {granularidade === 'mensal' ? 'Mês a mês' : 'Semana a semana'}
+                {modo === 'periodo'
+                  ? 'Dia a dia'
+                  : granularidade === 'mensal'
+                    ? 'Mês a mês'
+                    : 'Semana a semana'}
               </h2>
               <Select
                 value={metricaDoGrafico}
@@ -378,28 +458,51 @@ export default function RelatorioPage() {
                 </SelectContent>
               </Select>
             </div>
-            <GraficoDePeriodos
-              periodos={periodos}
-              metrica={metricaDoGrafico}
-              selecionado={emFoco as string}
-              onSelecionar={setSelecionada}
-            />
-            <p className="text-xs text-muted-foreground">
-              Clique num período para trazer os cartões e o comparativo para ele. Barra listrada =
-              período com dias sem coleta; traço vazado = nenhum dado — nunca zero.
-            </p>
+            {modo === 'periodo' ? (
+              <>
+                <GraficoDiario
+                  dias={metricas ?? []}
+                  de={janelaAtiva.de}
+                  ate={janelaAtiva.ate}
+                  metrica={metricaDoGrafico}
+                  anterior={comparativo.anterior}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Uma barra por dia. Traço vazado = dia sem coleta, nunca zero. A linha tracejada
+                  é a média diária do período anterior de mesmo tamanho.
+                </p>
+              </>
+            ) : (
+              <>
+                <GraficoDePeriodos
+                  periodos={periodos}
+                  metrica={metricaDoGrafico}
+                  selecionado={emFoco as string}
+                  onSelecionar={setSelecionada}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Clique num período para trazer os cartões e o comparativo para ele. Barra
+                  listrada = período com dias sem coleta; traço vazado = nenhum dado — nunca zero.
+                </p>
+              </>
+            )}
           </Card>
 
-          <Card className="p-4">
-            <h2 className="mb-2 text-sm font-semibold">
-              Arquivo completo ({periodos.length}{' '}
-              {granularidade === 'mensal' ? 'meses' : 'semanas'})
+          <Card className="space-y-2 p-4">
+            <h2 className="text-sm font-semibold">
+              {modo === 'periodo'
+                ? `${comparativo.atual.rotulo} contra ${comparativo.anterior?.rotulo ?? 'o período anterior'}`
+                : `Arquivo completo (${periodos.length} ${granularidade === 'mensal' ? 'meses' : 'semanas'})`}
             </h2>
-            <TabelaDePeriodos
-              periodos={periodos}
-              selecionado={emFoco as string}
-              onSelecionar={setSelecionada}
-            />
+            {modo === 'periodo' ? (
+              <TabelaComparativa comparativo={comparativo} />
+            ) : (
+              <TabelaDePeriodos
+                periodos={periodos}
+                selecionado={emFoco as string}
+                onSelecionar={setSelecionada}
+              />
+            )}
           </Card>
 
           <p className="text-xs text-muted-foreground">

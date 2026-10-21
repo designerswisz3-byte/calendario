@@ -13,7 +13,8 @@ import {
 
 export interface RelatorioParaImprimir {
   perfil: string
-  granularidade: Granularidade
+  /** 'periodo' = janela escolhida à mão; o arquivo abaixo são as duas janelas. */
+  granularidade: Granularidade | 'periodo'
   periodos: Periodo[]
   comparativo: Comparativo
 }
@@ -78,7 +79,12 @@ export function ImpressaoDoRelatorio({ relatorio, onConcluido }: Props) {
     <div className="area-de-impressao impressao-do-relatorio" aria-hidden>
       <h1>Relatório — @{perfil}</h1>
       <p className="relatorio-subtitulo">
-        {granularidade === 'mensal' ? 'Visão mensal' : 'Visão semanal'} · período em foco:{' '}
+        {granularidade === 'mensal'
+          ? 'Visão mensal'
+          : granularidade === 'semanal'
+            ? 'Visão semanal'
+            : 'Período escolhido'}{' '}
+        · período em foco:{' '}
         {atual.rotulo} ({atual.inicio} a {atual.fim}) · {atual.diasComDado} de{' '}
         {atual.diasNoPeriodo} dias com dado · gerado em{' '}
         {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -133,7 +139,13 @@ export function ImpressaoDoRelatorio({ relatorio, onConcluido }: Props) {
         </p>
       )}
 
-      <h2>Arquivo {granularidade === 'mensal' ? 'mês a mês' : 'semana a semana'}</h2>
+      <h2>
+        {granularidade === 'mensal'
+          ? 'Arquivo mês a mês'
+          : granularidade === 'semanal'
+            ? 'Arquivo semana a semana'
+            : 'As duas janelas comparadas'}
+      </h2>
       <table>
         <thead>
           <tr>

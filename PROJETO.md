@@ -562,6 +562,33 @@ cinza, sem nada na tela explicando o motivo. Duas correções:
    trava: a pessoa clica, não acontece nada, e ela conclui que o produto
    quebrou.
 
+#### O período escolhido à mão
+
+Mensal e semanal respondem "como foi este mês". A aba **Período** responde a
+pergunta que aparece quando alguém está decidindo: "como foram os 40 dias
+desde que mudei a frequência", "como foi a campanha". Isso não cabe em meses
+fechados.
+
+- **Atalhos** (7, 28, 90 dias, este mês, mês passado, 12 meses) mais dois
+  campos de data. Digitar duas datas toda vez seria atrito, e atrito em painel
+  significa painel que não se abre.
+- **O par de comparação é a janela anterior de mesmo tamanho, colada nela.**
+  Comparar 14 dias com o mês passado inteiro não diz nada.
+- **Sem histórico antes da janela, a comparação some** em vez de virar
+  "-100%": falta de base não é queda.
+- **Gráfico dia a dia** com uma barra por dia, traço vazado onde não houve
+  coleta, e uma linha tracejada na média diária do período anterior — o
+  comparativo que cabe num gráfico diário sem virar sopa de duas séries.
+- **Tabela métrica a métrica**: período, anterior e variação. É o que se relê
+  numa reunião, onde barra não ajuda.
+- O PDF do modo Período leva as **duas janelas**, não o arquivo mensal inteiro:
+  seriam dois relatórios no mesmo papel.
+
+`seguidores_ganhos` aparece uma vez só na tabela, embora esteja na lista de
+fluxos: a linha de cima prefere a diferença entre dois snapshots de total (que
+inclui quem saiu) e a de baixo seria a soma das entradas. Dois números com o
+mesmo nome, lado a lado, é como se desconfia de um painel.
+
 ### `/noticias`
 
 Lista agrupada por dia de publicação, ordenada por relevância dentro do dia.
@@ -878,6 +905,19 @@ fresco têm a mesma cara, e ninguém sabe se o painel parou de atualizar.
 significa "esta coleta não trouxe este campo", não "o valor é nulo".
 Sobrescrever com nulo apagaria o salvamento que veio de importação manual só
 porque a API de conta não entrega salvamento por dia.
+
+#### Histórico: até onde a API vai
+
+Medido no projeto dele, não deduzido: a série diária volta pelo menos até
+**setembro de 2025** — 390 dias no arquivo. `scripts/rotina-metricas/historico.py`
+faz o mutirão inicial, varrendo 30 dias por vez (o limite da Meta por pedido),
+do mais antigo para o mais novo: se a cota acabar no meio, o que falta é
+passado distante e não o mês que ele está olhando.
+
+Uma armadilha que custou uma execução: **`follower_count` só existe nos
+últimos 30 dias**. Pedido para trás disso, a Meta recusa a janela INTEIRA — e
+aí nem o alcance vem. O script pede o ganho de seguidores só na janela recente;
+nos meses antigos o campo fica nulo, que é a verdade (não temos), e não zero.
 
 #### O ganho de seguidores com um snapshot só
 
