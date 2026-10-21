@@ -258,7 +258,7 @@ derruba o anterior, que é como se faz rotação sem acumular chave velha.
 
 Guarda só o **hash** (sha256). O token em claro existe uma vez, no retorno de
 `criar_chave_de_ingestao` — o banco não consegue mostrá-lo de novo nem para o
-dono. Para que serve e por que não a `service_role`: §8, "A coleta diária".
+dono. Para que serve e por que não a `service_role`: §8, "A coleta de notícias".
 
 ### `relatorio_perfis` e `relatorio_metricas_diarias` — o arquivo de métricas
 
@@ -970,7 +970,7 @@ ficarem errados:
 por publicação. Preencher com zero inventaria queda; ausente a tela mostra como
 cobertura incompleta, que é a verdade.
 
-### A coleta diária: como ela roda
+### A coleta de notícias: como ela roda
 
 A tela não pode fazer isso sozinha. O app roda no navegador e, para gravar em
 nome do usuário sem a sessão dele aberta, precisaria de uma chave de escrita
@@ -979,14 +979,48 @@ Supabase é o ponto de encontro.
 
 As três peças:
 
-1. **Routine diária** `trig_01LCPbNiHyETcnQ5dADJd7PU` — "Coleta diária —
-   moda, economia, política e empreendedorismo",
-   `CRON_TZ=America/Sao_Paulo 52 6 * * 1-5`. Dispara uma sessão nova a cada dia
-   útil, às 06:52 de Brasília.
+1. **Routine** `trig_01LCPbNiHyETcnQ5dADJd7PU` — "Notícias — varredura de
+   manhã, checagem ao meio-dia e à noite",
+   `CRON_TZ=America/Sao_Paulo 52 6,12,18 * * 1-5`. Dispara uma sessão nova
+   **três vezes por dia útil**, às 06:52, 12:52 e 18:52 de Brasília.
 
-   O horário não é 7:00 em ponto de propósito: a maioria dos agendamentos cai
-   na hora cheia, e fila de servidor no minuto 0 atrasa a execução. 06:52 é o
-   mesmo horário na prática, sem a fila.
+   O horário não é a hora cheia de propósito: a maioria dos agendamentos cai
+   no minuto 0, e fila de servidor ali atrasa a execução. 06:52 é o mesmo
+   horário na prática, sem a fila.
+
+   **As três corridas não fazem a mesma coisa**, e isso é o ponto inteiro do
+   desenho. O próprio prompt descobre em qual modo está:
+
+   ```bash
+   export HORA=$(TZ=America/Sao_Paulo date +%H)
+   [ "$HORA" -lt 10 ] && export MODO=varredura || export MODO=checagem
+   ```
+
+   | Modo | Quando | O que é | Régua |
+   | --- | --- | --- | --- |
+   | **varredura** | 06:52 | a coleta do dia: varre as quatro frentes, janela de 48h | 5 a 9 itens, relevância ≥ 3 |
+   | **checagem** | 12:52 e 18:52 | só o que surgiu nas últimas ~6 horas | 0 a 3 itens, **relevância 4 ou 5** |
+
+   Na checagem, **"Nada novo desde a coleta da manhã." é a saída esperada e
+   desejável** — uma linha, sem lista, sem JSON. O prompt diz isso com todas as
+   letras porque o risco de rodar mais vezes não é técnico, é de atenção: uma
+   sessão que precisa justificar a própria corrida enche a lista de "vale
+   saber", e três listas infladas por dia destroem exatamente a utilidade da
+   aba, que é ele estar atualizado em cinco minutos. Por isso a régua SOBE na
+   checagem em vez de descer, e análise, retrospectiva e "o que esperar de"
+   ficam para a varredura do dia seguinte — elas não perdem validade em seis
+   horas.
+
+   Repetição não é um risco aqui: cada corrida lê `urls_de_noticias` (30 dias)
+   antes de pesquisar, e nas checagens é essa consulta que faz quase todo o
+   trabalho — a maior parte do que aparecer já vai estar gravada da manhã.
+
+   O custo real é outro, e é o que vale revisar depois de uma semana: **três
+   sessões e três notificações por dia útil** em vez de uma. Se as checagens
+   virarem ruído, há dois ajustes de uma linha: cair para `52 6,13 * * 1-5`
+   (duas corridas) ou desligar o push e deixar a checagem só gravando.
+   Fim de semana continua fora — notícia de sábado entra na varredura de
+   segunda.
 
 2. **A sessão** pesquisa, cura pela régua de relevância, monta o JSON e publica
    com `curl` direto no PostgREST. Antes de pesquisar ela lista as URLs dos
@@ -1071,7 +1105,7 @@ empreendedorismo**, porque decisão de estoque e de preço não é tomada só co
 notícia do setor: juros, câmbio e tributação mudam a conta antes de qualquer
 tendência.
 
-| Frente | Cota diária | Filtro |
+| Frente | Cota na varredura | Filtro |
 | --- | --- | --- |
 | Moda e e-commerce | 3 a 5 | marketplace, importação, concorrência, logística, devolução |
 | Economia | 1 a 3 | Selic, câmbio, inflação, varejo restrito, inadimplência — só o que mexe na conta dele |
@@ -1090,7 +1124,8 @@ que já estão lá — que são todas de moda e continuam certas sem tocar em na
 A tela conta e filtra por editoria (`editoriaDe`, em `src/lib/noticias.ts`), e
 a fileira de frentes só aparece quando existe mais de uma na base.
 
-Às segundas a mesma sessão também procura calendário novo de feira. Em modo
+Na varredura de segunda a mesma sessão também procura calendário novo de
+feira (nas checagens, não — calendário de feira não muda de seis em seis horas). Em modo
 publicação ela grava o evento **direto na tabela `eventos`** — a data aparece na
 grade no mesmo dia, sem branch e sem deploy. Em modo entrega ela só reporta a
 data em texto, porque **não existe tela para cadastrar um evento à mão**: o
@@ -1135,7 +1170,7 @@ migrações, e é **idempotente**.
 >        (select count(*) from storage.buckets where id in ('media','canvas')) as buckets;
 > ```
 
-**Para a coleta diária gravar sozinha**, rode também
+**Para a coleta de notícias gravar sozinha**, rode também
 `supabase/porta-de-ingestao.sql` (é o mesmo conteúdo da migração
 `20260914001400`, num arquivo separado para colar sem procurar). Depois, num
 editor limpo, **digitando a linha** — ela fica comentada no arquivo de
