@@ -844,6 +844,41 @@ seguidores retroativo**. "Todos os meses arquivados" só existe a partir do dia
 em que alguém começa a arquivar — é exatamente por isso que o Relatório mostra
 a cobertura de cada período em vez de preencher o buraco.
 
+### Métricas do Instagram: a coleta do Relatório
+
+`scripts/puxar-metricas.mjs` puxa os dias de `@euraphaelaraujo` pela CLI da
+InsightfulPipe e imprime o JSON que a aba Relatório importa.
+
+A credencial fica na CLI (`insightfulpipe auth`, chaveiro do sistema). O script
+nunca vê a chave — ele chama a CLI já autenticada. Chave de API em arquivo
+versionado é chave vazada.
+
+O workspace tem outras contas conectadas (outra marca, contas de anúncio de
+terceiros). Três travas para nenhuma delas ser tocada: os ids da conta são
+fixos no arquivo, toda chamada é de leitura (`query`, nunca `action`) e a
+primeira coisa que o script faz é conferir que o perfil devolvido é
+`@euraphaelaraujo` — se o id responder como outra conta, ele para sem coletar.
+
+Três detalhes da API da Meta que o script resolve, e que custam caro se
+ficarem errados:
+
+1. **`followers_count` e `follower_count` diferem por uma letra e são opostos.**
+   O primeiro é o total do perfil (4.399); o segundo é quantos entraram
+   naquele dia (4). O apelido de importação mapeava os dois para "seguidores",
+   e o gráfico desceria de 4.399 para 4 parecendo dado, não defeito. Pego na
+   conferência do arquivo antes de ele ser usado; agora há teste.
+2. **`until` é exclusivo**, então para incluir o último dia pede-se o dia
+   seguinte. E o balde carimbado com `end_time` de 19/10 É o dia 19/10 — isso
+   foi medido contra o total de um dia só, não deduzido.
+3. **Só `reach` e `follower_count` aceitam série temporal.** O resto vem como
+   total de um intervalo, por isso o laço dia a dia. E a janela máxima da Meta
+   para insights de conta é de 30 dias: o script recusa `--dias` maior em vez
+   de fatiar e dar impressão de histórico completo.
+
+`salvamentos` fica de fora: a API de conta não entrega salvamento por dia, só
+por publicação. Preencher com zero inventaria queda; ausente a tela mostra como
+cobertura incompleta, que é a verdade.
+
 ### A coleta diária: como ela roda
 
 A tela não pode fazer isso sozinha. O app roda no navegador e, para gravar em

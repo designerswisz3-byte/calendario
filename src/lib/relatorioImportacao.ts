@@ -15,8 +15,20 @@ import type { RelatorioMetricaEntrada } from '@/types/database'
 
 /** Coluna canônica -> nomes que aparecem na vida real. */
 const APELIDOS: Record<keyof Omit<RelatorioMetricaEntrada, 'dia'>, string[]> = {
-  seguidores: ['seguidores', 'followers', 'follower_count', 'total_subs', 'inscritos'],
-  seguidores_ganhos: ['seguidores_ganhos', 'follows', 'sub_increase_24h', 'novos_seguidores'],
+  /*
+   * `followers_count` e `follower_count` diferem por UMA letra e querem dizer
+   * coisas opostas na API da Meta: o primeiro é o total do perfil (4.399), o
+   * segundo é quantos seguidores entraram NAQUELE dia (4). Misturar os dois
+   * desenha o gráfico despencando de 4.399 para 4 — e parece dado, não bug.
+   */
+  seguidores: ['seguidores', 'followers', 'followers_count', 'total_subs', 'inscritos'],
+  seguidores_ganhos: [
+    'seguidores_ganhos',
+    'follows',
+    'follower_count',
+    'sub_increase_24h',
+    'novos_seguidores',
+  ],
   alcance: ['alcance', 'reach', 'accounts_reached'],
   views: ['views', 'visualizacoes', 'impressions', 'impressoes'],
   likes: ['likes', 'curtidas'],
