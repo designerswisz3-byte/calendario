@@ -846,6 +846,50 @@ a cobertura de cada período em vez de preencher o buraco.
 
 ### Métricas do Instagram: a coleta do Relatório
 
+**Rotina diária** `trig_01UrGTx4LJYk74pyWikgQsLD` — "Métricas do Instagram no
+Relatório", todo dia às 07:08 de Brasília. Ela instala a CLI, autentica com a
+chave, roda o coletor e grava pela porta estreita (`rpc/ingerir_metricas`).
+Nada de importar à mão.
+
+O coletor canônico é `scripts/rotina-metricas/coletor.py`;
+`scripts/gerar-prompt-metricas.mjs` monta o prompt da rotina com ele dentro. A
+sessão disparada não tem o repositório, então o script precisa viajar no
+prompt — e copiá-lo à mão sairia de sincronia na segunda vez, o mesmo motivo
+de `gerar-setup-completo.mjs` existir para o SQL.
+
+**Perfis**: a coleta varre as contas de Instagram **da marca 6366 (Swisz)** e
+cria o perfil no Relatório sozinha, na primeira corrida. Conta nova conectada
+naquela marca entra na coleta sem mexer em nada. As contas das outras marcas do
+workspace nem entram na lista — é o filtro que garante que a coleta não as
+toque.
+
+**Janela**: repuxa 7 dias a cada corrida, não só ontem. A Meta fecha a janela
+do dia com atraso, e quem grava só "ontem" congela um número provisório para
+sempre. O upsert é por `(perfil, dia)`, então repuxar atualiza.
+
+**`ingerir_metricas` usa `coalesce(novo, antigo)`** em cada coluna: nulo
+significa "esta coleta não trouxe este campo", não "o valor é nulo".
+Sobrescrever com nulo apagaria o salvamento que veio de importação manual só
+porque a API de conta não entrega salvamento por dia.
+
+#### O ganho de seguidores com um snapshot só
+
+A API não devolve histórico do TOTAL de seguidores — só o ganho de cada dia.
+Então a coleta grava o total uma vez por corrida, no último dia da janela.
+
+Isso quebrou o cálculo do período, e só apareceu com dado real: `ganhoDe`
+preferia a diferença entre o primeiro e o último snapshot do período, e com um
+snapshot só os dois eram a MESMA linha — diferença zero. O painel mostrava
+"Ganho de 0 no período" ao lado de 58 seguidores ganhos somados, e comparava
+esse zero com a soma do mês anterior: **-100%**, sem queda nenhuma.
+
+A regra agora exige dois snapshots **em dias diferentes**; sem isso, vale a
+soma dos ganhos diários. A preferência pela diferença continua certa quando ela
+existe: `follower_count` conta quem ENTROU, e a diferença entre dois totais é o
+líquido — inclui quem saiu.
+
+
+
 `scripts/puxar-metricas.mjs` puxa os dias de `@euraphaelaraujo` pela CLI da
 InsightfulPipe e imprime o JSON que a aba Relatório importa.
 

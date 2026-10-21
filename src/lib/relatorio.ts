@@ -75,6 +75,9 @@ export interface Periodo {
   /** Total de seguidores no primeiro e no último dia com snapshot. */
   seguidoresInicio: number | null
   seguidoresFim: number | null
+  /** Em que dia cada snapshot foi tirado — dois no mesmo dia não são uma variação. */
+  diaDoPrimeiroSnapshot: string | null
+  diaDoUltimoSnapshot: string | null
 }
 
 /* ------------------------------------------------------------------ datas -- */
@@ -236,6 +239,8 @@ function fechar(balde: Balde): Periodo {
     fluxos,
     seguidoresInicio: comSeguidores[0]?.seguidores ?? null,
     seguidoresFim: comSeguidores[comSeguidores.length - 1]?.seguidores ?? null,
+    diaDoPrimeiroSnapshot: comSeguidores[0]?.dia ?? null,
+    diaDoUltimoSnapshot: comSeguidores[comSeguidores.length - 1]?.dia ?? null,
   }
 }
 
@@ -309,11 +314,23 @@ export function comparar(periodos: Periodo[], chave: string): Comparativo | null
 
   const ganhoDe = (p: Periodo | null) => {
     if (!p) return null
-    // Preferimos a diferença dos snapshots: é o número que a Meta mostra.
-    // A soma dos ganhos diários serve de reserva quando falta snapshot.
-    if (p.seguidoresInicio !== null && p.seguidoresFim !== null) {
-      return p.seguidoresFim - p.seguidoresInicio
-    }
+    /*
+     * A diferença entre dois snapshots é o número que a Meta mostra, e é o
+     * preferido — mas só quando existem DOIS snapshots, em dias diferentes.
+     *
+     * Com um único snapshot no período, início e fim são a mesma linha e a
+     * conta dá zero. Apareceu com dado real: a coleta automática grava o total
+     * de seguidores uma vez por corrida (a API não devolve histórico do
+     * total), então outubro tinha um snapshot só e o painel mostrava "ganho de
+     * 0" ao lado de 58 seguidores ganhos somados — e ainda comparava esse zero
+     * com a soma do mês anterior, resultando em "-100%".
+     */
+    const doisSnapshots =
+      p.seguidoresInicio !== null &&
+      p.seguidoresFim !== null &&
+      p.diaDoPrimeiroSnapshot !== p.diaDoUltimoSnapshot
+
+    if (doisSnapshots) return p.seguidoresFim! - p.seguidoresInicio!
     return p.fluxos.seguidores_ganhos
   }
 
