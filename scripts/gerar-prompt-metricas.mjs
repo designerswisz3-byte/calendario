@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 const aqui = path.dirname(fileURLToPath(import.meta.url))
 const coletor = readFileSync(path.join(aqui, 'rotina-metricas/coletor.py'), 'utf8').trimEnd()
 
-const prompt = `Coleta diária das métricas de Instagram do Raphael para a aba Relatório do app dele.
+const prompt = `Coleta das métricas de Instagram do Raphael para a aba Relatório do app dele. Roda três vezes por dia.
 
 A sessão não tem o repositório clonado. Tudo o que é preciso está aqui.
 
@@ -56,9 +56,11 @@ ${coletor}
 ## 4. O que ele faz, para você conferir a saída
 
 - Lista as contas de Instagram **da marca ${'6366'} (Swisz)**. As contas de outras marcas do workspace não são tocadas: elas nem entram na lista.
-- Para cada conta: confere que o id responde com o username esperado, puxa alcance e novos seguidores em série, o resto dia a dia, e conta as publicações.
-- Grava via \`rpc/ingerir_metricas\`, que faz upsert por dia — rodar duas vezes no mesmo dia atualiza, não duplica.
+- Para cada conta: confere que o id responde com o username esperado, puxa o alcance em série, e o resto dia a dia — views, curtidas, comentários, compartilhamentos, **salvamentos**, interações, cliques, e **quantos seguiram e quantos deixaram de seguir**.
+- Depois, uma linha por **publicação** do período, com as métricas de cada post.
+- Grava via \`rpc/ingerir_metricas\` e \`rpc/ingerir_publicacoes\`, as duas com upsert — rodar duas vezes no mesmo dia atualiza, não duplica.
 - Repuxa os últimos 7 dias, não só ontem: a Meta fecha a janela do dia com atraso, e quem grava só "ontem" congela um número provisório.
+- Se aparecer **AVISO: ingerir_publicacoes não existe no banco**, repita esse aviso na sua resposta, numa linha. Não é falha da coleta: significa que falta rodar \`supabase/relatorio-publicacoes.sql\` no Supabase. O dia de métrica foi gravado assim mesmo.
 
 ## 5. Como terminar
 
@@ -66,8 +68,10 @@ Uma linha por perfil, exatamente o que o script imprimiu. Exemplo:
 
 \`\`\`
 2026-10-14 a 2026-10-20
-@euraphaelaraujo: 7 dia(s) · 4399 seguidores (+17 no período) · 6035 de alcance
+@euraphaelaraujo: 7 dia(s) · 6 publicação(ões) · 4402 seguidores (+28 / -19 = +9 no período) · 6035 de alcance
 \`\`\`
+
+Nada além disso. Esta rotina roda três vezes por dia: resumo curto é o que a torna suportável de ler.
 
 Se o script falhar, diga **a linha do erro** e não tente contornar — nem com dado inventado, nem com outra conta. Um erro visível custa um dia de métrica; um dado inventado custa a confiança no painel inteiro.
 
