@@ -43,9 +43,30 @@ export function usePublicacoesAgendadas() {
       }
       return { linhas: (data ?? []) as PublicacaoAgendadaRow[], faltaMigracao: false }
     },
-    // A rotina publica fora do navegador: sem isto, a tela mostraria
-    // "agendada" por tempo indeterminado depois de o post já estar no ar.
-    refetchInterval: 60_000,
+    /*
+     * Quem publica é a rotina, fora do navegador — a tela não fica sabendo
+     * sozinha. Sem recarregar de tempos em tempos, ela mostraria "agendada"
+     * por tempo indeterminado depois de o post já estar no ar.
+     *
+     * O ritmo muda com o que existe na fila, em vez de ser fixo:
+     *
+     * - PUBLICANDO: 5 s. É a janela de segundos em que a Meta está montando e
+     *   publicando. É o único momento em que alguém fica olhando a tela
+     *   esperando, então é o único que merece ser rápido.
+     * - AGENDADA (algo por vir): 20 s. Suficiente para o "foi ao ar" aparecer
+     *   quase junto com o post.
+     * - NADA PENDENTE: desliga. Uma aba aberta a tarde inteira sem nada na
+     *   fila não tem o que descobrir, e bater no banco de 20 em 20 segundos à
+     *   toa é a forma mais boba de gastar cota.
+     */
+    refetchInterval: (consulta) => {
+      const linhas = consulta.state.data?.linhas ?? []
+      if (linhas.some((l) => l.status === 'publicando')) return 5_000
+      if (linhas.some((l) => l.status === 'agendada')) return 20_000
+      return false
+    },
+    // Voltar para a aba é o gesto de quem quer saber se saiu: revalida na hora.
+    refetchOnWindowFocus: true,
   })
 }
 
