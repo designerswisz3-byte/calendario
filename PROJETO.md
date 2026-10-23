@@ -1074,48 +1074,58 @@ Supabase é o ponto de encontro.
 
 As três peças:
 
-1. **Routine** `trig_01LCPbNiHyETcnQ5dADJd7PU` — "Notícias — varredura de
-   manhã, checagem ao meio-dia e à noite",
-   `CRON_TZ=America/Sao_Paulo 52 6,12,18 * * 1-5`. Dispara uma sessão nova
-   **três vezes por dia útil**, às 06:52, 12:52 e 18:52 de Brasília.
+1. **Duas rotinas**, porque a notificação é por rotina e não por corrida:
+   `trig_01LCPbNiHyETcnQ5dADJd7PU` — "Notícias — varredura da manhã",
+   `40 7 * * 1-6`, **com push**; e `trig_016svzLt5o3R1NjqmWj85NFw` —
+   "Notícias — ronda do dia", `40 9-19/2 * * 1-5`, **sem push**. Sete corridas
+   por dia útil (07:40 e depois de duas em duas horas até 19:40), mais a
+   varredura de sábado.
 
    O horário não é a hora cheia de propósito: a maioria dos agendamentos cai
-   no minuto 0, e fila de servidor ali atrasa a execução. 06:52 é o mesmo
-   horário na prática, sem a fila.
+   no minuto 0, e fila de servidor ali atrasa a execução.
 
-   **As três corridas não fazem a mesma coisa**, e isso é o ponto inteiro do
-   desenho. O próprio prompt descobre em qual modo está:
+   A varredura da manhã cobre as quatro frentes e publica 5 a 9 itens. A ronda
+   publica **com a mesma régua** (relevância ≥ 3), até 4 itens, e "Nada novo
+   nas redações desde a última ronda." é saída normal e desejável — uma linha,
+   sem lista, sem JSON.
 
-   ```bash
-   export HORA=$(TZ=America/Sao_Paulo date +%H)
-   [ "$HORA" -lt 10 ] && export MODO=varredura || export MODO=checagem
-   ```
+   #### A correção que fez a aba deixar de viver em ontem
 
-   | Modo | Quando | O que é | Régua |
-   | --- | --- | --- | --- |
-   | **varredura** | 06:52 | a coleta do dia: varre as quatro frentes, janela de 48h | 5 a 9 itens, relevância ≥ 3 |
-   | **checagem** | 12:52 e 18:52 | só o que surgiu nas últimas ~6 horas | 0 a 3 itens, **relevância 4 ou 5** |
+   A primeira tentativa de melhorar isso foi aumentar a frequência e **subir** a
+   régua das corridas do meio do dia. Não resolveu, e o motivo é que o problema
+   nunca foi frequência. Medido em 23/10/2026, às 9h54: a busca na web
+   respondeu *"não encontrei notícias de 23 de outubro; as mais recentes são de
+   22"*. No mesmo minuto, a página de últimas do Mercado&Consumo tinha **cinco**
+   matérias daquele dia.
 
-   Na checagem, **"Nada novo desde a coleta da manhã." é a saída esperada e
-   desejável** — uma linha, sem lista, sem JSON. O prompt diz isso com todas as
-   letras porque o risco de rodar mais vezes não é técnico, é de atenção: uma
-   sessão que precisa justificar a própria corrida enche a lista de "vale
-   saber", e três listas infladas por dia destroem exatamente a utilidade da
-   aba, que é ele estar atualizado em cinco minutos. Por isso a régua SOBE na
-   checagem em vez de descer, e análise, retrospectiva e "o que esperar de"
-   ficam para a varredura do dia seguinte — elas não perdem validade em seis
-   horas.
+   **O índice de busca atrasa horas; a página da redação, não.** Uma rotina que
+   pesquisa por "notícia de hoje" recebe a de ontem — e receberia a de ontem
+   doze vezes ao dia. Por isso o método mudou: a coleta agora **abre as páginas
+   de últimas com WebFetch** (Mercado&Consumo, E-Commerce Brasil, InfoMoney,
+   Exame, Receita Federal, Agência Senado, Modern Retail, Retail Dive) e usa
+   busca só para confirmar um fato ou achar a fonte primária.
 
-   Repetição não é um risco aqui: cada corrida lê `urls_de_noticias` (30 dias)
-   antes de pesquisar, e nas checagens é essa consulta que faz quase todo o
-   trabalho — a maior parte do que aparecer já vai estar gravada da manhã.
+   Junto com isso caiu a aritmética de janelas de tempo. **O que é "novo" passou
+   a ser definido por diferença de conjunto**: a corrida lê `urls_de_noticias`
+   (10 dias) antes de qualquer coisa e fica com o que não está na lista. É
+   exato, não depende de a sessão raciocinar sobre quantas horas se passaram, e
+   é o que um leitor de feed faz.
 
-   O custo real é outro, e é o que vale revisar depois de uma semana: **três
-   sessões e três notificações por dia útil** em vez de uma. Se as checagens
-   virarem ruído, há dois ajustes de uma linha: cair para `52 6,13 * * 1-5`
-   (duas corridas) ou desligar o push e deixar a checagem só gravando.
-   Fim de semana continua fora — notícia de sábado entra na varredura de
-   segunda.
+   E o `publicado_em` virou obrigatório quando a listagem mostra a data: a aba
+   ordena por ele, então notícia sem data afunda no fim da lista mesmo sendo de
+   hoje.
+
+   O que o diagnóstico encontrou, e vale guardar: em 10 dias de rotina a aba
+   tinha **8 notícias no total** — contra as 5 a 9 por dia do desenho —, e uma
+   delas era uma matéria sobre debate entre candidatos na TV, que o prompt
+   proíbe com todas as letras. Daí a regra concreta que entrou no lugar da
+   recomendação genérica: **se o título tem nome de político e não tem nome de
+   tributo, não entra.**
+
+   Notificação: **só a varredura da manhã manda push.** As rondas gravam em
+   silêncio. É por isso que são duas rotinas e não uma — a notificação é
+   configurada por rotina, não por corrida. Domingo fica fora; sábado tem só a
+   varredura.
 
 2. **A sessão** pesquisa, cura pela régua de relevância, monta o JSON e publica
    com `curl` direto no PostgREST. Antes de pesquisar ela lista as URLs dos
