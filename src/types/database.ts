@@ -265,6 +265,49 @@ export type RelatorioPublicacaoRow = {
   atualizado_em: string
 }
 
+/* --------------------------------------------- publicações programadas -- */
+
+export type StatusDaPublicacao =
+  | 'agendada'
+  | 'publicando'
+  | 'publicada'
+  | 'falhou'
+  | 'cancelada'
+
+/** Uma mídia da fila, na ordem em que entra no carrossel. */
+export type MidiaDaPublicacao = { url: string; tipo: MediaType }
+
+/**
+ * Um post programado para ir ao ar no Instagram.
+ *
+ * `legenda` e `midias` são CÓPIA do conteúdo no momento do agendamento, e não
+ * ponteiro para o preview: o que vai ao ar é o que ele aprovou, e editar o
+ * conteúdo depois não muda em silêncio um post que já está na fila.
+ */
+export type PublicacaoAgendadaRow = {
+  id: string
+  user_id: string
+  content_preview_id: string | null
+  calendar_item_id: string | null
+  rede: 'instagram'
+  /** Sem o "@". */
+  handle: string
+  /** Quando vai ao ar, em UTC. */
+  quando: string
+  formato: 'post' | 'carrossel' | 'reels' | 'story'
+  legenda: string
+  midias: MidiaDaPublicacao[]
+  status: StatusDaPublicacao
+  /** O container da Meta, guardado antes de publicar. */
+  creation_id: string | null
+  permalink: string | null
+  erro: string | null
+  tentativas: number
+  publicada_em: string | null
+  criado_em: string
+  atualizado_em: string
+}
+
 /* ------------------------------------------------- eventos e notícias -- */
 
 export type CategoriaDeEvento = 'comercial' | 'setorial' | 'feriado' | 'sazonal'
@@ -524,6 +567,35 @@ export interface Database {
           atualizado_em?: string
         }
         Update: Partial<Omit<RelatorioPublicacaoRow, 'id' | 'perfil_id'>>
+        Relationships: []
+      }
+      publicacoes_agendadas: {
+        Row: PublicacaoAgendadaRow
+        Insert: Omit<
+          PublicacaoAgendadaRow,
+          | 'id'
+          | 'rede'
+          | 'status'
+          | 'creation_id'
+          | 'permalink'
+          | 'erro'
+          | 'tentativas'
+          | 'publicada_em'
+          | 'criado_em'
+          | 'atualizado_em'
+        > & {
+          id?: string
+          rede?: 'instagram'
+          status?: StatusDaPublicacao
+          creation_id?: string | null
+          permalink?: string | null
+          erro?: string | null
+          tentativas?: number
+          publicada_em?: string | null
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: Partial<Omit<PublicacaoAgendadaRow, 'id' | 'user_id'>>
         Relationships: []
       }
       canvas_boards: {

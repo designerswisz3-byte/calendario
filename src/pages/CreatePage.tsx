@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { AjustesDoCliente } from '@/components/calendar/AjustesDoCliente'
 import { MediaUploader, type MediaItem } from '@/components/preview/MediaUploader'
 import { InstagramPreview } from '@/components/preview/InstagramPreview'
+import { ProgramarPublicacao } from '@/components/preview/ProgramarPublicacao'
 import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
 import {
@@ -60,6 +61,22 @@ export default function CreatePage() {
   const [copied, setCopied] = React.useState(false)
   const hydrated = React.useRef(false)
 
+  /*
+   * O que está salvo no banco, para a tela saber se o que ela mostra é o que
+   * iria ao ar.
+   *
+   * O agendamento publica a versão SALVA — ele copia legenda e mídias no
+   * momento de programar. Sem esta comparação, alguém ajusta a legenda, clica
+   * em programar e vai ao ar o texto antigo, sem nada na tela ter avisado.
+   */
+  const salvo = React.useRef<string | null>(null)
+  const assinaturaAtual = JSON.stringify({
+    legenda,
+    tipo,
+    midias: media.map((m) => m.url),
+  })
+  const temAlteracaoNaoSalva = salvo.current !== null && salvo.current !== assinaturaAtual
+
   // Edição: carrega o conteúdo já vinculado ao item de planejamento.
   React.useEffect(() => {
     if (hydrated.current || !linkedPreview) return
@@ -77,6 +94,11 @@ export default function CreatePage() {
       })),
     )
     setGeneratedUrl(`${window.location.origin}/preview/${linkedPreview.id}`)
+    salvo.current = JSON.stringify({
+      legenda: linkedPreview.legenda ?? '',
+      tipo: linkedPreview.tipo,
+      midias: linkedPreview.media_assets.map((asset) => asset.url_arquivo),
+    })
   }, [linkedPreview])
 
   // O tipo do planejamento sugere o tipo do conteúdo (exceto "ideia").
@@ -176,6 +198,7 @@ export default function CreatePage() {
 
       setPreviewId(saved.id)
       setGeneratedUrl(`${window.location.origin}/preview/${saved.id}`)
+      salvo.current = JSON.stringify({ legenda, tipo, midias: media.map((m) => m.url) })
       toast({
         variant: 'success',
         title: isEditing ? 'Conteúdo atualizado' : 'Link de preview gerado',
@@ -357,6 +380,19 @@ export default function CreatePage() {
                 </div>
               )}
             </form>
+
+            {/* Fora do <form>: o agendamento não é parte do salvar, e um
+                Enter no formulário não pode disparar uma publicação. */}
+            <div className="mt-5 border-t border-border/60 pt-5">
+              <ProgramarPublicacao
+                contentPreviewId={previewId}
+                calendarItemId={calendarItemId}
+                formato={tipo}
+                legenda={legenda}
+                midias={media.map((item) => ({ url: item.url, tipo: item.tipo }))}
+                temAlteracaoNaoSalva={temAlteracaoNaoSalva}
+              />
+            </div>
           </CardContent>
         </Card>
 

@@ -70,6 +70,19 @@ export const CANVA_URL_REGEX = /^https:\/\/([a-z0-9-]+\.)?canva\.(com|cn|me|site
 /** Limite real de caracteres da legenda no Instagram. */
 export const CAPTION_MAX_LENGTH = 2200
 
+/**
+ * A conta que o agendamento publica.
+ *
+ * Fixa, e não escolhida numa lista, pelo mesmo motivo da trava do coletor de
+ * métricas: o workspace conectado tem contas de OUTRAS marcas, de terceiros, e
+ * nenhuma tela deve abrir a porta para publicar nelas por engano. Trocar de
+ * conta é mudar esta linha, de propósito.
+ */
+export const CONTA_DO_INSTAGRAM = 'euraphaelaraujo'
+
+/** Quanto tempo depois do horário uma publicação ainda pode ir ao ar. */
+export const ATRASO_MAXIMO_MINUTOS = 120
+
 /** Tipos que usam vídeo vertical 9:16 em vez de imagens. */
 export const VIDEO_TYPES: ContentType[] = ['reels', 'story']
 

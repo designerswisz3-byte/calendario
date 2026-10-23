@@ -22,4 +22,5 @@ export const queryKeys = {
   relatorioMetricas: (perfilId: string) => ['relatorio', 'metricas', perfilId] as const,
   relatorioPublicacoes: (perfilId: string) =>
     ['relatorio', 'publicacoes', perfilId] as const,
+  publicacoesAgendadas: () => ['publicacoes-agendadas'] as const,
 }
