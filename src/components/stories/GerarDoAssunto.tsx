@@ -89,8 +89,13 @@ export function GerarDoAssunto({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              {/* Aqui a lista é completa de propósito: o tema só é escolhido
+                  na geração, a partir do texto livre, então não há como saber
+                  ainda quais arcos ele sustenta. O ★ marca os narrativos, que
+                  são os mais pesados de gravar. */}
               {ARCOS.map((arco) => (
                 <SelectItem key={arco.id} value={arco.id}>
+                  {arco.narrativo ? '★ ' : ''}
                   {arco.rotulo} · {arco.passos.length} stories · {arco.tom}
                 </SelectItem>
               ))}

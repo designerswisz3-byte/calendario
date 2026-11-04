@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ArrowDown, ArrowUp, Check, Copy, MessageCircle, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Clock, Copy, Link2, Plus, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,9 +12,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { GATILHOS, type GatilhoId } from '@/lib/stories/gatilhos'
+import { GATILHOS, GATILHOS_EM_ORDEM, ROTULO_AEI, type GatilhoId } from '@/lib/stories/gatilhos'
+import {
+  DISPOSITIVOS,
+  DISPOSITIVOS_EM_ORDEM,
+  type DispositivoId,
+} from '@/lib/stories/dispositivos'
+import { MedidorDeTriade } from '@/components/stories/MedidorDeTriade'
 import { cn } from '@/lib/utils'
 import type { StoryDaSequencia } from '@/types/database'
+
+/** O dispositivo deste story, com o padrão do movimento quando não há um. */
+function dispositivoDo(story: StoryDaSequencia): DispositivoId {
+  const escolhido = story.dispositivo as DispositivoId | undefined
+  if (escolhido && DISPOSITIVOS[escolhido]) return escolhido
+  // Sequência salva antes dos dispositivos existirem: cai no padrão do
+  // movimento, que é o que o gerador usaria hoje.
+  return GATILHOS[story.gatilho as GatilhoId]?.dispositivo ?? 'nenhum'
+}
 
 interface Props {
   titulo: string
@@ -70,7 +85,13 @@ export function EditorDeSequencia({ titulo, stories, observacao, onTitulo, onSto
           gatilho: 'compromisso',
           direcao_visual: GATILHOS.compromisso.direcaoVisual,
           texto: '',
-          pede_interacao: true,
+          pede_interacao: GATILHOS.compromisso.pedeInteracao,
+          aei: GATILHOS.compromisso.aei,
+          dispositivo: GATILHOS.compromisso.dispositivo,
+          pedido: `${DISPOSITIVOS[GATILHOS.compromisso.dispositivo].rotulo}: ${
+            DISPOSITIVOS[GATILHOS.compromisso.dispositivo].comoUsar
+          }`,
+          depois_do_pedido: DISPOSITIVOS[GATILHOS.compromisso.dispositivo].oQueFazerDepois,
         },
       ]),
     )
@@ -80,7 +101,18 @@ export function EditorDeSequencia({ titulo, stories, observacao, onTitulo, onSto
     const texto = [
       titulo,
       '',
-      ...stories.flatMap((story) => [story.rotulo, `(${story.direcao_visual})`, '', story.texto, '']),
+      ...stories.flatMap((story) => [
+        story.momento ? `${story.rotulo} — publicar: ${story.momento}` : story.rotulo,
+        `(${story.direcao_visual})`,
+        '',
+        story.texto,
+        // O pedido entra no texto copiado porque é informação de gravação: sem
+        // ele, quem cola a sequência no bloco de notas perde a enquete, a
+        // tarja e a palavra que a pessoa tem de mandar.
+        ...(story.pedido ? ['', `▸ Pedido — ${story.pedido}`] : []),
+        ...(story.depois_do_pedido ? [`▸ Depois — ${story.depois_do_pedido}`] : []),
+        '',
+      ]),
       observacao,
     ].join('\n')
     try {
@@ -112,10 +144,23 @@ export function EditorDeSequencia({ titulo, stories, observacao, onTitulo, onSto
           <article key={i} className="space-y-2 rounded-lg border border-border/70 bg-background/40 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">{story.rotulo || `Story ${i + 1}`}</span>
-              {story.pede_interacao && (
+              {/* A ponta da tríade fica à vista story por story: é assim que a
+                  pessoa entende de onde vem o número do medidor lá embaixo. */}
+              {(story.aei ?? gatilho?.aei) && (
+                <Badge variant="outline" className="text-[0.65rem] font-normal">
+                  {ROTULO_AEI[(story.aei ?? gatilho.aei) as keyof typeof ROTULO_AEI]}
+                </Badge>
+              )}
+              {story.momento && (
                 <Badge variant="secondary" className="gap-1 text-[0.65rem]">
-                  <MessageCircle className="h-3 w-3" />
-                  pede interação
+                  <Clock className="h-3 w-3" />
+                  {story.momento}
+                </Badge>
+              )}
+              {story.retomada && (
+                <Badge variant="secondary" className="gap-1 text-[0.65rem]" title={story.retomada}>
+                  <Link2 className="h-3 w-3" />
+                  amarra no anterior
                 </Badge>
               )}
               <div className="ml-auto flex items-center gap-0.5">
@@ -158,19 +203,32 @@ export function EditorDeSequencia({ titulo, stories, observacao, onTitulo, onSto
             <div className="grid gap-2 sm:grid-cols-[11rem_1fr]">
               <Select
                 value={story.gatilho}
-                onValueChange={(valor) =>
+                onValueChange={(valor) => {
+                  const movimento = GATILHOS[valor as GatilhoId]
+                  const pedido = DISPOSITIVOS[movimento.dispositivo]
                   alterar(i, {
                     gatilho: valor,
-                    direcao_visual: GATILHOS[valor as GatilhoId].direcaoVisual,
-                    pede_interacao: Boolean(GATILHOS[valor as GatilhoId].pedeInteracao),
+                    direcao_visual: movimento.direcaoVisual,
+                    pede_interacao: movimento.pedeInteracao,
+                    // A tríade e o pedido acompanham o movimento: trocar
+                    // "informação" por "entretenimento" tem de mexer no
+                    // medidor na hora, senão ele passa a mentir.
+                    aei: movimento.aei,
+                    dispositivo: movimento.dispositivo,
+                    pedido:
+                      movimento.dispositivo === 'nenhum'
+                        ? ''
+                        : `${pedido.rotulo}: ${pedido.comoUsar}`,
+                    depois_do_pedido:
+                      movimento.dispositivo === 'nenhum' ? '' : pedido.oQueFazerDepois,
                   })
-                }
+                }}
               >
                 <SelectTrigger aria-label={`Gatilho do ${story.rotulo}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(GATILHOS).map((g) => (
+                  {GATILHOS_EM_ORDEM.map((g) => (
                     <SelectItem key={g.id} value={g.id}>
                       {g.rotulo}
                     </SelectItem>
@@ -197,6 +255,56 @@ export function EditorDeSequencia({ titulo, stories, observacao, onTitulo, onSto
                 story.texto.includes('[preencha:') && 'border-amber-500/60 bg-amber-500/5',
               )}
             />
+
+            {/*
+              O pedido é editável e separado do texto de propósito.
+
+              Ele não é fala: é o que vai POR CIMA da tela — a enquete, a
+              caixinha, a tarja, a palavra que a pessoa tem de mandar. Misturado
+              no texto, ele acabava sendo lido em voz alta na gravação; e sem
+              ele à vista, a sequência inteira saía sem nenhum pedido, que é o
+              que fazia tudo parecer igual.
+            */}
+            <div className="grid gap-2 sm:grid-cols-[11rem_1fr]">
+              <Select
+                value={dispositivoDo(story)}
+                onValueChange={(valor) => {
+                  const pedido = DISPOSITIVOS[valor as DispositivoId]
+                  alterar(i, {
+                    dispositivo: valor,
+                    pede_interacao: valor !== 'nenhum',
+                    pedido: valor === 'nenhum' ? '' : `${pedido.rotulo}: ${pedido.comoUsar}`,
+                    depois_do_pedido: valor === 'nenhum' ? '' : pedido.oQueFazerDepois,
+                  })
+                }}
+              >
+                <SelectTrigger aria-label={`Pedido do ${story.rotulo || `story ${i + 1}`}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DISPOSITIVOS_EM_ORDEM.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.rotulo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Input
+                value={story.pedido ?? ''}
+                onChange={(e) => alterar(i, { pedido: e.target.value })}
+                placeholder="O que vai por cima da tela"
+                className="text-xs"
+                disabled={dispositivoDo(story) === 'nenhum'}
+              />
+            </div>
+
+            {dispositivoDo(story) !== 'nenhum' && (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground/70">Depois: </span>
+                {story.depois_do_pedido || DISPOSITIVOS[dispositivoDo(story)].oQueFazerDepois}
+              </p>
+            )}
           </article>
         )
       })}
@@ -215,6 +323,8 @@ export function EditorDeSequencia({ titulo, stories, observacao, onTitulo, onSto
           {copiado ? 'Copiado' : 'Copiar sequência'}
         </Button>
       </div>
+
+      <MedidorDeTriade stories={stories} />
 
       {observacao && (
         <p className="rounded-md bg-foreground/[0.04] p-2.5 text-xs leading-relaxed text-muted-foreground">

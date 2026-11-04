@@ -1,6 +1,24 @@
-import { ARCOS, GATILHOS, type Arco, type Gatilho, type GatilhoId } from '@/lib/stories/gatilhos'
+import {
+  ARCOS,
+  GATILHOS,
+  ROTULO_AEI,
+  contarAEI,
+  type AEI,
+  type Arco,
+  type Gatilho,
+  type GatilhoId,
+} from '@/lib/stories/gatilhos'
+import {
+  DISPOSITIVOS,
+  LIMITE_DE_PEDIDOS,
+  exigeEsforco,
+  type DispositivoId,
+} from '@/lib/stories/dispositivos'
 import { contrair } from '@/lib/stories/frases'
 import { TEMAS, TEMAS_POR_ID, type Eixo, type Tema } from '@/lib/stories/temas'
+
+/** Em que momento do dia o story vai ao ar. Só os arcos de dia inteiro usam. */
+export type Momento = 'manhã' | 'meio do dia' | 'tarde' | 'noite'
 
 export interface StoryGerado {
   ordem: number
@@ -9,6 +27,24 @@ export interface StoryGerado {
   direcaoVisual: string
   texto: string
   pedeInteracao: boolean
+  /** Qual ponta da tríade este story alimenta. */
+  aei: AEI
+  /** O dispositivo: o que este story PEDE de quem assiste. */
+  dispositivo: DispositivoId
+  /** Como executar o pedido na tela. Vazio quando o story não pede nada. */
+  pedido: string
+  /** O que fazer com o que chegar. Vazio quando o story não pede nada. */
+  depoisDoPedido: string
+  /** A hora de publicar, nos arcos gravados ao longo do dia. */
+  momento?: Momento
+  /**
+   * A linha que amarra este story no anterior.
+   *
+   * É o que faltava para a sequência deixar de ser uma pilha de stories
+   * independentes. Sem isso, cada tela recomeça do zero e quem assiste não tem
+   * motivo nenhum para ver a próxima.
+   */
+  retomada?: string
 }
 
 export interface Sequencia {
@@ -18,6 +54,15 @@ export interface Sequencia {
   stories: StoryGerado[]
   /** O recado final: qual story carrega o peso da sequência. */
   observacao: string
+  /** Como a tríade ficou. A tela mostra, e o diagnóstico usa. */
+  aei: Record<AEI, number>
+  /**
+   * O que está faltando nesta sequência, na régua da tríade.
+   *
+   * Vazio quando as três pontas estão representadas. O diagnóstico é o mesmo
+   * que se usa num perfil inteiro, aplicado a um dia.
+   */
+  diagnostico: string
 }
 
 /* ------------------------------------------------------------- semente -- */
@@ -43,6 +88,45 @@ export function sementeDoDia(dia: string, giro = 0, tentativa = 0): number {
 
 /** A última frase do story — é por ela que se percebe a repetição na tela. */
 const fechamento = (texto: string) => texto.split('\n\n').pop()?.trim() ?? ''
+
+/**
+ * Comprimento a partir do qual repetir um campo do tema incomoda.
+ *
+ * `dadoQueProva` costuma ser uma frase longa — "preço de venda menos custo,
+ * comissão do canal, frete e taxa de devolução" — e ela aparecia em dois
+ * stories seguidos: o da virada citava o dado no fecho e o da autoridade
+ * citava o mesmo dado no meio. Lido na tela, parece que o segundo story
+ * esqueceu que o primeiro existiu.
+ *
+ * O corte existe porque campo curto PODE repetir: "a arara" aparecendo duas
+ * vezes numa sequência sobre arara é natural, e remendar isso só pioraria a
+ * frase.
+ */
+const CAMPO_LONGO = 30
+
+/**
+ * Este story repete o story anterior?
+ *
+ * Duas formas de repetir, e as duas se notam na tela: terminar na mesma frase,
+ * e citar duas vezes o mesmo campo longo do tema.
+ */
+function repetiu(texto: string, anterior: string, tema: Tema): boolean {
+  if (fechamento(texto) === fechamento(anterior)) return true
+  return [tema.dadoQueProva, tema.prazoReal, tema.promessa, tema.pergunta].some(
+    (campo) => campo.length >= CAMPO_LONGO && texto.includes(campo) && anterior.includes(campo),
+  )
+}
+
+/**
+ * Como se diz a hora de publicar.
+ *
+ * Existe só por causa da preposição: "publicar na meio do dia" era o que saía
+ * quando o rótulo do momento ia direto para a frase. Guardar a frase inteira
+ * aqui deixa o valor do momento limpo para a tela, que o mostra como etiqueta.
+ */
+export function quandoPublicar(momento: Momento): string {
+  return momento === 'meio do dia' ? 'no meio do dia' : `de ${momento}`
+}
 
 /** Espalha os gatilhos: sem isto, na semente 0 todos cairiam na variante 0. */
 function digitos(texto: string): number {
@@ -84,6 +168,22 @@ const EXIGE: Partial<Record<GatilhoId, (tema: Tema, vezes: number) => boolean>> 
   contraste: (t) => Boolean(t.contraste),
   vulnerabilidade: (t) => Boolean(t.erro),
   prova_social: (t) => Boolean(t.provaSocial),
+  depoimento: (t) => Boolean(t.provaSocial),
+  // A reflexão é o movimento mais importante e o único que o gerador NÃO
+  // improvisa: sem as três partes (o automático, o que ele esconde e o jeito
+  // certo), o story sairia abrindo uma caixa que ninguém fecha.
+  reflexao: (t) => Boolean(t.reflexao),
+  rotina: (t) => Boolean(t.rotina),
+  usufruto: (t) => Boolean(t.usufruto),
+  ancora: (t) => Boolean(t.ancora),
+  piada_interna: (t) => Boolean(t.ancora),
+  // Os quatro tempos da história andam juntos: um tema que tem a quebra e não
+  // tem o cenário normal produziria uma história que começa no problema, que é
+  // exatamente o erro que o arco narrativo existe para corrigir.
+  cena_normal: (t) => Boolean(t.historia),
+  quebra: (t) => Boolean(t.historia),
+  virada: (t) => Boolean(t.historia),
+  licao: (t) => Boolean(t.historia),
   // Conta as REPETIÇÕES: a oficina de quatro passos só serve ao tema que tem
   // quatro ações. Com três, o quarto story sairia pedindo o passo que falta.
   passo: (t, vezes) => t.acaoUtil.length >= vezes,
@@ -107,7 +207,7 @@ export function arcosPossiveis(tema: Tema): Arco[] {
  * pergunta final — nenhum desses gatilhos cita a cena, e uma sequência assim
  * ignoraria a imagem que foi o ponto de partida.
  */
-const CITAM_O_OBJETO: GatilhoId[] = ['bastidor', 'tempo_real', 'curiosidade']
+const CITAM_O_OBJETO: GatilhoId[] = ['bastidor', 'tempo_real', 'curiosidade', 'didatico']
 
 /**
  * O formato que entra quando a pessoa não escolheu.
@@ -135,6 +235,163 @@ export function arcoPadrao(
   const fila = [...sugeridos, ...usavel.filter((id) => !sugeridos.includes(id))]
   if (fila.length === 0) return tema.arcosSugeridos[0] ?? ARCOS[0].id
   return fila[semente % fila.length]
+}
+
+/* ------------------------------------------------------------- costura -- */
+
+/**
+ * A linha que amarra um story no anterior.
+ *
+ * ----------------------------------------------------------------------------
+ * O defeito que isto corrige
+ * ----------------------------------------------------------------------------
+ * "Não conecta em nada" tinha duas causas. Uma era de conteúdo — faltava o
+ * eixo de contexto e faltava reflexão. A outra era estrutural, e é esta: os
+ * stories eram independentes. Cada tela começava do zero, sem citar a
+ * anterior, então não havia motivo nenhum para ver a próxima. Uma sequência
+ * assim pode ter sete telas boas e render como sete telas soltas.
+ *
+ * A costura é indexada pela ABERTURA, não pelo story que recebe a linha. Faz
+ * diferença: o que precisa ser retomado é a promessa que a abertura deixou no
+ * ar — o dado que ficou tampado, a cena que ficou pendente, a pergunta de
+ * alguém que ficou sem resposta. Retomar outra coisa é costura falsa.
+ *
+ * `onde` lista os movimentos que podem receber a retomada, em ordem de
+ * preferência. Se o arco não tiver nenhum deles, não há costura — e isso é
+ * melhor do que forçar uma linha que não fecha nada.
+ */
+interface Costura {
+  onde: GatilhoId[]
+  linha: (tema: Tema) => string
+}
+
+const COSTURAS: Partial<Record<GatilhoId, Costura>> = {
+  numero: {
+    onde: ['autoridade', 'virada', 'didatico', 'reciprocidade', 'item'],
+    linha: (t) => `Lembra do dado que eu tampei no começo? É este: ${t.dadoQueProva}.`,
+  },
+  cena_normal: {
+    onde: ['virada', 'licao', 'autoridade'],
+    linha: () => 'Volta naquela cena do começo, porque é ali que estava o erro.',
+  },
+  reflexao: {
+    onde: ['autoridade', 'reciprocidade', 'aplicavel', 'usufruto'],
+    linha: () => 'Agora que a ficha caiu, vem a parte prática.',
+  },
+  mito: {
+    onde: ['autoridade', 'reciprocidade', 'contraste'],
+    linha: () => 'Aquela ideia que eu derrubei lá atrás: olha o que entra no lugar dela.',
+  },
+  pergunta_da_caixinha: {
+    onde: ['autoridade', 'reciprocidade', 'aplicavel', 'passo'],
+    linha: () => 'Voltando na pergunta de quem me mandou: a resposta é esta.',
+  },
+  print_direct: {
+    onde: ['autoridade', 'reciprocidade', 'identificacao'],
+    linha: () => 'Foi exatamente isso que eu respondi para ela no direct.',
+  },
+  bastidor: {
+    onde: ['autoridade', 'usufruto', 'licao'],
+    linha: (t) => `Tudo que eu mostrei aqui existe por causa de uma decisão: ${t.pergunta}`,
+  },
+  basico: {
+    onde: ['aplicavel', 'depoimento', 'reciprocidade'],
+    linha: () => 'Aquela pergunta básica do começo tem resposta, e ela é curta.',
+  },
+  abertura: {
+    onde: ['autoridade', 'reciprocidade', 'aplicavel'],
+    linha: (t) => `Eu prometi isso no primeiro story: ${t.promessa}`,
+  },
+  depoimento: {
+    onde: ['autoridade', 'reciprocidade'],
+    linha: () => 'O resultado que eu mostrei no começo saiu exatamente deste jeito de fazer.',
+  },
+  tempo_real: {
+    onde: ['vulnerabilidade', 'autoridade', 'licao'],
+    linha: () => 'Isso que você acabou de ver acontecer é o motivo do que eu vou falar agora.',
+  },
+}
+
+/**
+ * Os stories deste arco que podem receber a retomada, do melhor para o pior.
+ *
+ * A retomada vai no ÚLTIMO candidato possível, não no primeiro. Costurar logo
+ * no story 2 não costura nada: as duas telas estão coladas, e ninguém esqueceu
+ * a abertura em dez segundos. A retomada só tem função depois que a sequência
+ * andou — é ali que quem entrou no meio precisa da ponte, e quem viu tudo
+ * recebe o fecho do laço.
+ *
+ * Devolve vários candidatos, e não um, porque o melhor lugar pode estar
+ * ocupado: a linha da retomada cita um campo do tema, e se o story vizinho já
+ * citar o mesmo campo, a costura cria exatamente a repetição que o resto do
+ * gerador evita.
+ */
+function candidatosACostura(arco: Arco): { indices: number[]; costura: Costura } | null {
+  const costura = COSTURAS[arco.passos[0]]
+  if (!costura) return null
+
+  const indices: number[] = []
+  for (let i = arco.passos.length - 1; i >= 2; i--) {
+    if (costura.onde.includes(arco.passos[i])) indices.push(i)
+  }
+  return indices.length > 0 ? { indices, costura } : null
+}
+
+/* ------------------------------------------------------------ momentos -- */
+
+/**
+ * A que hora cada story vai ao ar, nos arcos gravados ao longo do dia.
+ *
+ * Divide a sequência em quatro blocos e nomeia cada um. Não é decoração: é o
+ * que permite o arco narrativo existir de verdade — o cenário normal de manhã,
+ * o problema no meio do dia, a virada à tarde e o aprendizado à noite. Gravado
+ * tudo de uma vez, o mesmo arco vira um bloco só, e quem assiste não tem por
+ * que voltar.
+ */
+const MOMENTOS: Momento[] = ['manhã', 'meio do dia', 'tarde', 'noite']
+
+function momentoDe(indice: number, total: number): Momento {
+  if (total <= 1) return 'manhã'
+  const faixa = Math.floor((indice * MOMENTOS.length) / total)
+  return MOMENTOS[Math.min(faixa, MOMENTOS.length - 1)]
+}
+
+/* -------------------------------------------------------- dispositivos -- */
+
+/**
+ * Quais stories pedem algo, e o quê.
+ *
+ * Cada movimento traz um dispositivo preferido, mas a sequência INTEIRA tem um
+ * orçamento: três pedidos no máximo, e no máximo um que custe trabalho de
+ * verdade. Acima disso a sequência para de parecer conteúdo e passa a parecer
+ * captação — e o pedido seguinte deixa de ser atendido.
+ *
+ * O corte é feito de trás para frente, e isso é de propósito: o pedido do
+ * fecho é o que mais importa (é o que a pessoa acabou de ganhar o direito de
+ * atender), então quem perde o pedido é o story do meio.
+ */
+function orcamentoDePedidos(passos: GatilhoId[]): DispositivoId[] {
+  const preferidos = passos.map((passo) => GATILHOS[passo].dispositivo)
+
+  const comPedido = preferidos
+    .map((dispositivo, i) => ({ dispositivo, i }))
+    .filter(({ dispositivo }) => dispositivo !== 'nenhum')
+
+  const mantidos = new Set<number>()
+  let esforcoUsado = false
+
+  // De trás para frente: o fecho tem prioridade sobre o meio.
+  for (let k = comPedido.length - 1; k >= 0; k--) {
+    const { dispositivo, i } = comPedido[k]
+    if (mantidos.size >= LIMITE_DE_PEDIDOS) break
+    if (exigeEsforco(dispositivo)) {
+      if (esforcoUsado) continue
+      esforcoUsado = true
+    }
+    mantidos.add(i)
+  }
+
+  return preferidos.map((dispositivo, i) => (mantidos.has(i) ? dispositivo : 'nenhum'))
 }
 
 /* --------------------------------------------------------------- gerar -- */
@@ -180,6 +437,7 @@ export function gerarSequencia(
   const repeticoes = new Map<GatilhoId, number>()
   const ocorrencias: number[] = []
   const stories: StoryGerado[] = []
+  const pedidos = orcamentoDePedidos(arco.passos)
 
   for (const [i, gatilhoId] of arco.passos.entries()) {
     const gatilho = GATILHOS[gatilhoId]
@@ -199,10 +457,17 @@ export function gerarSequencia(
      * acha que é repost.
      */
     const anterior = stories[stories.length - 1]
-    if (anterior && !gatilho.porOcorrencia && fechamento(texto) === fechamento(anterior.texto)) {
+    if (anterior && !gatilho.porOcorrencia && repetiu(texto, anterior.texto, tema)) {
       indice = (indice + 1) % gatilho.variantes.length
-      texto = gatilho.variantes[indice](tema, ocorrencia)
+      const alternativa = gatilho.variantes[indice](tema, ocorrencia)
+      // Só troca se a alternativa resolver. Em gatilho de três variantes que
+      // citam todas o mesmo campo, girar o índice à toa só muda a frase de
+      // cima e mantém a repetição que incomoda.
+      if (!repetiu(alternativa, anterior.texto, tema)) texto = alternativa
     }
+
+    const dispositivo = pedidos[i]
+    const pedido = DISPOSITIVOS[dispositivo]
 
     stories.push({
       ordem: i + 1,
@@ -210,8 +475,47 @@ export function gerarSequencia(
       gatilho: gatilhoId,
       direcaoVisual: direcaoDoTema(gatilhoId, tema),
       texto,
-      pedeInteracao: Boolean(gatilho.pedeInteracao),
+      pedeInteracao: dispositivo !== 'nenhum',
+      aei: gatilho.aei,
+      dispositivo,
+      pedido: dispositivo === 'nenhum' ? '' : `${pedido.rotulo}: ${pedido.comoUsar}`,
+      depoisDoPedido: dispositivo === 'nenhum' ? '' : pedido.oQueFazerDepois,
+      momento: arco.aoLongoDoDia ? momentoDe(i, arco.passos.length) : undefined,
     })
+  }
+
+  /*
+   * A costura entra DEPOIS de todos os stories estarem escritos.
+   *
+   * Tem de ser depois: a linha de retomada cita a abertura, e a abertura só
+   * está decidida quando a variante dela foi sorteada. Antes, o texto da
+   * retomada falaria de uma promessa que não é a que entrou na tela.
+   */
+  const emenda = candidatosACostura(arco)
+  if (emenda) {
+    const retomada = emenda.costura.linha(tema)
+    /*
+     * Testa a costura contra os DOIS vizinhos antes de aplicar.
+     *
+     * Medido no banco inteiro: a costura do dado ("lembra do dado que eu
+     * tampei? é este: …") caía, em `entrega_seca` e `lista_longa`, exatamente
+     * ao lado do story que já citava o mesmo dado. Duas telas seguidas
+     * repetindo a mesma frase longa — a repetição que a emenda deveria
+     * disfarçar, criada por ela.
+     *
+     * Se nenhum candidato passar, a sequência fica SEM costura. Costura falsa
+     * é pior que costura nenhuma.
+     */
+    const posicao = emenda.indices.find((i) => {
+      if (i >= stories.length) return false
+      const vizinhos = [stories[i - 1], stories[i + 1]].filter(Boolean)
+      return vizinhos.every((v) => !repetiu(retomada, v.texto, tema))
+    })
+
+    if (posicao !== undefined) {
+      const alvo = stories[posicao]
+      stories[posicao] = { ...alvo, retomada, texto: `${retomada}\n\n${alvo.texto}` }
+    }
   }
 
   /*
@@ -249,13 +553,52 @@ export function gerarSequencia(
     }
   }
 
+  const aei = contarAEI(arco.passos)
+
   return {
     temaId: tema.id,
     titulo: tema.titulo,
     arcoId: arco.id,
     stories,
     observacao: observacaoDe(arco, stories),
+    aei,
+    diagnostico: diagnosticarAEI(aei),
   }
+}
+
+/**
+ * O que está faltando nesta sequência.
+ *
+ * A régua é a tríade, e o diagnóstico é o mesmo que se aplica a um perfil
+ * inteiro — cada ponta que falta produz um sintoma diferente, e são sintomas
+ * que o Raphael consegue reconhecer na própria conta:
+ *
+ *  - sem AUTORIDADE: a audiência engaja e não compra;
+ *  - sem ENTRETENIMENTO: ela não cria vínculo, assiste e vai embora;
+ *  - sem INFORMAÇÃO: ela não sente que ganha nada em continuar acompanhando.
+ *
+ * Devolve string vazia quando as três pontas estão representadas. Vazio é o
+ * caso bom, e a tela não mostra nada — aviso que aparece sempre não é lido.
+ */
+export function diagnosticarAEI(aei: Record<AEI, number>): string {
+  const faltando = (Object.keys(aei) as AEI[]).filter((ponta) => aei[ponta] === 0)
+  if (faltando.length === 0) return ''
+
+  const SINTOMA: Record<AEI, string> = {
+    autoridade:
+      'Sem autoridade nenhuma nesta sequência: nenhum story mostra você fazendo, um resultado seu ou o de outra pessoa. É o que faz a audiência engajar e não comprar.',
+    entretenimento:
+      'Sem entretenimento nenhum nesta sequência: é tudo conteúdo técnico, sem respiro. É o que faz o seguidor assistir, não criar vínculo e ir embora.',
+    informacao:
+      'Sem informação nenhuma nesta sequência: não há nada que a pessoa consiga aplicar hoje. É o que faz ela sentir que não ganha nada em continuar acompanhando.',
+  }
+
+  if (faltando.length === 1) return SINTOMA[faltando[0]]
+
+  return (
+    `Faltam duas pontas da tríade aqui: ${faltando.map((p) => ROTULO_AEI[p].toLowerCase()).join(' e ')}. ` +
+    'Sequência assim funciona como complemento de um dia, não como o conteúdo do dia.'
+  )
 }
 
 /**
@@ -305,13 +648,35 @@ function direcaoDoTema(gatilhoId: GatilhoId, tema: Tema): string {
  * agora que existe arco sem dado, sem tarefa e sem pedido de resposta.
  */
 const PESO_DO_STORY: Partial<Record<GatilhoId, string>> = {
+  reflexao:
+    'é o story que decide a sequência. Se ele só constatar um fato em vez de mostrar que a pessoa faz errado, o resto não tem para onde ir — e se ele não entregar o jeito certo no fim, você abriu uma caixa e não fechou.',
+  licao:
+    'é a frase que a pessoa leva. Resumo da história não serve: tem de ser a regra que nasceu dela.',
+  cena_normal:
+    'é o tempo que todo mundo pula porque é o mais chato de gravar. Sem ele a quebra não quebra nada, e a história vira reclamação.',
+  virada:
+    'é onde quem assiste aprende a copiar o caminho. Pular daqui direto para o aprendizado é a diferença entre inspirar e ensinar.',
   autoridade:
     'é o story que torna a sua autoridade visível. Um dado real ali dá força a todos os outros.',
+  depoimento:
+    'é o story que tira o holofote de você. Publicado uma vez, ele destrava os próximos — ninguém manda print antes de ver alguém mandando.',
+  usufruto:
+    'é o caminho de autoridade que quase ninguém usa. Não é você trabalhando: é onde o trabalho te levou.',
   reciprocidade:
     'é o story que faz salvar. Sem uma tarefa que a pessoa consiga fazer hoje, a sequência vira opinião.',
+  aplicavel:
+    'é a amostra grátis. Pequena dose, pequena vitória — é por ela que a pessoa decide que vale acompanhar você.',
+  rotina:
+    'é o respiro, e é nele que quem assiste decide se gosta de você. Tem de ser pequeno e sem lição nenhuma: lição aqui estraga o efeito.',
+  ancora:
+    'é o movimento de efeito mais longo que existe. Só funciona com a MESMA frase repetida por semanas — se você mudar a palavra, não ancora.',
   passo: 'é o passo em que a pessoa para o celular e executa. Se for vago, ela abandona no meio.',
   item: 'é o item que precisa valer sozinho. Quem chega no meio da lista começa por ele.',
-  compromisso: 'é onde a conversa abre. Se a pergunta for vaga, ninguém responde.',
+  resumo: 'é a tela que a pessoa salva e manda para a sócia. Tem de valer sozinha, sem o resto.',
+  compromisso:
+    'é onde a conversa abre. Pergunta vaga não é respondida, e pergunta de sim ou não não gera conversa nenhuma.',
+  levante_a_mao:
+    'é triagem, não engajamento. A palavra exata é o que permite filtrar depois — e você precisa responder todos no mesmo dia.',
   gancho:
     'é o que traz a pessoa de volta amanhã. Só prometa a continuação que você realmente vai gravar.',
   vulnerabilidade:
@@ -319,7 +684,29 @@ const PESO_DO_STORY: Partial<Record<GatilhoId, string>> = {
   curiosidade: 'é o laço que segura a sequência. Se ele entregar a resposta, ninguém vê o resto.',
 }
 
-const ORDEM_DE_PESO: GatilhoId[] = ['autoridade', 'reciprocidade', 'passo', 'item', 'vulnerabilidade']
+/**
+ * Qual story é o mais pesado, quando o arco tem vários candidatos.
+ *
+ * A ordem não é arbitrária: é a ordem em que cada movimento derruba a
+ * sequência se sair fraco. Reflexão e os tempos da história vêm primeiro
+ * porque, se eles falham, não sobra sequência nenhuma — já um dado fraco
+ * ainda deixa o resto de pé.
+ */
+const ORDEM_DE_PESO: GatilhoId[] = [
+  'reflexao',
+  'cena_normal',
+  'virada',
+  'licao',
+  'autoridade',
+  'depoimento',
+  'usufruto',
+  'reciprocidade',
+  'aplicavel',
+  'passo',
+  'item',
+  'vulnerabilidade',
+  'ancora',
+]
 
 function observacaoDe(arco: Arco, stories: StoryGerado[]): string {
   const alvo =
@@ -438,6 +825,8 @@ export function sugerirTemas(
   })).sort((a, b) => b.ordem - a.ordem)
 
   const escolhidos: typeof porRotacao = []
+  /** O tema que entrou pela garantia de conexão. A tela explica por quê. */
+  let reservado: string | null = null
 
   /*
    * A vaga da pauta: o assunto da postagem marcada para hoje.
@@ -468,12 +857,48 @@ export function sugerirTemas(
     if (!escolhidos.includes(candidato)) escolhidos.push(candidato)
   }
 
+  /*
+   * Garantia de que UM dos assuntos do dia dá para falar de gente.
+   *
+   * Isto corrige, na lista de sugestões, o mesmo defeito que o eixo `contexto`
+   * corrige no banco de temas. Vinte e um dos vinte e nove temas falam de
+   * operação, então a rotação sozinha oferecia três assuntos técnicos quase
+   * todo dia — e um dia de conteúdo só técnico é exatamente o que faz o
+   * seguidor assistir e ir embora.
+   *
+   * A troca é feita DEPOIS da rotação, e não antes, e isso foi medido na tela:
+   * reservando a vaga antes, a reserva entrava mesmo quando a rotação já ia
+   * trazer um tema de conexão por conta própria, e o dia 4 de novembro saía com
+   * DUAS sugestões de "quem você é" e uma de operação. Reserva é piso, não cota
+   * — ela só age quando nada conecta.
+   *
+   * E troca a ÚLTIMA, nunca a primeira: a postagem do dia e o que está no ar
+   * esta semana continuam ganhando a frente da lista.
+   */
+  const CONECTAM: Eixo[] = ['contexto', 'humanidade']
+  if (quantos >= 3 && !escolhidos.some((e) => CONECTAM.includes(e.tema.eixo))) {
+    const conexao = porRotacao.find(
+      (p) => CONECTAM.includes(p.tema.eixo) && !escolhidos.includes(p),
+    )
+    if (conexao) {
+      reservado = conexao.tema.id
+      escolhidos[escolhidos.length - 1] = conexao
+    }
+  }
+
   return escolhidos.map(({ tema, batidas }) => {
     if (daPauta && tema.id === daPauta.tema.id) {
       return {
         tema,
         motivo: `Puxado da postagem deste dia: ${resumir(pauta)}.`,
         daPauta: true,
+      }
+    }
+    if (reservado === tema.id) {
+      return {
+        tema,
+        motivo:
+          'Entrou para o dia não ficar só técnico — é o assunto que fala de você, não de operação.',
       }
     }
     return {
@@ -640,14 +1065,31 @@ export function escolherTemaPor(
   return sugerirTemas(dia, contexto, 1)[0].tema
 }
 
-/** A sequência em texto corrido, para colar em qualquer lugar. */
+/**
+ * A sequência em texto corrido, para colar em qualquer lugar.
+ *
+ * Inclui o momento do dia e o pedido de cada story. Sem eles, o texto copiado
+ * perdia justamente as duas informações que a pessoa precisa na hora de gravar:
+ * a que hora publicar e o que colocar na tela.
+ */
 export function sequenciaEmTexto(sequencia: Sequencia): string {
   const partes = [sequencia.titulo, '']
   for (const story of sequencia.stories) {
-    partes.push(`${story.rotulo}`)
+    partes.push(
+      story.momento ? `${story.rotulo} — publicar ${quandoPublicar(story.momento)}` : story.rotulo,
+    )
     partes.push(`(${story.direcaoVisual})`)
     partes.push('')
     partes.push(story.texto)
+    if (story.pedido) {
+      partes.push('')
+      partes.push(`▸ Pedido — ${story.pedido}`)
+      partes.push(`▸ Depois — ${story.depoisDoPedido}`)
+    }
+    partes.push('')
+  }
+  if (sequencia.diagnostico) {
+    partes.push(`⚠ ${sequencia.diagnostico}`)
     partes.push('')
   }
   partes.push(sequencia.observacao)

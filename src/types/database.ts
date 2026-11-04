@@ -368,7 +368,15 @@ export type NoticiaEntrada = {
 
 /* ----------------------------------------------------------- stories -- */
 
-/** Um story dentro da sequência. Espelha src/lib/stories/gerador.ts. */
+/**
+ * Um story dentro da sequência. Espelha src/lib/stories/gerador.ts.
+ *
+ * Os campos acrescentados na reforma do gerador são todos OPCIONAIS, e isso é
+ * necessário: a coluna é `jsonb` e as sequências gravadas antes dela não têm
+ * nenhum deles. A tela deriva o que falta a partir do movimento (`gatilho`),
+ * que sempre existe — sequência antiga continua abrindo, só sem o pedido e sem
+ * a hora de publicar, que ninguém escreveu nela.
+ */
 export type StoryDaSequencia = {
   ordem: number
   rotulo: string
@@ -376,6 +384,18 @@ export type StoryDaSequencia = {
   direcao_visual: string
   texto: string
   pede_interacao: boolean
+  /** Qual ponta da tríade A.E.I este story alimenta. */
+  aei?: 'autoridade' | 'entretenimento' | 'informacao'
+  /** O dispositivo: o que o story PEDE de quem assiste. */
+  dispositivo?: string
+  /** Como executar o pedido na tela. */
+  pedido?: string
+  /** O que fazer com o que chegar do pedido. */
+  depois_do_pedido?: string
+  /** A hora de publicar, nos arcos gravados ao longo do dia. */
+  momento?: string
+  /** A linha que amarra este story no anterior. */
+  retomada?: string
 }
 
 export type StorySequenciaRow = {

@@ -29,10 +29,13 @@ import {
 import { EditorDeSequencia } from '@/components/stories/EditorDeSequencia'
 import { GerarDoAssunto, QUALQUER_EIXO } from '@/components/stories/GerarDoAssunto'
 import { ImagemDeApoio } from '@/components/stories/ImagemDeApoio'
-import { ARCOS } from '@/lib/stories/gatilhos'
+// `ARCOS` saiu daqui: a lista de arcos por tema agora usa `arcosPossiveis`,
+// que só oferece o que aquele tema sustenta, e o seletor do caminho de texto
+// livre vive dentro de GerarDoAssunto.
 import { ROTULO_DE_EIXO, TEMAS_POR_ID, type Eixo } from '@/lib/stories/temas'
 import {
   arcoPadrao,
+  arcosPossiveis,
   escolherTemaPor,
   gerarSequencia,
   sementeDoDia,
@@ -88,6 +91,12 @@ function paraLinhas(stories: ReturnType<typeof gerarSequencia>): StoryDaSequenci
     direcao_visual: story.direcaoVisual,
     texto: story.texto,
     pede_interacao: story.pedeInteracao,
+    aei: story.aei,
+    dispositivo: story.dispositivo,
+    pedido: story.pedido,
+    depois_do_pedido: story.depoisDoPedido,
+    momento: story.momento,
+    retomada: story.retomada,
   }))
 }
 
@@ -150,7 +159,20 @@ export function PainelDeStories({
   const [eixoEscolhido, setEixoEscolhido] = React.useState<Eixo | typeof QUALQUER_EIXO>(
     QUALQUER_EIXO,
   )
-  const [arcoEscolhido, setArcoEscolhido] = React.useState(ARCOS[0].id)
+  /*
+   * O arco inicial do caminho de texto livre.
+   *
+   * Era `ARCOS[0].id`, e isso quebrou quando os arcos narrativos passaram a
+   * vir primeiro na lista: o primeiro arco exige que o tema tenha os quatro
+   * tempos da história, e só uma parte dos temas tem. O padrão virava uma
+   * sequência cheia de `[preencha: …]` para quem só digitou um assunto.
+   *
+   * `reflexao_dura` é o padrão certo por dois motivos: todos os 29 temas
+   * sustentam ele (todos têm o campo `reflexao`), e ele é o formato que mais
+   * corrige o defeito antigo do gerador — abre quebrando o automático em vez
+   * de enunciar um fato.
+   */
+  const [arcoEscolhido, setArcoEscolhido] = React.useState('reflexao_dura')
 
   /*
    * Abrir uma sequência salva traz o arco dela para o seletor. Sem isto, abrir
@@ -530,9 +552,20 @@ export function PainelDeStories({
                         >
                           <SelectValue />
                         </SelectTrigger>
+                        {/*
+                          Só os arcos que ESTE tema sustenta inteiros.
+
+                          Antes a lista trazia todos, e escolher um que o tema
+                          não sustenta produzia uma sequência cheia de
+                          `[preencha: …]`. Com 29 arcos e cada tema sustentando
+                          de 13 a 24, oferecer os 29 aqui é oferecer
+                          principalmente os que não funcionam — e o seletor tem
+                          o tema na mão, então não há motivo para isso.
+                        */}
                         <SelectContent>
-                          {ARCOS.map((arco) => (
+                          {arcosPossiveis(tema).map((arco) => (
                             <SelectItem key={arco.id} value={arco.id}>
+                              {arco.narrativo ? '★ ' : ''}
                               {arco.rotulo} · {arco.passos.length} stories · {arco.tom}
                             </SelectItem>
                           ))}
