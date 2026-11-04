@@ -414,6 +414,19 @@ export type StorySequenciaRow = {
   publicado: boolean
   /** Guardada na gaveta de ideias soltas: sai da grade, mantém tudo o mais. */
   na_gaveta: boolean
+  /**
+   * Quem escreveu: ele (`manual`) ou a rotina diária (`rotina`).
+   *
+   * `manual` cobre tanto o que ele digitou quanto o que o gerador do app
+   * montou — dos dois jeitos ele estava na frente da tela e aceitou. `rotina`
+   * é o que apareceu sozinho de madrugada, e isso precisa ficar visível:
+   * rascunho que aparece sem aviso e parece escrito por ele é o jeito mais
+   * rápido de ele gravar uma frase que não é dele.
+   *
+   * Opcional no tipo porque as linhas gravadas antes da coluna existir voltam
+   * sem ela até o `select *` seguinte.
+   */
+  origem?: 'manual' | 'rotina'
   criado_em: string
   atualizado_em: string
 }

@@ -102,7 +102,14 @@ export function useSalvarSequencia() {
       // não acerta linha nenhuma volta SEM erro, e a tela diria "Salvo".
       const { data, error } = await supabase
         .from('stories_sequencias')
-        .update(campos)
+        // Salvar passa a origem para `manual`, e isso não é detalhe.
+        //
+        // A rotina diária deixa sugestões no dia, marcadas na grade para ele
+        // não confundir com o que escreveu. No instante em que ele abre uma
+        // delas e salva, ele leu e assumiu o texto — a marca tem de sair, ou
+        // ela vira ruído e ele para de olhar para ela. Que é o mesmo que não
+        // ter marca nenhuma.
+        .update({ ...campos, origem: 'manual' })
         .eq('id', id)
         .select('id')
       if (error) throw error
