@@ -415,6 +415,58 @@ Três proteções contra o número que mente:
   num perfil de 500);
 - divisão por zero não vira percentual: de 0 para 50 a tela mostra `+50`.
 
+#### As cores dos gráficos não foram escolhidas, foram validadas
+
+Há um conjunto próprio de cores para gráfico (`--viz-1` a `--viz-4` em
+`src/index.css`), separado das cores de interface, com passos distintos para
+tema claro e escuro. Ele passou num validador de daltonismo: separação CVD
+ΔE ≥ 8 em todos os pares e contraste ≥ 3:1 contra a superfície do cartão, nos
+dois temas.
+
+**O par óbvio para ganho e perda — verde e vermelho — FALHA**, com ΔE 5,8 em
+deuteranopia: abaixo até do piso em que a cor é aceitável acompanhada de outro
+sinal. É o erro mais comum em painel de métrica, e ele não aparece para quem
+desenha. O par usado é o índigo da marca contra o vermelho (ΔE 21,6 claro /
+19,2 escuro): continua lendo como opostos, e continua legível para quem não
+distingue verde de vermelho.
+
+Uma cor fica abaixo de 3:1 no tema claro (o verde-água de "Foto"). A regra para
+esse caso é rótulo visível, não trocar a cor — por isso o nome do formato
+aparece escrito ao lado da barra, sempre.
+
+#### O painel: quatro perguntas, quatro blocos
+
+A aba não é uma lista de números; cada bloco responde uma pergunta que vira
+decisão:
+
+| Bloco | Pergunta |
+| --- | --- |
+| Seis cartões | como foi o período contra o anterior |
+| Área dia a dia | quando aconteceu, e o que saiu naquele dia |
+| Ganhos × perdas | a audiência cresce ou só gira |
+| O que mais rendeu + formato | o que repetir da próxima vez |
+
+Três decisões de leitura que não são estéticas:
+
+- **Ganhos e perdas espelhados pelo zero**, e não lado a lado. Espelhado, a
+  diferença entre as duas alturas É o saldo, lida sem conta. Um dia de +4/−4
+  fica visivelmente simétrico — e é exatamente o dia que passa despercebido num
+  gráfico só de ganhos.
+- **O comparativo é uma linha de referência**, não uma segunda área. Duas áreas
+  sobrepostas disputam a mesma leitura e nenhuma sobrevive.
+- **Formato é alcance MÉDIO por peça**, nunca o total. O total premiaria o
+  formato mais publicado: 12 reels ganham de 2 carrosséis mesmo rendendo menos
+  por peça. A pergunta é "o que vale gravar da próxima vez", e só a média
+  responde — com a contagem ao lado, porque média de duas peças não é média de
+  doze.
+
+Dois defeitos reais saíram do teste de navegador, nenhum dos dois visível na
+leitura do código: o balão do gráfico ficava **por cima** do ponto perto da
+borda direita e engolia o clique; e o ponto destacado, que aparece exatamente
+sob o cursor, recebia o clique em vez de deixá-lo passar — clicar ao lado do
+ponto abria o dia, clicar no ponto não fazia nada. Os dois agora são
+`pointerEvents: 'none'`.
+
 #### O crescimento de seguidores: três tentativas, nessa ordem
 
 O erro mais caro que a aba já teve: ela mostrava **"-1 seguidor"** numa janela

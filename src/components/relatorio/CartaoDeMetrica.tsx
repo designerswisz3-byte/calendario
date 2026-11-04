@@ -1,4 +1,10 @@
-import { ArrowDownRight, ArrowRight, ArrowUpRight, TriangleAlert } from 'lucide-react'
+import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { comSinal, numero, percentual, type Variacao } from '@/lib/relatorio'
 import { cn } from '@/lib/utils'
@@ -13,6 +19,8 @@ interface Props {
    * em vez de assumir que verde = subiu para sempre.
    */
   menorEhMelhor?: boolean
+  /** Ícone no canto. Recessivo de propósito: ele ajuda a varrer, não a ler. */
+  icone?: LucideIcon
 }
 
 /**
@@ -23,7 +31,13 @@ interface Props {
  * percentual aparece em cinza com um aviso: um mês de 15 dias contra um de 30
  * "cai 50%" sem nada ter piorado, e é esse número que viraria decisão errada.
  */
-export function CartaoDeMetrica({ titulo, variacao, rotuloAnterior, menorEhMelhor }: Props) {
+export function CartaoDeMetrica({
+  titulo,
+  variacao,
+  rotuloAnterior,
+  menorEhMelhor,
+  icone: Icone2,
+}: Props) {
   const { atual, diferenca, percentual: pct, comparavel } = variacao
   const subiu = diferenca !== null && diferenca > 0
   const desceu = diferenca !== null && diferenca < 0
@@ -34,7 +48,12 @@ export function CartaoDeMetrica({ titulo, variacao, rotuloAnterior, menorEhMelho
 
   return (
     <Card className="p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{titulo}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {titulo}
+        </p>
+        {Icone2 && <Icone2 aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
+      </div>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{numero(atual)}</p>
 
       {diferenca === null ? (

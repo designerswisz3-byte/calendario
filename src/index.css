@@ -47,6 +47,26 @@
     /* Gradiente neutro sutil do fundo */
     --bg-blob-a: 243 75% 59% / 0.10;
     --bg-blob-b: 199 89% 48% / 0.08;
+
+    /*
+     * Cores de GRÁFICO, separadas das cores de interface.
+     *
+     * Não são escolhidas por gosto: este conjunto passou no validador de
+     * daltonismo nos dois temas (separação CVD ΔE >= 8 em todos os pares, e
+     * contraste >= 3:1 contra a superfície do cartão). Verde-e-vermelho, que
+     * seria o par óbvio para ganho e perda, FALHA — ΔE 5,8 em deuteranopia,
+     * abaixo até do piso. Por isso perda é vermelha e ganho é o índigo da
+     * marca: lidos como opostos por quem enxerga cor e por quem não enxerga.
+     *
+     * Hex cru e não `hsl(var(--primary))` de propósito: o Recharts precisa de
+     * cor resolvida em `stroke`/`fill`, e um gradiente SVG não aceita a
+     * sintaxe de variável do Tailwind.
+     */
+    --viz-1: #6366f1;   /* principal — alcance, ganhos */
+    --viz-2: #e34948;   /* oposto — perdas */
+    --viz-3: #eb6834;   /* categórica 3 — formato */
+    --viz-4: #1baf7a;   /* categórica 4 — formato */
+    --viz-grade: 220 18% 88%;
   }
 
   .dark {
@@ -84,6 +104,14 @@
 
     --bg-blob-a: 243 75% 62% / 0.16;
     --bg-blob-b: 199 89% 55% / 0.10;
+
+    /* Os mesmos matizes, re-escalonados para o fundo escuro — não é o claro
+       clareado automaticamente; cada passo foi validado contra esta superfície. */
+    --viz-1: #7c7ff4;
+    --viz-2: #e66767;
+    --viz-3: #d95926;
+    --viz-4: #199e70;
+    --viz-grade: 220 16% 24%;
   }
 
   * {

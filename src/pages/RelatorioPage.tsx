@@ -23,9 +23,22 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/use-toast'
 import { todayKey } from '@/lib/date'
+import {
+  Bookmark,
+  Eye,
+  Heart,
+  Share2,
+  TrendingUp,
+  UserMinus,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { CartaoDeMetrica } from '@/components/relatorio/CartaoDeMetrica'
+import { DesempenhoPorFormato } from '@/components/relatorio/DesempenhoPorFormato'
 import { DiaDetalhado } from '@/components/relatorio/DiaDetalhado'
-import { GraficoDiario } from '@/components/relatorio/GraficoDiario'
+import { GanhosEPerdas } from '@/components/relatorio/GanhosEPerdas'
+import { PainelDeAlcance } from '@/components/relatorio/PainelDeAlcance'
+import { TopPublicacoes } from '@/components/relatorio/TopPublicacoes'
 import { SeletorDePeriodo } from '@/components/relatorio/SeletorDePeriodo'
 import { TabelaComparativa } from '@/components/relatorio/TabelaComparativa'
 import { GraficoDePeriodos } from '@/components/relatorio/GraficoDePeriodos'
@@ -58,14 +71,24 @@ import { porDia as publicacoesPorDia } from '@/lib/relatorioPublicacoes'
 import { errorMessage } from '@/lib/supabase'
 import type { RedeSocial, RelatorioMetricaEntrada } from '@/types/database'
 
-/** Cartões do topo, na ordem do funil. */
+/** Cartões do topo, na ordem do funil: quem viu, quem reagiu, quem guardou. */
 const DESTAQUES = [
   'alcance',
   'views',
   'interacoes',
   'salvamentos',
-  'compartilhamentos',
 ] as const satisfies readonly MetricaDeFluxo[]
+
+/** O ícone é para varrer a grade de relance, não para ler. Fica recessivo. */
+const ICONE: Partial<Record<MetricaDeFluxo, typeof Eye>> = {
+  alcance: TrendingUp,
+  views: Eye,
+  interacoes: Heart,
+  salvamentos: Bookmark,
+  compartilhamentos: Share2,
+  seguidores_ganhos: UserPlus,
+  seguidores_perdidos: UserMinus,
+}
 
 export default function RelatorioPage() {
   const { data: perfis, isLoading: carregandoPerfis } = usePerfis()
@@ -424,9 +447,12 @@ export default function RelatorioPage() {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Card className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Seguidores
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Seguidores
+                </p>
+                <Users aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+              </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {numero(comparativo.atual.seguidoresFim)}
               </p>
@@ -453,15 +479,20 @@ export default function RelatorioPage() {
             </Card>
 
             <Card className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Ganhos e perdas
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Ganhos e perdas
+                </p>
+                <UserPlus aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+              </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
-                <span className="text-emerald-600 dark:text-emerald-400">
+                {/* As mesmas cores do gráfico logo abaixo: o cartão e a barra
+                    têm de falar a mesma língua, senão viram dois assuntos. */}
+                <span style={{ color: 'var(--viz-1)' }}>
                   +{numero(comparativo.fluxos.seguidores_ganhos.atual ?? 0)}
                 </span>
                 <span className="mx-1.5 text-base font-normal text-muted-foreground">/</span>
-                <span className="text-rose-600 dark:text-rose-400">
+                <span style={{ color: 'var(--viz-2)' }}>
                   −{numero(comparativo.fluxos.seguidores_perdidos.atual ?? 0)}
                 </span>
               </p>
@@ -478,6 +509,7 @@ export default function RelatorioPage() {
                 titulo={ROTULOS[metrica]}
                 variacao={comparativo.fluxos[metrica]}
                 rotuloAnterior={comparativo.anterior?.rotulo ?? null}
+                icone={ICONE[metrica]}
               />
             ))}
           </div>
@@ -509,7 +541,7 @@ export default function RelatorioPage() {
             </div>
             {modo === 'periodo' ? (
               <>
-                <GraficoDiario
+                <PainelDeAlcance
                   dias={metricas ?? []}
                   de={janelaAtiva.de}
                   ate={janelaAtiva.ate}
@@ -520,9 +552,9 @@ export default function RelatorioPage() {
                   onSelecionarDia={setDiaAberto}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Uma barra por dia. Traço vazado = dia sem coleta, nunca zero. A linha tracejada
-                  é a média diária do período anterior de mesmo tamanho. O ponto azul marca o dia
-                  que teve publicação — passe o cursor para ver qual, clique para abrir o dia.
+                  Falha na linha = dia sem coleta, nunca zero. A linha tracejada é a média diária
+                  do período anterior de mesmo tamanho. Passe o cursor para ver o que foi
+                  publicado no dia; clique para abri-lo.
                 </p>
                 {diaAberto && (
                   <DiaDetalhado
@@ -548,6 +580,60 @@ export default function RelatorioPage() {
               </>
             )}
           </Card>
+
+          {/*
+            Duas perguntas que o gráfico de cima não responde, lado a lado:
+            "a audiência está crescendo ou só girando?" e "o que rendeu?".
+            Elas moram juntas porque a resposta de uma costuma explicar a outra
+            — semana de muito post e pouco saldo é um padrão, não um acaso.
+          */}
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <Card className="space-y-3 p-4">
+              <div>
+                <h2 className="text-sm font-semibold">Quem entrou e quem saiu</h2>
+                <p className="text-xs text-muted-foreground">
+                  Dia a dia, espelhado pelo zero — a diferença entre as duas alturas é o saldo.
+                </p>
+              </div>
+              <GanhosEPerdas
+                dias={metricas ?? []}
+                de={comparativo.atual.inicio}
+                ate={comparativo.atual.fim}
+              />
+            </Card>
+
+            <Card className="space-y-3 p-4">
+              <div>
+                <h2 className="text-sm font-semibold">O que mais rendeu</h2>
+                <p className="text-xs text-muted-foreground">
+                  As cinco publicações de maior alcance de {comparativo.atual.rotulo}.
+                </p>
+              </div>
+              <TopPublicacoes
+                publicacoes={publicacoes?.linhas ?? []}
+                de={comparativo.atual.inicio}
+                ate={comparativo.atual.fim}
+              />
+            </Card>
+          </div>
+
+          {(publicacoes?.linhas ?? []).some(
+            (pub) => pub.dia >= comparativo.atual.inicio && pub.dia <= comparativo.atual.fim,
+          ) && (
+            <Card className="space-y-3 p-4">
+              <div>
+                <h2 className="text-sm font-semibold">Qual formato rende mais</h2>
+                <p className="text-xs text-muted-foreground">
+                  Em {comparativo.atual.rotulo}, por peça publicada.
+                </p>
+              </div>
+              <DesempenhoPorFormato
+                publicacoes={publicacoes?.linhas ?? []}
+                de={comparativo.atual.inicio}
+                ate={comparativo.atual.fim}
+              />
+            </Card>
+          )}
 
           <Card className="space-y-2 p-4">
             <h2 className="text-sm font-semibold">
