@@ -20,11 +20,18 @@ import {
   List,
   ListOrdered,
   Loader2,
+  Paperclip,
   Strikethrough,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { TIPOS_DE_IMAGEM } from '@/lib/notasAnexos'
+import {
+  TIPOS_DE_DOCUMENTO,
+  TIPOS_DE_IMAGEM,
+  ehDocumentoAceito,
+  type DocumentoAnexado as Documento,
+} from '@/lib/notasAnexos'
+import { DocumentoAnexado } from '@/components/notas/documentoAnexado'
 import { ImagemRedimensionavel } from '@/components/notas/ImagemRedimensionavel'
 
 /**
@@ -74,6 +81,16 @@ interface Props {
   onChange: (html: string) => void
   /** Sobe o arquivo e devolve o caminho no bucket. */
   onSubirImagem: (arquivo: File) => Promise<{ caminho: string; url: string }>
+  /** Sobe um documento (PDF e afins) e devolve o que o cartão precisa. */
+  onSubirDocumento: (arquivo: File) => Promise<Documento>
+  /**
+   * Avisa que um anexo não entrou, e por quê.
+   *
+   * O erro sobe para quem usa, em vez de virar um toast daqui: a página já
+   * tem o canal de aviso dela, e um editor que abre o próprio toast acaba
+   * mostrando dois para o mesmo problema.
+   */
+  onFalhaDeAnexo: (mensagem: string) => void
   /** Abre o seletor de notas para inserir uma ligação [[...]]. */
   onInserirLigacao: () => void
 }
@@ -112,11 +129,13 @@ function BotaoDaBarra({
 function Barra({
   editor,
   onImagem,
+  onDocumento,
   onLigacao,
   subindo,
 }: {
   editor: Editor
   onImagem: () => void
+  onDocumento: () => void
   onLigacao: () => void
   subindo: boolean
 }) {
@@ -180,6 +199,9 @@ function Barra({
       <BotaoDaBarra titulo="Inserir imagem" onClick={onImagem}>
         {subindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
       </BotaoDaBarra>
+      <BotaoDaBarra titulo="Anexar documento (PDF, Word, Excel…)" onClick={onDocumento}>
+        <Paperclip className="h-4 w-4" />
+      </BotaoDaBarra>
       <BotaoDaBarra titulo="Ligar a outra nota" onClick={onLigacao}>
         <Link2 className="h-4 w-4" />
       </BotaoDaBarra>
@@ -197,12 +219,31 @@ function Barra({
  * `key` é o caminho do React, e não depende do que a biblioteca faz por
  * dentro.
  */
+/**
+ * Vale a pena interceptar este colar/arrastar?
+ *
+ * Só quando há pelo menos um arquivo que a nota sabe guardar. Se não houver,
+ * o evento segue para o TipTap — é o que preserva o colar de texto, de HTML e
+ * de imagem vinda de outra aba, que não chegam como `File`.
+ */
+function algumAceito(arquivos: File[]): boolean {
+  return arquivos.some((a) => TIPOS_DE_IMAGEM.includes(a.type) || ehDocumentoAceito(a))
+}
+
 export const EditorDeNota = React.forwardRef<EditorDeNotaRef, Props>(function EditorDeNota(
-  { conteudoInicial, onChange, onSubirImagem, onInserirLigacao },
+  { conteudoInicial, onChange, onSubirImagem, onSubirDocumento, onInserirLigacao, onFalhaDeAnexo },
   ref,
 ) {
   const entradaRef = React.useRef<HTMLInputElement>(null)
+  const entradaDocRef = React.useRef<HTMLInputElement>(null)
   const [subindo, setSubindo] = React.useState(false)
+
+  // Mesmas refs do onChange, e pelo mesmo motivo: entrar no array de
+  // dependências do editor recriaria a instância e perderia o cursor.
+  const subirDocumentoRef = React.useRef(onSubirDocumento)
+  subirDocumentoRef.current = onSubirDocumento
+  const falhaRef = React.useRef(onFalhaDeAnexo)
+  falhaRef.current = onFalhaDeAnexo
 
   // Ref, e não dependência: o onChange é recriado a cada render de quem usa, e
   // recriar o editor a cada tecla perderia o cursor.
@@ -214,6 +255,7 @@ export const EditorDeNota = React.forwardRef<EditorDeNotaRef, Props>(function Ed
       extensions: [
         StarterKit.configure({ heading: { levels: [2, 3] } }),
         ImagemAnexada.configure({ inline: false, allowBase64: false }),
+        DocumentoAnexado,
         TaskList,
         TaskItem.configure({ nested: true }),
         Placeholder.configure({
@@ -227,22 +269,19 @@ export const EditorDeNota = React.forwardRef<EditorDeNotaRef, Props>(function Ed
           class:
             'prose-notas min-h-[22rem] px-5 py-4 focus:outline-none',
         },
-        // Colar print é o jeito mais comum de pôr imagem numa nota.
+        // Colar print é o jeito mais comum de pôr imagem numa nota; arrastar
+        // um PDF da área de trabalho é o jeito mais comum de pôr documento.
         handlePaste: (_visao, evento) => {
-          const arquivos = [...(evento.clipboardData?.files ?? [])].filter((a) =>
-            TIPOS_DE_IMAGEM.includes(a.type),
-          )
-          if (arquivos.length === 0) return false
+          const arquivos = [...(evento.clipboardData?.files ?? [])]
+          if (!algumAceito(arquivos)) return false
           evento.preventDefault()
           void inserirArquivos(arquivos)
           return true
         },
         handleDrop: (_visao, evento) => {
           const arrastado = evento as DragEvent
-          const arquivos = [...(arrastado.dataTransfer?.files ?? [])].filter((a) =>
-            TIPOS_DE_IMAGEM.includes(a.type),
-          )
-          if (arquivos.length === 0) return false
+          const arquivos = [...(arrastado.dataTransfer?.files ?? [])]
+          if (!algumAceito(arquivos)) return false
           evento.preventDefault()
           void inserirArquivos(arquivos)
           return true
@@ -256,11 +295,39 @@ export const EditorDeNota = React.forwardRef<EditorDeNotaRef, Props>(function Ed
       setSubindo(true)
       try {
         for (const arquivo of arquivos) {
-          const { caminho, url } = await onSubirImagem(arquivo)
-          editor.chain().focus().setImage({ src: url, alt: arquivo.name }).run()
-          // O setImage não aceita atributos extras: o anexo entra logo depois,
-          // no nó recém-criado, que é onde a seleção está.
-          editor.commands.updateAttributes('image', { anexo: caminho })
+          /*
+           * Um arquivo que falha não derruba os outros.
+           *
+           * Arrastar cinco PDFs e perder os cinco porque o terceiro passou do
+           * limite é o pior desfecho possível: os quatro bons já tinham
+           * subido. Cada um é tratado por si, e o que não entrou vira um aviso
+           * nomeando o arquivo.
+           */
+          try {
+            if (TIPOS_DE_IMAGEM.includes(arquivo.type)) {
+              const { caminho, url } = await onSubirImagem(arquivo)
+              editor.chain().focus().setImage({ src: url, alt: arquivo.name }).run()
+              // O setImage não aceita atributos extras: o anexo entra logo
+              // depois, no nó recém-criado, que é onde a seleção está.
+              editor.commands.updateAttributes('image', { anexo: caminho })
+              continue
+            }
+
+            if (ehDocumentoAceito(arquivo)) {
+              const { caminho, nome, tipo, tamanho } = await subirDocumentoRef.current(arquivo)
+              // `caminho` vira `anexo` aqui: a biblioteca fala em caminho de
+              // bucket, e o nó do editor usa o mesmo nome de atributo que a
+              // imagem já usa (`data-anexo`), para o HTML salvo ser coerente.
+              editor.chain().focus().inserirDocumento({ anexo: caminho, nome, tipo, tamanho }).run()
+              continue
+            }
+
+            falhaRef.current(`"${arquivo.name}" não é um tipo de arquivo aceito aqui.`)
+          } catch (erro) {
+            falhaRef.current(
+              erro instanceof Error ? erro.message : `Não consegui anexar "${arquivo.name}".`,
+            )
+          }
         }
       } finally {
         setSubindo(false)
@@ -287,6 +354,7 @@ export const EditorDeNota = React.forwardRef<EditorDeNotaRef, Props>(function Ed
         editor={editor}
         subindo={subindo}
         onImagem={() => entradaRef.current?.click()}
+        onDocumento={() => entradaDocRef.current?.click()}
         onLigacao={onInserirLigacao}
       />
 
@@ -298,6 +366,29 @@ export const EditorDeNota = React.forwardRef<EditorDeNotaRef, Props>(function Ed
         ref={entradaRef}
         type="file"
         accept={TIPOS_DE_IMAGEM.join(',')}
+        multiple
+        className="hidden"
+        onChange={(evento) => {
+          void inserirArquivos([...(evento.target.files ?? [])])
+          evento.target.value = ''
+        }}
+      />
+
+      {/*
+        `accept` lista os tipos E as extensões.
+
+        Só os tipos não basta: o Windows manda `File.type` vazio para vários
+        documentos, e o seletor de arquivos esconderia justamente os que a
+        pessoa quer anexar. Com a extensão na lista, eles aparecem.
+      */}
+      <input
+        ref={entradaDocRef}
+        type="file"
+        accept={[
+          ...TIPOS_DE_DOCUMENTO,
+          '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+          '.rtf', '.zip', '.json', '.txt', '.csv', '.md',
+        ].join(',')}
         multiple
         className="hidden"
         onChange={(evento) => {

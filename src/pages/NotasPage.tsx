@@ -34,7 +34,13 @@ import {
   useNotas,
   useSalvarNota,
 } from '@/hooks/useNotas'
-import { paraArmazenamento, paraExibicao, subirAnexo, urlAssinada } from '@/lib/notasAnexos'
+import {
+  paraArmazenamento,
+  paraExibicao,
+  subirAnexo,
+  subirDocumento,
+  urlAssinada,
+} from '@/lib/notasAnexos'
 import { chaveDoTitulo, ligacoesDe, tituloDoConteudo } from '@/lib/notasLinks'
 import type { CanvasDados } from '@/types/database'
 
@@ -227,6 +233,25 @@ export default function NotasPage() {
     },
     [user],
   )
+
+  /*
+   * Documento não pede URL assinada aqui, e é por isso que esta função é
+   * menor que a da imagem.
+   *
+   * A imagem precisa de uma URL para aparecer no editor. O cartão do
+   * documento se desenha com nome, tipo e tamanho, e só pede a assinatura
+   * quando alguém clica em abrir ou baixar — que é quando ela ainda está
+   * válida. Uma URL pedida agora expiraria em uma hora dentro de uma nota que
+   * fica guardada para sempre.
+   */
+  const anexarDocumento = React.useCallback(
+    (arquivo: File) => subirDocumento(user!.id, arquivo),
+    [user],
+  )
+
+  const avisarFalhaDeAnexo = React.useCallback((mensagem: string) => {
+    toast({ variant: 'destructive', title: 'Não consegui anexar', description: mensagem })
+  }, [])
 
   async function trocarDeNota(id: string) {
     if (id === selecionada) return
@@ -554,6 +579,8 @@ export default function NotasPage() {
                 conteudoInicial={preparado.html}
                 onChange={aoMudarTexto}
                 onSubirImagem={subirImagem}
+                onSubirDocumento={anexarDocumento}
+                onFalhaDeAnexo={avisarFalhaDeAnexo}
                 onInserirLigacao={() => setSeletorAberto(true)}
               />
 

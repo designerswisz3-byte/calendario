@@ -453,6 +453,33 @@
   padding-left: 1.2rem;
 }
 
+/*
+ * O documento anexado, no papel.
+ *
+ * No PDF não há botão de abrir nem de baixar — o que resta é dizer que o
+ * anexo existe e qual é o nome dele. Sem esta regra o nome sairia como um
+ * parágrafo solto no meio do texto, indistinguível de uma frase da nota, e
+ * quem lesse a impressão não saberia que ali havia um arquivo.
+ *
+ * O nome vem do texto dentro da div, escrito por `renderHTML` em
+ * documentoAnexado.ts justamente para este caso.
+ */
+.impressao-da-nota [data-documento] {
+  display: flex;
+  gap: 0.4rem;
+  border: 1pt solid #ccc;
+  border-radius: 4pt;
+  padding: 0.4rem 0.6rem;
+  font-size: 10pt;
+  page-break-inside: avoid;
+}
+
+.impressao-da-nota [data-documento]::before {
+  content: 'Anexo:';
+  font-weight: 600;
+  color: #666;
+}
+
 .impressao-da-nota ul {
   list-style: disc;
 }
