@@ -431,6 +431,23 @@ export type StorySequenciaRow = {
   atualizado_em: string
 }
 
+/**
+ * Uma referência visual da aba Stories.
+ *
+ * Só imagem e uma linha, de propósito: não é conteúdo planejado, é insumo. Por
+ * isso não tem data e não entra na grade — o banco inteiro é a gaveta dela.
+ */
+export type StoryReferenciaRow = {
+  id: string
+  user_id: string
+  /** Caminho no bucket `canvas`, nunca uma URL: ela expira, a linha não. */
+  caminho: string
+  /** O que a imagem mostra, em uma linha. É o que o gerador lê como objeto. */
+  legenda: string
+  criado_em: string
+  atualizado_em: string
+}
+
 export type StorySequenciaEntrada = Pick<
   StorySequenciaRow,
   'data' | 'titulo' | 'tema_id' | 'arco_id' | 'stories' | 'observacao'
@@ -518,6 +535,17 @@ export interface Database {
           atualizado_em?: string
         }
         Update: Partial<Omit<NotaRow, 'id' | 'user_id'>>
+        Relationships: []
+      }
+      stories_referencias: {
+        Row: StoryReferenciaRow
+        Insert: Omit<StoryReferenciaRow, 'id' | 'criado_em' | 'atualizado_em' | 'legenda'> & {
+          id?: string
+          criado_em?: string
+          atualizado_em?: string
+          legenda?: string
+        }
+        Update: Partial<Omit<StoryReferenciaRow, 'id' | 'user_id'>>
         Relationships: []
       }
       stories_sequencias: {

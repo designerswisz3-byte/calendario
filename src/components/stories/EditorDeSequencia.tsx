@@ -19,6 +19,7 @@ import {
   type DispositivoId,
 } from '@/lib/stories/dispositivos'
 import { MedidorDeTriade } from '@/components/stories/MedidorDeTriade'
+import { sequenciaSalvaEmTexto } from '@/lib/stories/texto'
 import { cn } from '@/lib/utils'
 import type { StoryDaSequencia } from '@/types/database'
 
@@ -98,23 +99,7 @@ export function EditorDeSequencia({ titulo, stories, observacao, onTitulo, onSto
   }
 
   async function copiarTudo() {
-    const texto = [
-      titulo,
-      '',
-      ...stories.flatMap((story) => [
-        story.momento ? `${story.rotulo} — publicar: ${story.momento}` : story.rotulo,
-        `(${story.direcao_visual})`,
-        '',
-        story.texto,
-        // O pedido entra no texto copiado porque é informação de gravação: sem
-        // ele, quem cola a sequência no bloco de notas perde a enquete, a
-        // tarja e a palavra que a pessoa tem de mandar.
-        ...(story.pedido ? ['', `▸ Pedido — ${story.pedido}`] : []),
-        ...(story.depois_do_pedido ? [`▸ Depois — ${story.depois_do_pedido}`] : []),
-        '',
-      ]),
-      observacao,
-    ].join('\n')
+    const texto = sequenciaSalvaEmTexto(titulo, stories, observacao)
     try {
       await navigator.clipboard.writeText(texto)
       setCopiado(true)

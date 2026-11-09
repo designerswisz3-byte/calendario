@@ -9,11 +9,15 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { ChevronLeft, ChevronRight, Clapperboard } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clapperboard, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { CartaoDeSequencia } from '@/components/stories/CartaoDeSequencia'
+import { ConteudoDaSequencia } from '@/components/stories/ConteudoDaSequencia'
+import { BancoDeReferencias } from '@/components/stories/BancoDeReferencias'
+import { sequenciaSalvaEmTexto } from '@/lib/stories/texto'
+import { VisorDaGaveta } from '@/components/gaveta/VisorDaGaveta'
 import { Gaveta } from '@/components/gaveta/Gaveta'
 import { GradeDeStories } from '@/components/stories/GradeDeStories'
 import {
@@ -37,6 +41,12 @@ import { useAuth } from '@/components/auth/AuthProvider'
 import { useCalendarItems } from '@/hooks/useCalendarItems'
 import { useEventos } from '@/hooks/useEventos'
 import { useNoticias } from '@/hooks/useNoticias'
+import {
+  useExcluirReferencia,
+  useReferencias,
+  useSalvarLegendaDaReferencia,
+  useSubirReferencia,
+} from '@/hooks/useReferencias'
 import {
   useCriarSequencia,
   useExcluirSequencia,
@@ -67,6 +77,65 @@ export default function StoriesPage() {
   // então abrir Stories depois do Calendário não vai ao banco de novo.
   const { data: postagens = [] } = useCalendarItems(referencia)
   const { data: gaveta = [] } = useGavetaDeStories()
+  /*
+   * A sequência aberta para leitura, guardada por ID e não por objeto: pelo
+   * objeto, o modal mostraria a cópia congelada no clique, e devolver a ideia
+   * para hoje enquanto ela está aberta não se refletiria na tela.
+   */
+  const [sequenciaAberta, setSequenciaAberta] = React.useState<string | null>(null)
+  // Sai da gaveta ATUAL: some sozinha quando a sequência deixa a gaveta.
+  const daGavetaAberta = gaveta.find((s) => s.id === sequenciaAberta) ?? null
+  const [copiada, setCopiada] = React.useState(false)
+
+  /* ---------------------------------------------------- referências ------ */
+  /*
+   * `banco`, e não `referencias`: neste arquivo `referencia` já é o MÊS de
+   * referência da grade, e duas coisas com nomes a uma letra de distância no
+   * mesmo componente é uma troca esperando acontecer na próxima edição.
+   */
+  const { data: banco = [], isLoading: carregandoBanco } = useReferencias()
+  const subirReferencia = useSubirReferencia()
+  const legendaDaReferencia = useSalvarLegendaDaReferencia()
+  const excluirReferencia = useExcluirReferencia()
+
+  async function aoSubirReferencias(arquivos: File[]) {
+    /*
+     * Uma imagem que falha não derruba as outras do mesmo lote.
+     *
+     * Colar três prints e perder os três porque o segundo estourou o limite do
+     * bucket é o pior desfecho: dois já tinham subido. Cada um é tratado por
+     * si, e o que não entrou vira um aviso nomeando o problema.
+     */
+    for (const arquivo of arquivos) {
+      try {
+        await subirReferencia.mutateAsync({ arquivo })
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Não consegui salvar a referência',
+          description: errorMessage(error),
+        })
+      }
+    }
+  }
+
+  async function copiarSequencia(sequencia: StorySequenciaRow) {
+    try {
+      await navigator.clipboard.writeText(
+        sequenciaSalvaEmTexto(sequencia.titulo, sequencia.stories ?? [], sequencia.observacao),
+      )
+      setCopiada(true)
+      setTimeout(() => setCopiada(false), 1800)
+    } catch {
+      // Área de transferência bloqueada pelo navegador. O texto continua à
+      // vista no visor, então falhar aqui não impede ninguém de nada.
+      toast({
+        variant: 'destructive',
+        title: 'Não consegui copiar',
+        description: 'O navegador bloqueou o acesso à área de transferência.',
+      })
+    }
+  }
   const guardar = useGuardarSequencia()
   const [arrastando, setArrastando] = React.useState<StorySequenciaRow | null>(null)
   const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -371,6 +440,16 @@ export default function StoriesPage() {
             />
           </div>
 
+          {/*
+            Gaveta e Referências empilham numa coluna só.
+
+            Soltas como irmãs do container, elas viravam a segunda e a terceira
+            COLUNA do `xl:flex-row` — ficavam lado a lado, e a grade do mês
+            encolhia para caber as duas. Aqui elas dividem a mesma faixa
+            lateral, uma embaixo da outra, e a largura fixa sai desta coluna em
+            vez de cada painel carregar a sua.
+          */}
+          <div className="flex w-full shrink-0 flex-col gap-3 xl:w-56">
           <Gaveta
             id="gaveta-stories"
             titulo="Ideias soltas"
@@ -379,7 +458,17 @@ export default function StoriesPage() {
           >
             {gaveta.map((sequencia) => (
               <div key={sequencia.id} className="space-y-0.5">
-                <CartaoDeSequencia sequencia={sequencia} />
+                {/*
+                  * O clique abre a LEITURA, não o painel do dia.
+                  *
+                  * O painel mostra um dia, e esta sequência não está em dia
+                  * nenhum — saiu da grade ao ser guardada. O visor mostra o
+                  * que está escrito e deixa a decisão para depois de ler.
+                  */}
+                <CartaoDeSequencia
+                  sequencia={sequencia}
+                  onClick={() => setSequenciaAberta(sequencia.id)}
+                />
                 <div className="flex items-center gap-1 pl-1">
                   <span className="text-[0.6rem] text-muted-foreground">
                     de {formatShortDate(sequencia.data)}
@@ -395,6 +484,42 @@ export default function StoriesPage() {
               </div>
             ))}
           </Gaveta>
+
+          {/*
+            Referências ficam embaixo da gaveta, na mesma coluna.
+            São o outro insumo de quem grava story: a gaveta guarda o que
+            ESCREVER, isto guarda o que OLHAR enquanto escreve.
+          */}
+          <BancoDeReferencias
+            referencias={banco}
+            carregando={carregandoBanco}
+            subindo={subirReferencia.isPending}
+            onSubir={(arquivos) => void aoSubirReferencias(arquivos)}
+            onLegenda={(id, legenda) =>
+              legendaDaReferencia.mutate(
+                { id, legenda },
+                {
+                  onError: (erro: unknown) =>
+                    toast({
+                      variant: 'destructive',
+                      title: 'Não consegui salvar a legenda',
+                      description: errorMessage(erro),
+                    }),
+                },
+              )
+            }
+            onExcluir={(referencia) =>
+              excluirReferencia.mutate(referencia, {
+                onError: (erro: unknown) =>
+                  toast({
+                    variant: 'destructive',
+                    title: 'Não consegui excluir a referência',
+                    description: errorMessage(erro),
+                  }),
+              })
+            }
+          />
+          </div>
         </div>
 
         <DragOverlay dropAnimation={null}>
@@ -435,6 +560,34 @@ export default function StoriesPage() {
         onImagem={aoSubirImagem}
         onRemoverImagem={() => alterar({ imagemCaminho: null, imagemDescricao: '' })}
       />
+
+      {/* ---------- Leitura de uma sequência guardada ---------- */}
+      {daGavetaAberta && (
+        <VisorDaGaveta
+          aberto
+          onFechar={() => setSequenciaAberta(null)}
+          titulo={daGavetaAberta.titulo || 'Sequência sem título'}
+          guardadaDe={daGavetaAberta.data}
+          onUsarHoje={() => {
+            // Fecha ANTES de devolver: a sequência sai da gaveta e o visor
+            // perderia o conteúdo debaixo de si, piscando vazio por um quadro.
+            setSequenciaAberta(null)
+            void devolverParaHoje(daGavetaAberta.id)
+          }}
+          acoes={
+            <Button size="sm" variant="ghost" onClick={() => void copiarSequencia(daGavetaAberta)}>
+              {copiada ? (
+                <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+              ) : (
+                <Copy className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {copiada ? 'Copiada' : 'Copiar'}
+            </Button>
+          }
+        >
+          <ConteudoDaSequencia sequencia={daGavetaAberta} />
+        </VisorDaGaveta>
+      )}
     </div>
   )
 }

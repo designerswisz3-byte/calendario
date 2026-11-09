@@ -21,6 +21,8 @@ import { ListView } from '@/components/calendar/ListView'
 import { MonthGrid } from '@/components/calendar/MonthGrid'
 import { MonthProgress } from '@/components/calendar/MonthProgress'
 import { Gaveta } from '@/components/gaveta/Gaveta'
+import { VisorDaGaveta } from '@/components/gaveta/VisorDaGaveta'
+import { ConteudoDoItem } from '@/components/calendar/ConteudoDoItem'
 import { LegendaDeEventos } from '@/components/calendar/LegendaDeEventos'
 import { Teleprompter } from '@/components/calendar/Teleprompter'
 import { toast } from '@/components/ui/use-toast'
@@ -42,6 +44,7 @@ import {
   useMoveCalendarItem,
 } from '@/hooks/useCalendarItems'
 import { TYPE_LABEL } from '@/lib/constants'
+import { tituloDoItem } from '@/lib/texto'
 import { useTags } from '@/hooks/useTags'
 import { useEventos, useImportarCatalogo } from '@/hooks/useEventos'
 import { eventosPorDia } from '@/lib/eventos'
@@ -57,6 +60,14 @@ export default function CalendarPage() {
   const [openDayKey, setOpenDayKey] = React.useState<string | null>(null)
   const [dragging, setDragging] = React.useState<CalendarItemWithRelations | null>(null)
   const [prompter, setPrompter] = React.useState<CalendarItemWithRelations | null>(null)
+  /*
+   * A ideia aberta para leitura, guardada por ID e não por objeto.
+   *
+   * Pelo objeto, o modal mostraria a cópia congelada no clique: devolver a
+   * ideia para hoje enquanto ela está aberta atualizaria a gaveta e não o que
+   * está na tela. Pelo id, o conteúdo sai sempre da lista atual.
+   */
+  const [ideiaAberta, setIdeiaAberta] = React.useState<string | null>(null)
   // De onde o teleprompter foi aberto, para devolver o painel ao fechar.
   const diaAntesDoPrompter = React.useRef<string | null>(null)
 
@@ -178,6 +189,15 @@ export default function CalendarPage() {
    * arrasto nenhum, e mesmo no desktop arrastar da gaveta até um dia
    * específico é um gesto chato quando a resposta é "é para hoje".
    */
+  /*
+   * O item aberto sai da gaveta ATUAL, a cada render.
+   *
+   * Some sozinho quando a ideia deixa a gaveta — devolvida aqui, arrastada
+   * para um dia, ou apagada noutra aba. Guardar o objeto no estado deixaria o
+   * modal aberto mostrando uma ideia que não está mais lá.
+   */
+  const itemDaGavetaAberto = gaveta.find((item) => item.id === ideiaAberta) ?? null
+
   async function devolverParaHoje(item: CalendarItemWithRelations) {
     try {
       await guardar.mutateAsync({ id: item.id, guardar: false, data: todayKey() })
@@ -386,12 +406,18 @@ export default function CalendarPage() {
               {gaveta.map((item) => (
                 <div key={item.id} className="space-y-0.5">
                   {/*
-                    * Sem onClick: a gaveta é guarda, não é edição. Abrir o
-                    * painel do dia antigo mostraria um dia que não tem este
-                    * item (ele saiu da grade). Para mexer na ideia, devolva
-                    * primeiro — arrastando para um dia ou pelo botão.
+                    * O clique ABRE a leitura, não o painel do dia.
+                    *
+                    * O painel do dia seria a escolha errada e por um motivo
+                    * concreto: ele mostra um dia, e este item não está em dia
+                    * nenhum — saiu da grade quando foi guardado. Abriria um dia
+                    * antigo sem o item dentro.
+                    *
+                    * O visor mostra o que está escrito e deixa a decisão para
+                    * depois da leitura. A gaveta continua sendo guarda: para
+                    * EDITAR, a ideia volta para um dia.
                     */}
-                  <CalendarItemCard item={item} />
+                  <CalendarItemCard item={item} onClick={() => setIdeiaAberta(item.id)} />
                   <div className="flex items-center gap-1 pl-1">
                     <span className="text-[0.6rem] text-muted-foreground">
                       de {formatShortDate(item.data)}
@@ -451,6 +477,24 @@ export default function CalendarPage() {
             : undefined
         }
       />
+
+      {/* ---------- Leitura de uma ideia guardada ---------- */}
+      {itemDaGavetaAberto && (
+        <VisorDaGaveta
+          aberto
+          onFechar={() => setIdeiaAberta(null)}
+          titulo={tituloDoItem(itemDaGavetaAberto, TYPE_LABEL[itemDaGavetaAberto.tipo])}
+          guardadaDe={itemDaGavetaAberto.data}
+          onUsarHoje={() => {
+            // Fecha ANTES de devolver: a ideia sai da gaveta e o visor
+            // perderia o item debaixo de si, piscando vazio por um quadro.
+            setIdeiaAberta(null)
+            void devolverParaHoje(itemDaGavetaAberto)
+          }}
+        >
+          <ConteudoDoItem item={itemDaGavetaAberto} />
+        </VisorDaGaveta>
+      )}
     </div>
   )
 }

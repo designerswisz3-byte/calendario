@@ -51,3 +51,23 @@ export function tituloDoItem(
 ) {
   return primeiraLinha(item.notas) || item.preview?.nome_expert || reserva
 }
+
+/**
+ * O briefing SEM a linha que já virou título.
+ *
+ * `tituloDoItem` usa a primeira linha não vazia do briefing como nome do item.
+ * Numa tela que mostra os dois — o título no cabeçalho e o briefing no corpo —
+ * essa linha aparecia duas vezes, uma embaixo da outra. Pior: num briefing de
+ * uma linha só, que é o caso mais comum quando a ideia nasce de um impulso, o
+ * corpo inteiro era a repetição do cabeçalho.
+ *
+ * Devolve string vazia quando não sobra nada — e aí quem chama diz que não há
+ * briefing escrito, que é a verdade.
+ */
+export function briefingSemOTitulo(notas: string | null | undefined) {
+  const texto = notas ?? ''
+  const linhas = texto.split('\n')
+  const primeira = linhas.findIndex((linha) => linha.trim())
+  if (primeira === -1) return ''
+  return linhas.slice(primeira + 1).join('\n').trim()
+}

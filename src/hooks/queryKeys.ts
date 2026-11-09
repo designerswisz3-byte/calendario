@@ -17,6 +17,7 @@ export const queryKeys = {
   eventos: (de: string, ate: string) => ['eventos', de, ate] as const,
   storiesDoMes: (de: string, ate: string) => ['stories', de, ate] as const,
   gavetaDeStories: () => ['stories', 'gaveta'] as const,
+  referenciasDeStories: () => ['stories', 'referencias'] as const,
   noticias: () => ['noticias'] as const,
   relatorioPerfis: () => ['relatorio', 'perfis'] as const,
   relatorioMetricas: (perfilId: string) => ['relatorio', 'metricas', perfilId] as const,
