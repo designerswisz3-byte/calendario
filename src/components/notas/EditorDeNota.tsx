@@ -3,6 +3,7 @@ import {
   EditorContent,
   ReactNodeViewRenderer,
   useEditor,
+  useEditorState,
   type Editor,
 } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -10,6 +11,7 @@ import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
+import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details'
 import {
   Bold,
   CheckSquare,
@@ -18,6 +20,7 @@ import {
   Italic,
   Link2,
   List,
+  ListCollapse,
   ListOrdered,
   Loader2,
   Paperclip,
@@ -126,6 +129,11 @@ function BotaoDaBarra({
   )
 }
 
+/** O cursor está no título (e não no conteúdo) de uma lista recolhível? */
+function noTituloDaLista(editor: Editor): boolean {
+  return editor.state.selection.$from.parent.type.name === 'detailsSummary'
+}
+
 function Barra({
   editor,
   onImagem,
@@ -139,6 +147,36 @@ function Barra({
   onLigacao: () => void
   subindo: boolean
 }) {
+  /*
+   * A barra se inscreve no estado do editor, em vez de ler `editor.isActive`
+   * solto no render.
+   *
+   * O editor não redesenha o React a cada transação — e não deve, seria um
+   * render por tecla na página inteira. O efeito colateral é que a barra só se
+   * atualizava quando alguma OUTRA coisa a redesenhava: mover o cursor para
+   * dentro de um negrito não acendia o botão de negrito, e entrar no título de
+   * uma lista recolhível não trocava o rótulo do botão para "Desfazer".
+   *
+   * `useEditorState` redesenha só a barra, e só quando o valor devolvido muda.
+   * A chave é uma string de propósito: comparar texto é mais barato e mais
+   * seguro do que comparar um objeto novo a cada transação.
+   */
+  const noTitulo = useEditorState({
+    editor,
+    selector: ({ editor: atual }) =>
+      [
+        atual.isActive('heading', { level: 2 }),
+        atual.isActive('bold'),
+        atual.isActive('italic'),
+        atual.isActive('strike'),
+        atual.isActive('bulletList'),
+        atual.isActive('orderedList'),
+        atual.isActive('taskList'),
+        atual.isActive('details'),
+        noTituloDaLista(atual),
+      ].join(),
+  }).endsWith('true')
+
   return (
     <div className="flex flex-wrap items-center gap-0.5 border-b border-border/60 px-2 py-1.5">
       <BotaoDaBarra
@@ -192,6 +230,31 @@ function Barra({
         onClick={() => editor.chain().focus().toggleTaskList().run()}
       >
         <CheckSquare className="h-4 w-4" />
+      </BotaoDaBarra>
+      {/*
+        O que o botão faz depende de ONDE está o cursor, e são três casos:
+
+         · fora de uma lista recolhível: cria uma, envolvendo o que estiver
+           selecionado. O texto vira o conteúdo e o cursor vai para o título;
+         · no TÍTULO de uma: desfaz aquela lista. Título e conteúdo voltam a
+           ser parágrafos comuns, sem perder texto;
+         · no CONTEÚDO de uma: cria outra lista ali dentro.
+
+        A primeira versão desfazia sempre que o cursor estava dentro de uma
+        lista, como os outros botões da barra fazem. O teste de navegador
+        mostrou o custo: ficava impossível pôr uma lista dentro da outra, que
+        é metade da utilidade de uma lista recolhível.
+      */}
+      <BotaoDaBarra
+        titulo={noTitulo ? 'Desfazer lista recolhível' : 'Lista recolhível (toggle)'}
+        ativo={editor.isActive('details')}
+        onClick={() =>
+          noTituloDaLista(editor)
+            ? editor.chain().focus().unsetDetails().run()
+            : editor.chain().focus().setDetails().run()
+        }
+      >
+        <ListCollapse className="h-4 w-4" />
       </BotaoDaBarra>
 
       <span className="mx-1 h-5 w-px bg-border" />
@@ -258,8 +321,50 @@ export const EditorDeNota = React.forwardRef<EditorDeNotaRef, Props>(function Ed
         DocumentoAnexado,
         TaskList,
         TaskItem.configure({ nested: true }),
+        /*
+         * A lista recolhível (toggle), no HTML nativo `<details>`.
+         *
+         * `persist: true` grava no documento se cada uma está aberta ou
+         * fechada. Sem isso, toda nota reabriria com tudo recolhido — e quem
+         * organiza uma nota em seções quer encontrá-la como deixou, com as
+         * três que estava usando abertas e as outras dez fechadas.
+         *
+         * Por ser `<details>` de verdade no HTML salvo, a nota continua
+         * legível fora do editor: o navegador sabe abrir e fechar sozinho.
+         */
+        Details.configure({
+          persist: true,
+          HTMLAttributes: { class: 'toggle-da-nota' },
+          // O rótulo do botão em português, para leitor de tela. O padrão da
+          // biblioteca é em inglês.
+          renderToggleButton: ({ element, isOpen }) => {
+            element.setAttribute('aria-label', isOpen ? 'Recolher' : 'Expandir')
+            element.setAttribute('aria-expanded', String(isOpen))
+          },
+        }),
+        DetailsSummary,
+        DetailsContent,
         Placeholder.configure({
-          placeholder: 'Comece pelo título. A primeira linha nomeia a nota.',
+          /*
+           * `includeChildren` faz o texto de ajuda valer também para blocos
+           * aninhados — sem ele, o título vazio de uma lista recolhível não
+           * mostraria nada, e uma linha vazia com uma setinha do lado não diz
+           * a ninguém que ali se escreve.
+           */
+          includeChildren: true,
+          /*
+           * O padrão marca como vazio só o bloco onde o cursor está. Para o
+           * título da lista isso não serve: uma lista criada e deixada sem
+           * título viraria uma seta solta na nota assim que o cursor saísse
+           * dali. Marcando todos os vazios, o texto de ajuda fica até alguém
+           * escrever. Parágrafo vazio comum não ganha texto nenhum com isso —
+           * o CSS só desenha a ajuda no editor vazio e no título de lista.
+           */
+          showOnlyCurrent: false,
+          placeholder: ({ node }) =>
+            node.type.name === 'detailsSummary'
+              ? 'Título da lista'
+              : 'Comece pelo título. A primeira linha nomeia a nota.',
         }),
       ],
       content: conteudoInicial,

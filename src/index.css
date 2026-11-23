@@ -363,6 +363,78 @@
     content: attr(data-placeholder);
     @apply pointer-events-none float-left h-0 text-muted-foreground;
   }
+
+  /* --------------------------------------------------------------------------
+     Lista recolhível (toggle)
+     --------------------------------------------------------------------------
+     No editor, a extensão NÃO desenha um <details>: desenha
+
+       div[data-type='details']            ← a caixa (ganha .is-open aberta)
+         > button                          ← a setinha
+         > div                             ← título + conteúdo
+             > summary
+             > div[data-type='detailsContent'][hidden]
+
+     porque o <details> nativo engole o clique no título, e aí não dá para pôr
+     o cursor ali para escrever. Só o HTML SALVO é <details> de verdade. Por
+     isso os seletores abaixo miram a div — mirar `details` não pega nada na
+     tela de edição. */
+  .prose-notas div[data-type='details'] {
+    @apply my-2 flex items-start gap-1;
+  }
+
+  /* A setinha. Alvo de clique de 24px mesmo com o desenho pequeno: é o único
+     controle da lista, e num celular um alvo do tamanho do desenho se erra. */
+  .prose-notas div[data-type='details'] > button {
+    @apply mt-px flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground;
+  }
+
+  .prose-notas div[data-type='details'] > button::before {
+    content: '';
+    /* Triângulo em CSS, e não um caractere: "▸" muda de tamanho e de altura
+       de fonte para fonte, e ficaria desalinhado do título em metade dos
+       sistemas. */
+    border-style: solid;
+    border-width: 0.3rem 0 0.3rem 0.45rem;
+    border-color: transparent transparent transparent currentColor;
+    transition: transform 150ms ease;
+  }
+
+  .prose-notas div[data-type='details'].is-open > button::before {
+    transform: rotate(90deg);
+  }
+
+  .prose-notas div[data-type='details'] > div {
+    @apply min-w-0 flex-1;
+  }
+
+  /* `list-style: none` tira o marcador nativo do <summary>, que apareceria
+     como uma SEGUNDA setinha ao lado da nossa. */
+  .prose-notas div[data-type='details'] summary {
+    @apply list-none font-medium leading-6;
+  }
+
+  .prose-notas div[data-type='details'] summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* Título vazio: diz que ali se escreve. Uma linha em branco com uma seta do
+     lado não se explica sozinha. */
+  .prose-notas div[data-type='details'] summary.is-empty::before {
+    content: attr(data-placeholder);
+    @apply pointer-events-none float-left h-0 font-normal text-muted-foreground;
+  }
+
+  .prose-notas div[data-type='detailsContent'] {
+    @apply mt-1 space-y-2;
+  }
+
+  /* O `hidden` precisa ganhar do `space-y` e de qualquer display que o
+     conteúdo herde: sem o !important, uma lista fechada continuaria ocupando
+     espaço em alguns navegadores. */
+  .prose-notas div[data-type='detailsContent'][hidden] {
+    display: none !important;
+  }
 }
 
 /* ============================================================================
@@ -464,6 +536,37 @@
  * O nome vem do texto dentro da div, escrito por `renderHTML` em
  * documentoAnexado.ts justamente para este caso.
  */
+/*
+ * Lista recolhível, no papel.
+ *
+ * O HTML salvo é <details> nativo, e na impressão ele chega sempre com `open`
+ * (ver `abrirListasParaImprimir` em ImpressaoDaNota): papel não tem clique, e
+ * uma lista impressa fechada é conteúdo que sumiu do PDF sem avisar.
+ */
+.impressao-da-nota details {
+  margin-top: 0.6rem;
+  page-break-inside: avoid;
+}
+
+.impressao-da-nota details > summary {
+  font-weight: 600;
+  list-style: none;
+}
+
+.impressao-da-nota details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.impressao-da-nota details > [data-type='detailsContent'] {
+  margin-top: 0.3rem;
+  padding-left: 0.9rem;
+  border-left: 1pt solid #ccc;
+}
+
+.impressao-da-nota details > [data-type='detailsContent'] > * + * {
+  margin-top: 0.4rem;
+}
+
 .impressao-da-nota [data-documento] {
   display: flex;
   gap: 0.4rem;

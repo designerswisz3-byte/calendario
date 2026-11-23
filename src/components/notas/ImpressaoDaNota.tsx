@@ -32,6 +32,24 @@ interface Props {
  * A classe `area-de-impressao` é o que a regra de @media print procura para
  * esconder o app em volta — é compartilhada com a impressão do Relatório.
  */
+/**
+ * Abre todas as listas recolhíveis antes de imprimir.
+ *
+ * O HTML salvo guarda cada `<details>` aberto ou fechado, do jeito que a pessoa
+ * deixou. Na tela isso é o comportamento certo. No papel, uma lista fechada é
+ * conteúdo que some do PDF sem deixar rastro — quem recebe a impressão vê só o
+ * título e não tem como clicar.
+ *
+ * Só a cópia que vai para a impressão é alterada: a nota guardada continua com
+ * cada lista no estado em que estava.
+ */
+export function abrirListasParaImprimir(html: string): string {
+  if (!html.includes('<details')) return html
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+  for (const lista of doc.querySelectorAll('details')) lista.setAttribute('open', '')
+  return doc.body.innerHTML
+}
+
 export function ImpressaoDaNota({ conteudo, onConcluido }: Props) {
   const areaRef = React.useRef<HTMLDivElement>(null)
 
@@ -84,7 +102,10 @@ export function ImpressaoDaNota({ conteudo, onConcluido }: Props) {
         marcas que registramos, então não há caminho para marcação arbitrária
         entrar aqui. É conteúdo do dono da nota, para o PDF do dono da nota.
       */}
-      <div className="impressao-corpo" dangerouslySetInnerHTML={{ __html: conteudo.html }} />
+      <div
+        className="impressao-corpo"
+        dangerouslySetInnerHTML={{ __html: abrirListasParaImprimir(conteudo.html) }}
+      />
 
       {conteudo.desenho && (
         <div className="impressao-desenho">

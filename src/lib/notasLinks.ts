@@ -27,7 +27,13 @@ export function chaveDoTitulo(titulo: string) {
  * duplicaria texto de bloco aninhado, tipo <li><p>…</p></li>).
  */
 function texto(html: string) {
-  const comQuebras = html.replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr)\s*>/gi, '\n</$1>')
+  // `summary` está na lista por causa da lista recolhível: sem ele, uma nota
+  // que começa com um toggle teria o título do toggle GRUDADO na primeira
+  // linha do conteúdo — "ComprasLeite", e esse seria o nome da nota.
+  const comQuebras = html.replace(
+    /<\/(p|h[1-6]|li|blockquote|pre|div|tr|summary)\s*>/gi,
+    '\n</$1>',
+  )
   const doc = new DOMParser().parseFromString(`<body>${comQuebras}</body>`, 'text/html')
   return doc.body.textContent ?? ''
 }
