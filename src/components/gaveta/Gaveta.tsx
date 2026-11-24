@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core'
-import { Archive } from 'lucide-react'
+import { Archive, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -10,6 +10,18 @@ interface Props {
   explicacao: string
   quantidade: number
   children: React.ReactNode
+  /**
+   * Qual gaveta é esta, para a página saber onde o item foi solto.
+   *
+   * O calendário tem duas (ideias soltas e roteiros prontos), e as duas são
+   * alvos de soltura ao mesmo tempo. Sem este rótulo viajando junto com o
+   * evento, a página saberia que caiu "numa gaveta" e não em qual.
+   */
+  tipo?: string
+  icone?: LucideIcon
+  /** Como se chama uma unidade do que mora aqui. Vai para o leitor de tela. */
+  unidade?: [singular: string, plural: string]
+  className?: string
 }
 
 /**
@@ -25,20 +37,31 @@ interface Props {
  * se ela estiver visível enquanto o mês é planejado. Gaveta em outra aba é
  * gaveta que ninguém abre.
  */
-export function Gaveta({ id, titulo, explicacao, quantidade, children }: Props) {
-  const { setNodeRef, isOver } = useDroppable({ id, data: { gaveta: true } })
+export function Gaveta({
+  id,
+  titulo,
+  explicacao,
+  quantidade,
+  children,
+  tipo = 'ideias',
+  icone: Icone = Archive,
+  unidade = ['ideia', 'ideias'],
+  className,
+}: Props) {
+  const { setNodeRef, isOver } = useDroppable({ id, data: { gaveta: true, tipo } })
 
   return (
     <aside
       ref={setNodeRef}
-      aria-label={`${titulo}, ${quantidade} ${quantidade === 1 ? 'ideia' : 'ideias'}`}
+      aria-label={`${titulo}, ${quantidade} ${quantidade === 1 ? unidade[0] : unidade[1]}`}
       className={cn(
         'flex w-full shrink-0 flex-col gap-2 rounded-lg border border-dashed border-border/70 bg-white/30 p-2.5 transition-all duration-200 xl:w-56 dark:bg-white/[0.03]',
         isOver && 'border-solid border-primary bg-accent/70 ring-2 ring-primary/40 dark:bg-accent/40',
+        className,
       )}
     >
       <header className="flex items-center gap-1.5">
-        <Archive className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <Icone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {titulo}
         </h3>

@@ -9,7 +9,15 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { CalendarDays, ChevronLeft, ChevronRight, List, Plus } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  MonitorPlay,
+  Plus,
+  ScrollText,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -44,12 +52,13 @@ import {
   useMoveCalendarItem,
 } from '@/hooks/useCalendarItems'
 import { TYPE_LABEL } from '@/lib/constants'
-import { tituloDoItem } from '@/lib/texto'
+import { resumoDoRoteiro, tituloDoItem } from '@/lib/texto'
+import { cn } from '@/lib/utils'
 import { useTags } from '@/hooks/useTags'
 import { useEventos, useImportarCatalogo } from '@/hooks/useEventos'
 import { eventosPorDia } from '@/lib/eventos'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import type { CalendarItemWithRelations } from '@/types/database'
+import type { CalendarItemWithRelations, TipoDeGaveta } from '@/types/database'
 
 type ViewMode = 'calendario' | 'lista'
 
@@ -93,6 +102,26 @@ export default function CalendarPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const { data: gaveta = [] } = useGavetaDoCalendario()
+  /*
+   * Uma busca, duas listas.
+   *
+   * As duas gavetas saem da mesma consulta (tudo que tem `na_gaveta`) e são
+   * separadas aqui. Duas consultas dobrariam as idas ao banco e criariam um
+   * instante, a cada arrasto entre elas, em que o item estaria nas duas ou em
+   * nenhuma.
+   *
+   * `gaveta` ausente vale ideias: é o que acontece com tudo que foi guardado
+   * antes de a segunda gaveta existir, e num banco que ainda não rodou a
+   * migração.
+   */
+  const ideiasSoltas = React.useMemo(
+    () => gaveta.filter((item) => (item.gaveta ?? 'ideias') === 'ideias'),
+    [gaveta],
+  )
+  const roteirosProntos = React.useMemo(
+    () => gaveta.filter((item) => item.gaveta === 'roteiros'),
+    [gaveta],
+  )
   const guardar = useGuardarNaGaveta()
 
   React.useEffect(() => {
@@ -219,6 +248,8 @@ export default function CalendarPage() {
     const alvo = event.over?.data.current
     const targetKey = alvo?.dateKey as string | undefined
     const paraGaveta = alvo?.gaveta === true
+    const destino: TipoDeGaveta = alvo?.tipo === 'roteiros' ? 'roteiros' : 'ideias'
+    const origem: TipoDeGaveta = item.gaveta ?? 'ideias'
 
     /*
      * Três destinos possíveis, e os dois que importam são os de ida e volta:
@@ -228,13 +259,31 @@ export default function CalendarPage() {
      * embaralharia a ordem da lista.
      */
     if (paraGaveta) {
-      if (item.na_gaveta) return
+      // Soltar na MESMA gaveta de onde saiu não faz nada. Entre as duas, move:
+      // é assim que a ideia que ganhou roteiro muda de lugar sem passar pela
+      // grade.
+      if (item.na_gaveta && origem === destino) return
       try {
-        await guardar.mutateAsync({ id: item.id, guardar: true })
-        toast({
-          title: 'Guardado nas ideias soltas',
-          description: 'Sai da grade e continua com briefing, roteiro e etiquetas.',
+        await guardar.mutateAsync({
+          id: item.id,
+          guardar: true,
+          // O campo só viaja quando é necessário: indo para os roteiros, ou
+          // voltando de lá para as ideias. Ver o porquê em useGuardarNaGaveta.
+          gaveta: destino === 'roteiros' || origem === 'roteiros' ? destino : undefined,
         })
+        toast(
+          destino === 'roteiros'
+            ? {
+                title: 'Guardado em roteiros prontos',
+                description: item.roteiro?.trim()
+                  ? 'Fica aqui até o dia de gravar. Clique para ler ou abrir no teleprompter.'
+                  : 'Este item ainda não tem roteiro escrito — só o briefing foi junto.',
+              }
+            : {
+                title: 'Guardado nas ideias soltas',
+                description: 'Sai da grade e continua com briefing, roteiro e etiquetas.',
+              },
+        )
       } catch (mutationError) {
         toast({
           variant: 'destructive',
@@ -397,42 +446,107 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <Gaveta
-              id="gaveta-calendario"
-              titulo="Ideias soltas"
-              explicacao="Arraste para cá o item que você não vai usar no dia. Ele sai da grade e fica guardado com briefing, roteiro e etiquetas. Para usar depois, arraste de volta para um dia."
-              quantidade={gaveta.length}
-            >
-              {gaveta.map((item) => (
-                <div key={item.id} className="space-y-0.5">
-                  {/*
-                    * O clique ABRE a leitura, não o painel do dia.
-                    *
-                    * O painel do dia seria a escolha errada e por um motivo
-                    * concreto: ele mostra um dia, e este item não está em dia
-                    * nenhum — saiu da grade quando foi guardado. Abriria um dia
-                    * antigo sem o item dentro.
-                    *
-                    * O visor mostra o que está escrito e deixa a decisão para
-                    * depois da leitura. A gaveta continua sendo guarda: para
-                    * EDITAR, a ideia volta para um dia.
-                    */}
-                  <CalendarItemCard item={item} onClick={() => setIdeiaAberta(item.id)} />
-                  <div className="flex items-center gap-1 pl-1">
-                    <span className="text-[0.6rem] text-muted-foreground">
-                      de {formatShortDate(item.data)}
-                    </span>
-                    <button
-                      type="button"
-                      className="ml-auto rounded px-1 text-[0.6rem] text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      onClick={() => devolverParaHoje(item)}
-                    >
-                      usar hoje
-                    </button>
+            {/*
+              As duas gavetas, lado a lado.
+
+              Ideias soltas guarda o que ainda NÃO está pronto; roteiros prontos
+              guarda o que só espera o dia de gravar. Juntas na mesma lista,
+              elas estragariam as duas perguntas que respondem: "o que eu gravo
+              hoje, se sobrar uma hora?" exigiria caçar os prontos no meio dos
+              rascunhos.
+
+              Abaixo de `xl` a grade já ocupa a largura toda, e as duas ficam
+              em duas colunas embaixo dela. De `xl` para cima viram uma faixa
+              lateral de largura fixa — mais estreita por gaveta do que a
+              gaveta única era, para a grade do mês não pagar a conta inteira.
+            */}
+            <div className="grid w-full shrink-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:w-[24rem] xl:items-start 2xl:w-[28rem]">
+              <Gaveta
+                id="gaveta-calendario"
+                titulo="Ideias soltas"
+                explicacao="Arraste para cá o item que você não vai usar no dia. Ele sai da grade e fica guardado com briefing, roteiro e etiquetas. Para usar depois, arraste de volta para um dia."
+                quantidade={ideiasSoltas.length}
+                className="xl:w-full"
+              >
+                {ideiasSoltas.map((item) => (
+                  <div key={item.id} className="space-y-0.5">
+                    {/*
+                      * O clique ABRE a leitura, não o painel do dia.
+                      *
+                      * O painel do dia seria a escolha errada e por um motivo
+                      * concreto: ele mostra um dia, e este item não está em
+                      * dia nenhum — saiu da grade quando foi guardado. Abriria
+                      * um dia antigo sem o item dentro.
+                      *
+                      * O visor mostra o que está escrito e deixa a decisão
+                      * para depois da leitura. A gaveta continua sendo guarda:
+                      * para EDITAR, a ideia volta para um dia.
+                      */}
+                    <CalendarItemCard item={item} onClick={() => setIdeiaAberta(item.id)} />
+                    <div className="flex items-center gap-1 pl-1">
+                      <span className="text-[0.6rem] text-muted-foreground">
+                        de {formatShortDate(item.data)}
+                      </span>
+                      <button
+                        type="button"
+                        className="ml-auto rounded px-1 text-[0.6rem] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                        onClick={() => devolverParaHoje(item)}
+                      >
+                        usar hoje
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </Gaveta>
+                ))}
+              </Gaveta>
+
+              <Gaveta
+                id="gaveta-roteiros"
+                tipo="roteiros"
+                icone={ScrollText}
+                unidade={['roteiro', 'roteiros']}
+                titulo="Roteiros prontos"
+                explicacao="Arraste para cá o item que já tem roteiro escrito e só espera o dia de gravar. Ele sai da grade e fica à mão. No dia, arraste de volta — ou abra direto no teleprompter."
+                quantidade={roteirosProntos.length}
+                className="xl:w-full"
+              >
+                {roteirosProntos.map((item) => {
+                  const resumo = resumoDoRoteiro(item.roteiro)
+                  return (
+                    <div key={item.id} className="space-y-0.5">
+                      <CalendarItemCard item={item} onClick={() => setIdeiaAberta(item.id)} />
+                      <div className="flex items-center gap-1 pl-1">
+                        {/*
+                          * O tamanho do roteiro no lugar da data de origem.
+                          *
+                          * Na gaveta de ideias a pergunta é "de quando é
+                          * isto?". Aqui é "cabe na hora que eu tenho hoje?" —
+                          * e quem responde é a duração, não a data.
+                          *
+                          * Sem roteiro, a linha diz isso em vez de ficar
+                          * vazia: nada impede guardar aqui um item só com
+                          * briefing, mas ele não pode se passar por pronto.
+                          */}
+                        <span
+                          className={cn(
+                            'truncate text-[0.6rem] text-muted-foreground',
+                            !resumo && 'text-amber-600 dark:text-amber-500',
+                          )}
+                        >
+                          {resumo || 'sem roteiro escrito'}
+                        </span>
+                        <button
+                          type="button"
+                          className="ml-auto shrink-0 rounded px-1 text-[0.6rem] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                          onClick={() => devolverParaHoje(item)}
+                        >
+                          gravar hoje
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </Gaveta>
+            </div>
           </div>
           <DragOverlay dropAnimation={null}>
             {dragging && (
@@ -485,6 +599,34 @@ export default function CalendarPage() {
           onFechar={() => setIdeiaAberta(null)}
           titulo={tituloDoItem(itemDaGavetaAberto, TYPE_LABEL[itemDaGavetaAberto.tipo])}
           guardadaDe={itemDaGavetaAberto.data}
+          gaveta={itemDaGavetaAberto.gaveta === 'roteiros' ? 'roteiros prontos' : 'ideias soltas'}
+          acoes={
+            /*
+             * Teleprompter direto da gaveta, sem devolver o item para a grade.
+             *
+             * É o caso de uso inteiro dos roteiros prontos: sobrou meia hora,
+             * abre a gaveta, escolhe pelo tempo de fala e grava. Obrigar a
+             * arrastar para um dia antes de ler no teleprompter poria três
+             * passos entre a decisão e a gravação.
+             */
+            itemDaGavetaAberto.roteiro?.trim() ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const item = itemDaGavetaAberto
+                  // O teleprompter é tela cheia; o visor aberto por baixo
+                  // seguraria os cliques dos controles dele.
+                  setIdeiaAberta(null)
+                  diaAntesDoPrompter.current = null
+                  setPrompter(item)
+                }}
+              >
+                <MonitorPlay className="mr-1.5 h-3.5 w-3.5" />
+                Teleprompter
+              </Button>
+            ) : undefined
+          }
           onUsarHoje={() => {
             // Fecha ANTES de devolver: a ideia sai da gaveta e o visor
             // perderia o item debaixo de si, piscando vazio por um quadro.

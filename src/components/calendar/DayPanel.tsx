@@ -9,9 +9,10 @@ import {
   MessageSquareText,
   MonitorPlay,
   Palette,
-  Pencil,
   PenSquare,
+  Pencil,
   Plus,
+  ScrollText,
   Sparkles,
   Trash2,
 } from 'lucide-react'
@@ -47,7 +48,7 @@ import { useAjustes } from '@/hooks/useAjustes'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLarguraPainel } from '@/hooks/useLarguraPainel'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import type { CalendarItemWithRelations, EventoRow } from '@/types/database'
+import type { CalendarItemWithRelations, EventoRow, TipoDeGaveta } from '@/types/database'
 
 interface Props {
   dateKey: string | null
@@ -282,13 +283,25 @@ export function DayPanel({ dateKey, items, eventos, onOpenChange, onAbrirTelepro
    * quem já abriu o item e concluiu ali que não vai usar — e para o celular,
    * onde arrastar não existe.
    */
-  async function handleGuardar(item: CalendarItemWithRelations) {
+  async function handleGuardar(
+    item: CalendarItemWithRelations,
+    destino: TipoDeGaveta = 'ideias',
+  ) {
     try {
-      await guardar.mutateAsync({ id: item.id, guardar: true })
+      await guardar.mutateAsync({
+        id: item.id,
+        guardar: true,
+        // Mesma regra do arrasto: o campo só viaja indo para os roteiros ou
+        // voltando de lá. Ver o porquê em useGuardarNaGaveta.
+        gaveta: destino === 'roteiros' || item.gaveta === 'roteiros' ? destino : undefined,
+      })
       toast({
         variant: 'success',
-        title: 'Guardado nas ideias soltas',
-        description: 'Saiu da grade. Briefing, roteiro e etiquetas foram junto.',
+        title: destino === 'roteiros' ? 'Guardado em roteiros prontos' : 'Guardado nas ideias soltas',
+        description:
+          destino === 'roteiros'
+            ? 'Saiu da grade e fica à mão até o dia de gravar.'
+            : 'Saiu da grade. Briefing, roteiro e etiquetas foram junto.',
       })
     } catch (error) {
       toast({
@@ -440,6 +453,27 @@ export function DayPanel({ dateKey, items, eventos, onOpenChange, onAbrirTelepro
                     >
                       <Archive className="h-3.5 w-3.5" />
                     </Button>
+                    {/*
+                      * Só aparece quando HÁ roteiro escrito.
+                      *
+                      * A gaveta chama "roteiros prontos"; oferecer o botão num
+                      * item sem roteiro seria convidar a guardar lá o que não
+                      * está pronto. Pelo arrasto continua sendo possível — a
+                      * gaveta avisa "sem roteiro escrito" — mas o botão, que é
+                      * o caminho de quem está no celular, só oferece o que faz
+                      * sentido.
+                      */}
+                    {item.roteiro?.trim() && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => void handleGuardar(item, 'roteiros')}
+                        aria-label="Guardar em roteiros prontos"
+                        title="Guardar em roteiros prontos"
+                      >
+                        <ScrollText className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon-sm"

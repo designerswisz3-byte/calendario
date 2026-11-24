@@ -23,9 +23,22 @@ interface Props {
    * 7xl com padding encolheria a área de escrita sem motivo.
    */
   telaCheia?: boolean
+  /**
+   * Coluna central mais larga, para a tela que tem faixa lateral.
+   *
+   * O calendário divide a largura entre a grade do mês e as duas gavetas. Em
+   * 7xl, a segunda gaveta saiu inteira do bolso da grade: cada dia perdeu um
+   * quinto da largura e o título do card passou a cortar em "A cont…". Num
+   * monitor de 1440 para cima havia margem sobrando dos dois lados — é dela
+   * que a gaveta nova passa a tirar o espaço.
+   *
+   * O cabeçalho continua em 7xl de propósito: se ele alargasse só nesta tela,
+   * o menu pularia de lugar a cada troca de aba.
+   */
+  larga?: boolean
 }
 
-export function AppShell({ children, telaCheia = false }: Props) {
+export function AppShell({ children, telaCheia = false, larga = false }: Props) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
 
@@ -46,38 +59,38 @@ export function AppShell({ children, telaCheia = false }: Props) {
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-glass">
               <CalendarDays className="h-4 w-4" />
             </span>
-            <span className="hidden sm:inline">Calendário Editorial</span>
+            <span className="hidden xl:inline">Calendário Editorial</span>
           </NavLink>
 
           <nav className="flex items-center gap-1">
-            <NavLink to="/calendario" className={navLinkClass}>
+            <NavLink to="/calendario" className={navLinkClass} title="Calendário" aria-label="Calendário">
               <CalendarDays className="h-4 w-4" />
-              <span className="hidden sm:inline">Calendário</span>
+              <span className="hidden lg:inline">Calendário</span>
             </NavLink>
-            <NavLink to="/criar" className={navLinkClass} end>
+            <NavLink to="/criar" className={navLinkClass} end title="Criar conteúdo" aria-label="Criar conteúdo">
               <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Criar conteúdo</span>
+              <span className="hidden lg:inline">Criar conteúdo</span>
             </NavLink>
-            <NavLink to="/stories" className={navLinkClass}>
+            <NavLink to="/stories" className={navLinkClass} title="Stories" aria-label="Stories">
               <Clapperboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Stories</span>
+              <span className="hidden lg:inline">Stories</span>
             </NavLink>
-            <NavLink to="/notas" className={navLinkClass}>
+            <NavLink to="/notas" className={navLinkClass} title="Notas" aria-label="Notas">
               <NotebookPen className="h-4 w-4" />
-              <span className="hidden sm:inline">Notas</span>
+              <span className="hidden lg:inline">Notas</span>
             </NavLink>
-            <NavLink to="/noticias" className={navLinkClass}>
+            <NavLink to="/noticias" className={navLinkClass} title="Notícias" aria-label="Notícias">
               <Newspaper className="h-4 w-4" />
-              <span className="hidden sm:inline">Notícias</span>
+              <span className="hidden lg:inline">Notícias</span>
             </NavLink>
-            <NavLink to="/relatorio" className={navLinkClass}>
+            <NavLink to="/relatorio" className={navLinkClass} title="Relatório" aria-label="Relatório">
               <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Relatório</span>
+              <span className="hidden lg:inline">Relatório</span>
             </NavLink>
           </nav>
 
           <div className="ml-auto flex items-center gap-1">
-            <span className="mr-1 hidden max-w-[14rem] truncate text-xs text-muted-foreground lg:inline">
+            <span className="mr-1 hidden max-w-[14rem] truncate text-xs text-muted-foreground xl:inline">
               {user?.email}
             </span>
             <ThemeToggle />
@@ -93,7 +106,7 @@ export function AppShell({ children, telaCheia = false }: Props) {
           telaCheia
             ? // 4rem = a altura do cabeçalho grudento acima.
               'h-[calc(100vh-4rem)] w-full'
-            : 'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8',
+            : cn('mx-auto w-full px-4 py-6 sm:px-6 sm:py-8', larga ? 'max-w-[96rem]' : 'max-w-7xl'),
         )}
       >
         {children}

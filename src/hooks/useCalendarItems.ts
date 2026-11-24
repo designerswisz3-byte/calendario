@@ -11,6 +11,7 @@ import type {
   MediaAssetRow,
   PlanningType,
   TagRow,
+  TipoDeGaveta,
 } from '@/types/database'
 
 /** Chave de cache do mês: "YYYY-MM" em horário local. */
@@ -176,13 +177,27 @@ export function useGuardarNaGaveta() {
       id,
       guardar,
       data,
+      gaveta,
     }: {
       id: string
       guardar: boolean
       data?: string
+      /**
+       * Para qual gaveta. Só entra na gravação quando é informado.
+       *
+       * Quem guarda nas ideias soltas um item que nunca passou pelos roteiros
+       * NÃO manda este campo, e isso é de propósito: num banco que ainda não
+       * rodou a migração da segunda gaveta, mandar a coluna faria o banco
+       * recusar a gravação inteira — e a gaveta que já funcionava pararia de
+       * funcionar no dia em que a tela nova fosse ao ar.
+       */
+      gaveta?: TipoDeGaveta
     }) => {
-      const patch: { na_gaveta: boolean; data?: string } = { na_gaveta: guardar }
+      const patch: { na_gaveta: boolean; data?: string; gaveta?: TipoDeGaveta } = {
+        na_gaveta: guardar,
+      }
       if (!guardar && data) patch.data = data
+      if (guardar && gaveta) patch.gaveta = gaveta
 
       // `.select('id')` pelo mesmo motivo do resto do projeto: UPDATE que não
       // acerta linha nenhuma volta sem erro, e a tela diria que guardou.
@@ -191,7 +206,23 @@ export function useGuardarNaGaveta() {
         .update(patch)
         .eq('id', id)
         .select('id')
-      if (error) throw error
+      if (error) {
+        /*
+         * A coluna `gaveta` ainda não existe neste banco.
+         *
+         * O erro cru do PostgREST é "Could not find the 'gaveta' column of
+         * 'calendar_items' in the schema cache" — verdadeiro e inútil para
+         * quem só arrastou um card. A tradução diz o que fazer.
+         */
+        if (patch.gaveta && /gaveta/.test(error.message) && /column|schema cache/i.test(error.message)) {
+          throw new Error(
+            'Falta rodar no Supabase a migração dos roteiros prontos ' +
+              '(supabase/migrations/20260914002200_roteiros_prontos.sql). ' +
+              'Enquanto isso, a gaveta de ideias soltas continua funcionando.',
+          )
+        }
+        throw error
+      }
       if (!linhas || linhas.length === 0) {
         throw new Error(
           'O banco aceitou a gravação mas não alterou nenhuma linha. Confirme que a ' +

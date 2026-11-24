@@ -24,11 +24,22 @@ export type CalendarItemRow = {
   notas: string | null
   /** Roteiro de gravação — é o texto que alimenta o teleprompter. */
   roteiro: string | null
-  /** Guardado na gaveta de ideias soltas: sai da grade, mantém tudo o mais. */
+  /** Guardado numa gaveta: sai da grade, mantém tudo o mais. */
   na_gaveta: boolean
+  /**
+   * Para QUAL gaveta ele foi, quando `na_gaveta` é verdadeiro.
+   *
+   * Opcional no tipo porque, num banco que ainda não rodou a migração dos
+   * roteiros prontos, o `select *` volta sem a coluna. Ausente vale 'ideias' —
+   * que é onde tudo ficava antes de existir a segunda gaveta.
+   */
+  gaveta?: TipoDeGaveta
   criado_em: string
   atualizado_em: string
 }
+
+/** As duas gavetas do calendário. */
+export type TipoDeGaveta = 'ideias' | 'roteiros'
 
 export type ContentPreviewRow = {
   id: string

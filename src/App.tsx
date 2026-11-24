@@ -43,14 +43,16 @@ function RouteFallback() {
 function RotaPrivada({
   children,
   telaCheia,
+  larga,
 }: {
   children: React.ReactNode
   telaCheia?: boolean
+  larga?: boolean
 }) {
   const { pathname } = useLocation()
   return (
     <ProtectedRoute>
-      <AppShell telaCheia={telaCheia}>
+      <AppShell telaCheia={telaCheia} larga={larga}>
         {/* Trocar de rota limpa o erro: a tela nova merece uma chance. */}
         <ErrorBoundary chaveDeReset={pathname}>{children}</ErrorBoundary>
       </AppShell>
@@ -88,7 +90,7 @@ export default function App() {
         <Route
           path="/calendario"
           element={
-            <RotaPrivada>
+            <RotaPrivada larga>
               <CalendarPage />
             </RotaPrivada>
           }

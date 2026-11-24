@@ -16,6 +16,8 @@ interface Props {
   titulo: string
   /** A data em que a ideia estava marcada antes de ser guardada. */
   guardadaDe: string
+  /** O nome da gaveta onde ela está. Padrão: "ideias soltas". */
+  gaveta?: string
   /** O conteúdo da ideia. Cada gaveta traz o seu. */
   children: React.ReactNode
   /** Devolve a ideia para hoje e fecha. */
@@ -58,6 +60,7 @@ export function VisorDaGaveta({
   onFechar,
   titulo,
   guardadaDe,
+  gaveta = 'ideias soltas',
   children,
   onUsarHoje,
   acoes,
@@ -74,7 +77,7 @@ export function VisorDaGaveta({
           <DialogTitle className="pr-6 text-base leading-snug">{titulo}</DialogTitle>
           <DialogDescription className="flex items-center gap-1.5 text-xs">
             <Archive className="h-3 w-3 shrink-0" aria-hidden />
-            Guardada em ideias soltas · estava em {formatShortDate(guardadaDe)}
+            Em {gaveta} · estava em {formatShortDate(guardadaDe)}
           </DialogDescription>
         </DialogHeader>
 
