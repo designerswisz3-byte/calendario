@@ -19,6 +19,7 @@ export const queryKeys = {
   gavetaDeStories: () => ['stories', 'gaveta'] as const,
   referenciasDeStories: () => ['stories', 'referencias'] as const,
   noticias: () => ['noticias'] as const,
+  comunidadeFalados: () => ['comunidade', 'falados'] as const,
   relatorioPerfis: () => ['relatorio', 'perfis'] as const,
   relatorioMetricas: (perfilId: string) => ['relatorio', 'metricas', perfilId] as const,
   relatorioPublicacoes: (perfilId: string) =>

@@ -448,6 +448,17 @@ export type StorySequenciaRow = {
  * Só imagem e uma linha, de propósito: não é conteúdo planejado, é insumo. Por
  * isso não tem data e não entra na grade — o banco inteiro é a gaveta dela.
  */
+/** Um dia marcado como "falei sobre esse tema" na aba Comunidade. */
+export type ComunidadeFaladoRow = {
+  id: string
+  user_id: string
+  /** O dia do calendário, `YYYY-MM-DD`. */
+  data: string
+  /** O subtema da pauta que estava naquele dia. Ver src/lib/comunidade.ts. */
+  subtema_id: string
+  criado_em: string
+}
+
 export type StoryReferenciaRow = {
   id: string
   user_id: string
@@ -546,6 +557,12 @@ export interface Database {
           atualizado_em?: string
         }
         Update: Partial<Omit<NotaRow, 'id' | 'user_id'>>
+        Relationships: []
+      }
+      comunidade_falados: {
+        Row: ComunidadeFaladoRow
+        Insert: Omit<ComunidadeFaladoRow, 'id' | 'criado_em'> & { id?: string; criado_em?: string }
+        Update: Partial<Omit<ComunidadeFaladoRow, 'id' | 'user_id'>>
         Relationships: []
       }
       stories_referencias: {
