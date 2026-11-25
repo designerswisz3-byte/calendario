@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Newspaper, Upload } from 'lucide-react'
+import { Newspaper, TriangleAlert, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -12,6 +12,7 @@ import {
   EDITORIAS,
   ROTULO_DE_EDITORIA,
   briefingDaNoticia,
+  coletaParada,
   editoriaDe,
   type Editoria,
 } from '@/lib/noticias'
@@ -30,6 +31,21 @@ import type { NoticiaEntrada, NoticiaRow } from '@/types/database'
 type Filtro = 'relevantes' | 'nao_lidas' | 'todas'
 
 const TODAS_AS_EDITORIAS = 'tudo'
+
+/** "segunda, 17/11 às 14h" — dia da semana na frente, que é como se lembra. */
+function quandoParou(quando: Date): string {
+  const dia = quando.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'America/Sao_Paulo',
+  })
+  const hora = quando.toLocaleTimeString('pt-BR', {
+    hour: 'numeric',
+    timeZone: 'America/Sao_Paulo',
+  })
+  return `${dia} às ${hora}h`
+}
 
 export default function NoticiasPage() {
   const navigate = useNavigate()
@@ -58,6 +74,14 @@ export default function NoticiasPage() {
     TODAS_AS_EDITORIAS,
   )
   const [abrindoImportacao, setAbrindoImportacao] = React.useState(false)
+
+  /*
+   * Calculado a cada vez que a lista muda, e não num relógio.
+   *
+   * Um aviso de coleta parada não precisa acender no minuto exato: quem abre a
+   * aba recarrega a lista, e é nesse momento que a pergunta importa.
+   */
+  const parada = React.useMemo(() => coletaParada(noticias), [noticias])
   const [criandoPauta, setCriandoPauta] = React.useState<string | null>(null)
 
   const porEditoria = React.useMemo(() => {
@@ -152,7 +176,7 @@ export default function NoticiasPage() {
           {noticias.length} na base · {naoLidas} não lidas
         </p>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <Tabs value={filtro} onValueChange={(v) => setFiltro(v as Filtro)}>
             <TabsList>
               <TabsTrigger value="relevantes">Relevantes ({relevantes})</TabsTrigger>
@@ -167,6 +191,27 @@ export default function NoticiasPage() {
           </Button>
         </div>
       </header>
+
+      {parada && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+        >
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-0.5">
+            <p className="font-medium">
+              A coleta automática não grava nada desde {quandoParou(parada.ultimaColeta)}.
+            </p>
+            <p className="text-muted-foreground">
+              {parada.varredurasPerdidas === 1
+                ? 'A varredura desta manhã não chegou'
+                : `${parada.varredurasPerdidas} varreduras da manhã não chegaram`}
+              , então a lista abaixo pode estar desatualizada. Peça ao Claude: “verifique as
+              rotinas de notícias e recupere os dias que faltaram”.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/*
         * As frentes só aparecem quando há mais de uma na base: enquanto a

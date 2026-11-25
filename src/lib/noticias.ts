@@ -186,3 +186,86 @@ export const ROTULO_DE_RELEVANCIA: Record<number, string> = {
   4: 'Mexe no plano',
   5: 'Decide esta semana',
 }
+
+// ---------------------------------------------------------------------------
+// A coleta parou?
+// ---------------------------------------------------------------------------
+
+/** Brasília. Fixo em -3: o Brasil não tem horário de verão desde 2019. */
+const BRT_EM_MS = -3 * 60 * 60 * 1000
+const HORA_EM_MS = 60 * 60 * 1000
+
+/** A varredura da manhã roda às 7h40 de Brasília, de segunda a sábado. */
+const VARREDURA = { hora: 7, minuto: 40 }
+
+/**
+ * Folga depois da varredura antes de estranhar o silêncio.
+ *
+ * Quatro horas cobrem a varredura das 7h40 e as rondas das 9h40 e das 11h40.
+ * Três corridas seguidas sem gravar nada não é manhã fraca de notícia.
+ */
+const FOLGA_EM_HORAS = 4
+
+export interface ColetaParada {
+  /** Quando entrou a última notícia. */
+  ultimaColeta: Date
+  /** Quantas varreduras da manhã já deveriam ter gravado alguma coisa. */
+  varredurasPerdidas: number
+}
+
+/**
+ * Diz se a coleta automática parou — olhando só para o que já está na tela.
+ *
+ * Existe porque rotina que não grava não faz barulho: em novembro de 2026 a
+ * aba ficou seis dias sem receber notícia e a única pista era a data do item
+ * do topo, que ninguém lê como alarme.
+ *
+ * A conta é feita aqui, no navegador, de propósito. O outro aviso (a rotina
+ * que confere a coleta e notifica o celular) roda no mesmo agendador que as
+ * rotinas de coleta: se o agendador inteiro parar, ele para junto. Este não
+ * depende de nada além de a pessoa abrir a aba.
+ *
+ * Devolve `null` quando está tudo em dia, e também quando a base está vazia:
+ * quem nunca coletou nada não tem coleta para parar.
+ */
+export function coletaParada(
+  noticias: Pick<NoticiaRow, 'coletado_em'>[],
+  agora: Date = new Date(),
+): ColetaParada | null {
+  let ultima = 0
+  for (const noticia of noticias) {
+    const quando = Date.parse(noticia.coletado_em)
+    if (quando > ultima) ultima = quando
+  }
+  if (!ultima) return null
+
+  /*
+   * Anda para trás, dia a dia, pelas varreduras que já deveriam ter gravado.
+   *
+   * O truque do fuso: somar o deslocamento e ler os campos em UTC dá a data
+   * de Brasília sem depender do fuso do computador — que pode ser o de uma
+   * viagem. Sete dias bastam: mais do que isso, o aviso já apareceu há tempo.
+   */
+  const hojeEmBrasilia = new Date(agora.getTime() + BRT_EM_MS)
+  let perdidas = 0
+  for (let atras = 0; atras < 7; atras++) {
+    const dia = new Date(
+      Date.UTC(
+        hojeEmBrasilia.getUTCFullYear(),
+        hojeEmBrasilia.getUTCMonth(),
+        hojeEmBrasilia.getUTCDate() - atras,
+        VARREDURA.hora,
+        VARREDURA.minuto,
+      ),
+    )
+    // Domingo não tem varredura.
+    if (dia.getUTCDay() === 0) continue
+    const varredura = dia.getTime() - BRT_EM_MS
+    if (agora.getTime() - varredura < FOLGA_EM_HORAS * HORA_EM_MS) continue
+    // Entrou notícia depois desta varredura: daqui para trás está tudo certo.
+    if (ultima >= varredura) break
+    perdidas++
+  }
+
+  return perdidas > 0 ? { ultimaColeta: new Date(ultima), varredurasPerdidas: perdidas } : null
+}
