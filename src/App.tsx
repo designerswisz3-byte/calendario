@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { cn } from '@/lib/utils'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
@@ -14,6 +15,7 @@ import { isSupabaseConfigured } from '@/lib/supabase'
 const CalendarPage = React.lazy(() => import('@/pages/CalendarPage'))
 /** Editor e desenho são bundles grandes; só carregam para quem abre Notas. */
 const NotasPage = React.lazy(() => import('@/pages/NotasPage'))
+const ComunidadePage = React.lazy(() => import('@/pages/ComunidadePage'))
 const CreatePage = React.lazy(() => import('@/pages/CreatePage'))
 /** Dashboard de métricas — tabela larga e impressão própria, carrega sob demanda. */
 const RelatorioPage = React.lazy(() => import('@/pages/RelatorioPage'))
@@ -23,9 +25,16 @@ const LoginPage = React.lazy(() => import('@/pages/LoginPage'))
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'))
 const PublicPreviewPage = React.lazy(() => import('@/pages/PublicPreviewPage'))
 
-function RouteFallback() {
+function RouteFallback({ dentroDaMoldura = false }: { dentroDaMoldura?: boolean }) {
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div
+      className={cn(
+        'flex items-center justify-center',
+        // Dentro da moldura o cabeçalho já ocupa parte da tela: a altura
+        // inteira empurraria o indicador para baixo da dobra.
+        dentroDaMoldura ? 'min-h-[50vh]' : 'min-h-screen',
+      )}
+    >
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       <span className="sr-only">Carregando…</span>
     </div>
@@ -54,7 +63,18 @@ function RotaPrivada({
     <ProtectedRoute>
       <AppShell telaCheia={telaCheia} larga={larga}>
         {/* Trocar de rota limpa o erro: a tela nova merece uma chance. */}
-        <ErrorBoundary chaveDeReset={pathname}>{children}</ErrorBoundary>
+        <ErrorBoundary chaveDeReset={pathname}>
+          {/*
+            O Suspense fica DENTRO da moldura, e não só em volta das rotas.
+
+            As páginas são carregadas sob demanda. Com um único Suspense lá em
+            cima, a primeira visita a cada aba escondia a tela inteira —
+            cabeçalho e navegação junto — enquanto o código da página chegava,
+            e a aba clicada só acendia depois. Aqui dentro, a moldura fica: a
+            navegação responde no clique e só o miolo espera.
+          */}
+          <React.Suspense fallback={<RouteFallback dentroDaMoldura />}>{children}</React.Suspense>
+        </ErrorBoundary>
       </AppShell>
     </ProtectedRoute>
   )
@@ -100,6 +120,14 @@ export default function App() {
           element={
             <RotaPrivada>
               <StoriesPage />
+            </RotaPrivada>
+          }
+        />
+        <Route
+          path="/comunidade"
+          element={
+            <RotaPrivada>
+              <ComunidadePage />
             </RotaPrivada>
           }
         />

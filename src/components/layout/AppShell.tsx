@@ -1,5 +1,15 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, CalendarDays, Clapperboard, LogOut, Newspaper, NotebookPen, Sparkles } from 'lucide-react'
+import {
+  BarChart3,
+  CalendarDays,
+  Clapperboard,
+  LogOut,
+  MessagesSquare,
+  Newspaper,
+  NotebookPen,
+  Sparkles,
+} from 'lucide-react'
+import { BottomNavBar, type ItemDaNavegacao } from '@/components/ui/bottom-nav-bar'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useAuth } from '@/components/auth/AuthProvider'
@@ -7,13 +17,21 @@ import { toast } from '@/components/ui/use-toast'
 import { errorMessage } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-250',
-    isActive
-      ? 'bg-primary text-primary-foreground shadow-glass'
-      : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground',
-  )
+/*
+ * As abas, na ordem em que o trabalho acontece: planejar, produzir, publicar o
+ * dia a dia, guardar o que se aprende, se informar e medir. "Comunidade" fica
+ * depois de Stories porque é o outro canal diário — o que se fala hoje no
+ * grupo.
+ */
+const ABAS: ItemDaNavegacao[] = [
+  { to: '/calendario', label: 'Calendário', icon: CalendarDays },
+  { to: '/criar', label: 'Criar conteúdo', curto: 'Criar', icon: Sparkles, end: true },
+  { to: '/stories', label: 'Stories', icon: Clapperboard },
+  { to: '/comunidade', label: 'Comunidade', icon: MessagesSquare },
+  { to: '/notas', label: 'Notas', icon: NotebookPen },
+  { to: '/noticias', label: 'Notícias', icon: Newspaper },
+  { to: '/relatorio', label: 'Relatório', icon: BarChart3 },
+]
 
 interface Props {
   children: React.ReactNode
@@ -55,39 +73,12 @@ export function AppShell({ children, telaCheia = false, larga = false }: Props) 
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-white/20 bg-background/60 backdrop-blur-xl dark:border-white/10">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6">
-          <NavLink to="/calendario" className="mr-1 hidden items-center gap-2 font-semibold tracking-tight sm:flex">
+          <NavLink to="/calendario" className="mr-1 flex items-center gap-2 font-semibold tracking-tight">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-glass">
               <CalendarDays className="h-4 w-4" />
             </span>
-            <span className="hidden xl:inline">Calendário Editorial</span>
+            <span className="md:hidden xl:inline">Calendário Editorial</span>
           </NavLink>
-
-          <nav className="flex items-center gap-1">
-            <NavLink to="/calendario" className={navLinkClass} title="Calendário" aria-label="Calendário">
-              <CalendarDays className="h-4 w-4" />
-              <span className="hidden lg:inline">Calendário</span>
-            </NavLink>
-            <NavLink to="/criar" className={navLinkClass} end title="Criar conteúdo" aria-label="Criar conteúdo">
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden lg:inline">Criar conteúdo</span>
-            </NavLink>
-            <NavLink to="/stories" className={navLinkClass} title="Stories" aria-label="Stories">
-              <Clapperboard className="h-4 w-4" />
-              <span className="hidden lg:inline">Stories</span>
-            </NavLink>
-            <NavLink to="/notas" className={navLinkClass} title="Notas" aria-label="Notas">
-              <NotebookPen className="h-4 w-4" />
-              <span className="hidden lg:inline">Notas</span>
-            </NavLink>
-            <NavLink to="/noticias" className={navLinkClass} title="Notícias" aria-label="Notícias">
-              <Newspaper className="h-4 w-4" />
-              <span className="hidden lg:inline">Notícias</span>
-            </NavLink>
-            <NavLink to="/relatorio" className={navLinkClass} title="Relatório" aria-label="Relatório">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden lg:inline">Relatório</span>
-            </NavLink>
-          </nav>
 
           <div className="ml-auto flex items-center gap-1">
             <span className="mr-1 hidden max-w-[14rem] truncate text-xs text-muted-foreground xl:inline">
@@ -101,12 +92,37 @@ export function AppShell({ children, telaCheia = false, larga = false }: Props) 
         </div>
       </header>
 
+      {/*
+        A navegação mora FORA do cabeçalho, e não dentro dele.
+
+        O cabeçalho tem `backdrop-blur`, e um elemento com backdrop-filter vira
+        a referência de posição para tudo que é `fixed` dentro dele. A pílula
+        ficaria presa aos 64px do cabeçalho e nunca chegaria ao rodapé no
+        celular.
+
+        Uma pílula só, em dois lugares: centralizada sobre o cabeçalho de `md`
+        para cima, e flutuando no rodapé no celular — onde sete abas não cabem
+        ao lado do logo, e onde o polegar alcança. `mx-auto w-fit` em vez de
+        `left-1/2 -translate-x-1/2`: a animação de entrada usa `transform`, e
+        os dois brigariam pela mesma propriedade.
+      */}
+      <BottomNavBar
+        itens={ABAS}
+        className="fixed inset-x-0 bottom-4 z-40 mx-auto w-fit md:bottom-auto md:top-1.5"
+      />
+
       <main
         className={cn(
           telaCheia
-            ? // 4rem = a altura do cabeçalho grudento acima.
-              'h-[calc(100vh-4rem)] w-full'
-            : cn('mx-auto w-full px-4 py-6 sm:px-6 sm:py-8', larga ? 'max-w-[96rem]' : 'max-w-7xl'),
+            ? // 4rem = a altura do cabeçalho grudento acima. No celular saem
+              // mais 5rem: a pílula flutua no rodapé e cobriria a última linha.
+              'h-[calc(100dvh-9rem)] w-full md:h-[calc(100vh-4rem)]'
+            : cn(
+                // `pb-24` no celular pelo mesmo motivo: o fim da página precisa
+                // rolar para cima da pílula.
+                'mx-auto w-full px-4 pb-24 pt-6 sm:px-6 sm:pt-8 md:pb-8',
+                larga ? 'max-w-[96rem]' : 'max-w-7xl',
+              ),
         )}
       >
         {children}
