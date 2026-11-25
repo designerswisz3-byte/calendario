@@ -1,4 +1,4 @@
-import { Archive } from 'lucide-react'
+import { Archive, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,6 +24,17 @@ interface Props {
   onUsarHoje: () => void
   /** Ações extras no rodapé, antes do "Usar hoje". */
   acoes?: React.ReactNode
+  /**
+   * Abre a edição. Quando informado, o rodapé troca o aviso de "só leitura"
+   * por um botão Editar. A gaveta de stories não informa e continua só leitura.
+   */
+  onEditar?: () => void
+  /**
+   * Substitui o rodapé inteiro. É o que a edição usa: enquanto se escreve, os
+   * botões são Cancelar e Salvar — "Usar hoje" no meio de uma edição tiraria o
+   * item da gaveta com o texto pela metade.
+   */
+  rodape?: React.ReactNode
 }
 
 /**
@@ -43,8 +54,12 @@ interface Props {
  * e isso só acontece se dentro dela der para ler.
  *
  * ----------------------------------------------------------------------------
- * Por que é SÓ LEITURA
+ * Por que nasceu SÓ LEITURA — e o que mudou
  * ----------------------------------------------------------------------------
+ * (Os itens do calendário passaram a ser editáveis aqui quando surgiu a gaveta
+ * de roteiros prontos: ver EditorDoItemGuardado. O raciocínio abaixo continua
+ * valendo para as sequências de stories, que seguem só para leitura.)
+ *
  * A gaveta continua sendo guarda, não bancada de trabalho. Editar aqui exigiria
  * duplicar o painel do dia e o editor de sequência dentro de um modal, e criaria
  * duas telas que fazem a mesma coisa de dois jeitos diferentes — que é como
@@ -64,6 +79,8 @@ export function VisorDaGaveta({
   children,
   onUsarHoje,
   acoes,
+  onEditar,
+  rodape,
 }: Props) {
   return (
     <Dialog open={aberto} onOpenChange={(valor) => !valor && onFechar()}>
@@ -84,15 +101,26 @@ export function VisorDaGaveta({
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin px-5 py-4">{children}</div>
 
         <DialogFooter className="shrink-0 gap-2 border-t border-border/60 px-5 py-3 sm:justify-between">
-          <p className="hidden text-xs text-muted-foreground sm:block">
-            Só leitura. Para editar, traga a ideia de volta para um dia.
-          </p>
-          <div className="flex items-center gap-2">
-            {acoes}
-            <Button size="sm" onClick={onUsarHoje}>
-              Usar hoje
-            </Button>
-          </div>
+          {rodape ?? (
+            <>
+              {onEditar ? (
+                <Button size="sm" variant="outline" onClick={onEditar}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Editar
+                </Button>
+              ) : (
+                <p className="hidden text-xs text-muted-foreground sm:block">
+                  Só leitura. Para editar, traga a ideia de volta para um dia.
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                {acoes}
+                <Button size="sm" onClick={onUsarHoje}>
+                  Usar hoje
+                </Button>
+              </div>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

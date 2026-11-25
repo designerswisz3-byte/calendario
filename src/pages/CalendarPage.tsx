@@ -30,6 +30,7 @@ import { MonthGrid } from '@/components/calendar/MonthGrid'
 import { MonthProgress } from '@/components/calendar/MonthProgress'
 import { Gaveta } from '@/components/gaveta/Gaveta'
 import { VisorDaGaveta } from '@/components/gaveta/VisorDaGaveta'
+import { EditorDoItemGuardado } from '@/components/gaveta/EditorDoItemGuardado'
 import { ConteudoDoItem } from '@/components/calendar/ConteudoDoItem'
 import { LegendaDeEventos } from '@/components/calendar/LegendaDeEventos'
 import { Teleprompter } from '@/components/calendar/Teleprompter'
@@ -50,6 +51,7 @@ import {
   useGavetaDoCalendario,
   useGuardarNaGaveta,
   useMoveCalendarItem,
+  useUpdateCalendarItem,
 } from '@/hooks/useCalendarItems'
 import { TYPE_LABEL } from '@/lib/constants'
 import { resumoDoRoteiro, tituloDoItem } from '@/lib/texto'
@@ -77,6 +79,19 @@ export default function CalendarPage() {
    * está na tela. Pelo id, o conteúdo sai sempre da lista atual.
    */
   const [ideiaAberta, setIdeiaAberta] = React.useState<string | null>(null)
+  /*
+   * Editando o item aberto, em vez de só lendo.
+   *
+   * "Há alteração não salva" fica numa ref e não em estado: quem precisa saber
+   * é só o gesto de fechar, e um estado redesenharia a página do calendário
+   * inteira a cada tecla digitada no roteiro.
+   */
+  const [editandoGuardado, setEditandoGuardado] = React.useState(false)
+  const edicaoSuja = React.useRef(false)
+  const marcarEdicao = React.useCallback((haAlteracao: boolean) => {
+    edicaoSuja.current = haAlteracao
+  }, [])
+  const formDaEdicao = React.useId()
   // De onde o teleprompter foi aberto, para devolver o painel ao fechar.
   const diaAntesDoPrompter = React.useRef<string | null>(null)
 
@@ -123,6 +138,7 @@ export default function CalendarPage() {
     [gaveta],
   )
   const guardar = useGuardarNaGaveta()
+  const atualizarGuardado = useUpdateCalendarItem()
 
   React.useEffect(() => {
     if (isError) {
@@ -226,6 +242,59 @@ export default function CalendarPage() {
    * modal aberto mostrando uma ideia que não está mais lá.
    */
   const itemDaGavetaAberto = gaveta.find((item) => item.id === ideiaAberta) ?? null
+
+  /*
+   * Sem item aberto, não há edição em curso.
+   *
+   * Cobre o caso em que o item some por baixo do visor (apagado noutra aba,
+   * devolvido para a grade): sem isto, o próximo card clicado abriria direto
+   * no modo de edição, herdado de um item que nem existe mais.
+   */
+  const temItemAberto = itemDaGavetaAberto !== null
+  React.useEffect(() => {
+    if (temItemAberto) return
+    setEditandoGuardado(false)
+    edicaoSuja.current = false
+  }, [temItemAberto])
+
+  /** Texto digitado e não salvo não some num clique fora da janela. */
+  function podeDescartarEdicao() {
+    return (
+      !editandoGuardado ||
+      !edicaoSuja.current ||
+      window.confirm('Descartar as alterações que você ainda não salvou?')
+    )
+  }
+
+  function fecharVisor() {
+    if (!podeDescartarEdicao()) return
+    setEditandoGuardado(false)
+    edicaoSuja.current = false
+    setIdeiaAberta(null)
+  }
+
+  function cancelarEdicao() {
+    if (!podeDescartarEdicao()) return
+    setEditandoGuardado(false)
+    edicaoSuja.current = false
+  }
+
+  async function salvarEdicao(id: string, texto: { notas: string; roteiro: string }) {
+    try {
+      await atualizarGuardado.mutateAsync({ id, input: texto })
+      // Volta para a leitura, com o texto novo: é a confirmação de que salvou
+      // — e deixa o teleprompter a um clique, que é o passo seguinte natural.
+      edicaoSuja.current = false
+      setEditandoGuardado(false)
+      toast({ variant: 'success', title: 'Roteiro salvo', description: 'O item continua guardado na gaveta.' })
+    } catch (mutationError) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível salvar',
+        description: errorMessage(mutationError),
+      })
+    }
+  }
 
   async function devolverParaHoje(item: CalendarItemWithRelations) {
     try {
@@ -596,7 +665,35 @@ export default function CalendarPage() {
       {itemDaGavetaAberto && (
         <VisorDaGaveta
           aberto
-          onFechar={() => setIdeiaAberta(null)}
+          onFechar={fecharVisor}
+          onEditar={() => setEditandoGuardado(true)}
+          rodape={
+            editandoGuardado ? (
+              <>
+                <p className="hidden text-xs text-muted-foreground sm:block">
+                  Ctrl + Enter salva. O item continua na gaveta.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={cancelarEdicao}
+                    disabled={atualizarGuardado.isPending}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="submit"
+                    form={formDaEdicao}
+                    disabled={atualizarGuardado.isPending}
+                  >
+                    {atualizarGuardado.isPending ? 'Salvando…' : 'Salvar'}
+                  </Button>
+                </div>
+              </>
+            ) : undefined
+          }
           titulo={tituloDoItem(itemDaGavetaAberto, TYPE_LABEL[itemDaGavetaAberto.tipo])}
           guardadaDe={itemDaGavetaAberto.data}
           gaveta={itemDaGavetaAberto.gaveta === 'roteiros' ? 'roteiros prontos' : 'ideias soltas'}
@@ -634,7 +731,20 @@ export default function CalendarPage() {
             void devolverParaHoje(itemDaGavetaAberto)
           }}
         >
-          <ConteudoDoItem item={itemDaGavetaAberto} />
+          {editandoGuardado ? (
+            <EditorDoItemGuardado
+              // Um editor por item: trocar de item não pode herdar o texto
+              // digitado para o anterior.
+              key={itemDaGavetaAberto.id}
+              item={itemDaGavetaAberto}
+              formId={formDaEdicao}
+              salvando={atualizarGuardado.isPending}
+              onMudou={marcarEdicao}
+              onSalvar={(texto) => void salvarEdicao(itemDaGavetaAberto.id, texto)}
+            />
+          ) : (
+            <ConteudoDoItem item={itemDaGavetaAberto} />
+          )}
         </VisorDaGaveta>
       )}
     </div>
