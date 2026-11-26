@@ -1,6 +1,7 @@
 import * as React from 'react'
 import {
   Check,
+  ChevronLeft,
   FileDown,
   FileText,
   Loader2,
@@ -117,11 +118,23 @@ export default function NotasPage() {
   const montadoRef = React.useRef(true)
   React.useEffect(() => () => void (montadoRef.current = false), [])
 
-  // Seleciona a primeira nota ao abrir a tela.
+  /*
+   * Seleciona a primeira nota ao abrir a tela — SÓ com as duas colunas.
+   *
+   * No computador, lista e editor ficam lado a lado, e um editor vazio à
+   * direita seria espaço morto: abrir a primeira nota é o padrão certo.
+   *
+   * No celular só cabe uma coisa por vez, e "nenhuma nota selecionada" É a
+   * tela da lista. Selecionar sozinho ali tinha dois efeitos: a aba abria
+   * direto dentro da primeira nota (a fixada), sem nunca mostrar a lista; e o
+   * botão Voltar limpava a seleção só para este efeito escolher a mesma nota
+   * de novo, no mesmo instante. A pessoa ficava presa numa nota, sem caminho
+   * para as outras nem para criar uma nova.
+   */
   React.useEffect(() => {
-    if (selecionada || notas.length === 0) return
+    if (!temDuasColunas || selecionada || notas.length === 0) return
     setSelecionada(notas[0].id)
-  }, [notas, selecionada])
+  }, [notas, selecionada, temDuasColunas])
 
   // Quando a nota muda, resolve os anexos antes de montar o editor.
   React.useEffect(() => {
@@ -259,6 +272,15 @@ export default function NotasPage() {
     // recém-escrito porque a pessoa clicou na nota ao lado.
     await gravarRef.current()
     setSelecionada(id)
+  }
+
+  /** Só existe no celular: sai da nota e volta para a lista. */
+  async function voltarParaALista() {
+    // Mesmo cuidado de trocar de nota: o parágrafo recém-escrito é gravado
+    // antes de o editor sair da tela, e não deixado para o autosave que não
+    // vai mais rodar.
+    await gravarRef.current()
+    setSelecionada(null)
   }
 
   async function novaNota(titulo = '') {
@@ -440,7 +462,9 @@ export default function NotasPage() {
               <li>
                 <div
                   className={cn(
-                    'group flex items-center gap-1 rounded-lg px-2 py-2 transition-colors',
+                    'group flex items-center gap-1 rounded-lg px-2 transition-colors',
+                    // No celular a linha é o alvo do dedo: mais alta.
+                    temDuasColunas ? 'py-2' : 'py-3',
                     item.id === selecionada ? 'bg-primary/15' : 'hover:bg-foreground/5',
                   )}
                 >
@@ -476,9 +500,13 @@ export default function NotasPage() {
                       'transition-opacity',
                       // Fixada: o pino fica sempre à vista, é o estado dela.
                       // Solta: aparece no hover, para não poluir a lista.
+                      // No celular não existe hover: escondido ali, o botão
+                      // seria inalcançável.
                       item.fixada
                         ? 'text-primary'
-                        : 'opacity-0 focus:opacity-100 group-hover:opacity-100',
+                        : temDuasColunas
+                          ? 'opacity-0 focus:opacity-100 group-hover:opacity-100'
+                          : 'text-muted-foreground',
                     )}
                   >
                     {item.fixada ? (
@@ -492,7 +520,12 @@ export default function NotasPage() {
                     size="icon-sm"
                     aria-label={`Excluir ${item.titulo || 'nota sem título'}`}
                     onClick={() => void removerNota(item.id, item.titulo)}
-                    className="opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 hover:text-destructive"
+                    className={cn(
+                      'transition-opacity hover:text-destructive',
+                      temDuasColunas
+                        ? 'opacity-0 focus:opacity-100 group-hover:opacity-100'
+                        : 'text-muted-foreground',
+                    )}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -518,15 +551,41 @@ export default function NotasPage() {
               </Button>
             </div>
           ) : carregandoNota || !nota || preparado?.id !== nota.id ? (
-            <div className="flex flex-1 items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
+            <>
+              {/*
+                O caminho de volta existe também enquanto a nota carrega. Em
+                rede lenta — ou numa nota que não abre — sem ele o celular
+                ficaria parado num indicador de carregamento, sem saída.
+              */}
+              {!temDuasColunas && (
+                <div className="px-3 pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="-ml-1 px-2"
+                    onClick={() => setSelecionada(null)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Notas
+                  </Button>
+                </div>
+              )}
+              <div className="flex flex-1 items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            </>
           ) : (
             <>
               <div className="flex items-center gap-2 px-3 pt-2">
                 {!temDuasColunas && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelecionada(null)}>
-                    Voltar
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="-ml-1 px-2"
+                    onClick={() => void voltarParaALista()}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Notas
                   </Button>
                 )}
                 {/* Fixar sem precisar voltar para a lista: quem acabou de
