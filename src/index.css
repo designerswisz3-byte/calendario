@@ -275,8 +275,15 @@
    título, lista e checkbox saem todos como parágrafo cru.
    ========================================================================== */
 @layer components {
+  /*
+   * 16px no celular, e não os 15,2 do computador.
+   *
+   * O iPhone amplia a página inteira ao focar um campo editável com fonte
+   * menor que 16px — e não desfaz ao sair. Era metade do "não dá para saber
+   * onde estou": tocar no texto dava um zoom que cortava a largura da nota.
+   */
   .prose-notas {
-    @apply text-[0.95rem] leading-relaxed text-foreground;
+    @apply text-base leading-relaxed text-foreground md:text-[0.95rem];
   }
 
   .prose-notas > * + * {

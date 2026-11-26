@@ -178,7 +178,26 @@ function Barra({
   }).endsWith('true')
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-border/60 px-2 py-1.5">
+    <div
+      /*
+       * No celular, uma linha só, que rola para o lado.
+       *
+       * Quebrando em duas linhas, a barra tomava quase 100 pixels — e com o
+       * teclado aberto sobram uns 450 na tela inteira. De `md` para cima ela
+       * continua quebrando, como sempre.
+       */
+      className="flex flex-nowrap items-center gap-0.5 overflow-x-auto border-b border-border/60 px-2 py-1.5 [scrollbar-width:none] md:flex-wrap md:overflow-x-visible [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
+      /*
+       * Em tela de toque, tocar num botão não tira o foco do texto.
+       *
+       * Sem isto, cada toque na barra fechava o teclado e o reabria em
+       * seguida: a tela inteira encolhia e esticava a cada negrito. Só para
+       * toque — com mouse, o foco no botão continua valendo para o teclado.
+       */
+      onMouseDown={(evento) => {
+        if (window.matchMedia('(pointer: coarse)').matches) evento.preventDefault()
+      }}
+    >
       <BotaoDaBarra
         titulo="Título"
         ativo={editor.isActive('heading', { level: 2 })}

@@ -26,6 +26,7 @@ import {
 } from '@/components/notas/ImpressaoDaNota'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useAreaVisivel } from '@/hooks/useAreaVisivel'
 import {
   useCriarNota,
   useExcluirNota,
@@ -94,6 +95,86 @@ export default function NotasPage() {
   const [preparandoPdf, setPreparandoPdf] = React.useState(false)
 
   const { data: nota, isFetching: carregandoNota } = useNota(selecionada)
+
+  /*
+   * ---------------------------------------------------------------------------
+   * Escrever no celular
+   * ---------------------------------------------------------------------------
+   * Com o teclado aberto sobra menos da metade da tela. Do jeito que a nota
+   * era montada — dentro da página, abaixo do cabeçalho do app, com a barra de
+   * formatação em duas linhas, o rodapé de desenho e a navegação flutuando por
+   * cima — o texto ficava com uns 110 pixels: três linhas. Não dava para ver o
+   * parágrafo anterior nem saber onde o cursor estava.
+   *
+   * No celular a nota aberta passa a ser uma tela inteira, do tamanho exato do
+   * que está à vista (ver useAreaVisivel), e enquanto se digita tudo o que não
+   * é texto sai do caminho.
+   */
+  const emUmaColuna = !temDuasColunas
+  const area = useAreaVisivel(emUmaColuna && Boolean(selecionada))
+  const secaoRef = React.useRef<HTMLElement>(null)
+  const [escrevendo, setEscrevendo] = React.useState(false)
+  const fimDaEscrita = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  React.useEffect(() => () => void (fimDaEscrita.current && clearTimeout(fimDaEscrita.current)), [])
+
+  function aoFocar(evento: React.FocusEvent) {
+    if (!(evento.target as HTMLElement).closest?.('.ProseMirror')) return
+    if (fimDaEscrita.current) clearTimeout(fimDaEscrita.current)
+    setEscrevendo(true)
+  }
+
+  function aoDesfocar(evento: React.FocusEvent) {
+    if (!(evento.target as HTMLElement).closest?.('.ProseMirror')) return
+    /*
+     * Com atraso, de propósito: tocar num botão de formatação tira o foco do
+     * texto por um instante e devolve em seguida. Sem a espera, cada negrito
+     * faria o rodapé aparecer e sumir, e o texto pular junto.
+     */
+    if (fimDaEscrita.current) clearTimeout(fimDaEscrita.current)
+    fimDaEscrita.current = setTimeout(() => setEscrevendo(false), 250)
+  }
+
+  // O que não é texto sai da tela enquanto o teclado está aberto.
+  const soTexto = emUmaColuna && escrevendo && area.tecladoAberto
+
+  /*
+   * Mantém o cursor à vista quando a área muda de tamanho.
+   *
+   * O teclado abre DEPOIS do toque: o cursor é posto onde o dedo tocou, e meio
+   * segundo depois a metade de baixo da tela é coberta — muitas vezes com o
+   * cursor junto. O editor só rola sozinho quando se digita; nesse intervalo
+   * a pessoa fica olhando para um texto sem cursor, sem saber onde vai cair a
+   * primeira letra.
+   */
+  React.useEffect(() => {
+    if (!emUmaColuna || !escrevendo) return
+    const quadro = requestAnimationFrame(() => {
+      const editor = secaoRef.current?.querySelector('.ProseMirror')
+      const rolo = editor?.closest<HTMLElement>('.overflow-y-auto')
+      const selecao = window.getSelection()
+      if (!editor || !rolo || !selecao || selecao.rangeCount === 0) return
+      if (!editor.contains(selecao.anchorNode)) return
+
+      let cursor = selecao.getRangeAt(0).getBoundingClientRect()
+      // Parágrafo vazio: o intervalo não tem retângulo. O do próprio parágrafo
+      // serve — é uma linha só.
+      if (cursor.height === 0) {
+        const no = selecao.anchorNode
+        const elemento = no instanceof Element ? no : no?.parentElement
+        if (!elemento) return
+        cursor = elemento.getBoundingClientRect()
+      }
+      const janela = rolo.getBoundingClientRect()
+      // Uma linha de folga: o cursor colado na borda parece cortado.
+      const folga = 28
+      if (cursor.bottom > janela.bottom - folga) {
+        rolo.scrollTop += cursor.bottom - janela.bottom + folga
+      } else if (cursor.top < janela.top + 8) {
+        rolo.scrollTop -= janela.top + 8 - cursor.top
+      }
+    })
+    return () => cancelAnimationFrame(quadro)
+  }, [emUmaColuna, escrevendo, area.altura, soTexto])
 
   /*
    * Conteúdo pronto para o editor, SEMPRE carimbado com o id da nota de onde
@@ -407,7 +488,9 @@ export default function NotasPage() {
                 value={busca}
                 onChange={(evento) => setBusca(evento.target.value)}
                 placeholder="Buscar por título"
-                className="h-8 pl-8 text-sm"
+                // 16px no celular: abaixo disso o iPhone amplia a página
+                // inteira ao focar o campo, e não desfaz ao sair.
+                className="h-8 pl-8 text-base md:text-sm"
               />
             </div>
 
@@ -538,7 +621,33 @@ export default function NotasPage() {
       )}
 
       {mostrarEditor && (
-        <section className="glass flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
+        <section
+          ref={secaoRef}
+          onFocusCapture={aoFocar}
+          onBlurCapture={aoDesfocar}
+          className={cn(
+            'flex min-h-0 flex-col overflow-hidden',
+            emUmaColuna
+              ? /*
+                 * Tela inteira, por cima do cabeçalho e da navegação do app.
+                 * Fundo sólido: o vidro deixaria o cabeçalho aparecer por
+                 * trás do texto.
+                 */
+                'fixed inset-x-0 z-50 bg-background pt-[env(safe-area-inset-top)]'
+              : 'glass flex-1 rounded-xl',
+          )}
+          style={
+            emUmaColuna
+              ? {
+                  top: area.topo,
+                  height: area.altura,
+                  // Com o teclado fechado, o rodapé respeita a barra de gestos
+                  // do aparelho; aberto, o teclado já cobre essa faixa.
+                  paddingBottom: area.tecladoAberto ? undefined : 'env(safe-area-inset-bottom)',
+                }
+              : undefined
+          }
+        >
           {!selecionada ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
               <FileText className="h-6 w-6 text-muted-foreground" />
@@ -643,6 +752,15 @@ export default function NotasPage() {
                 onInserirLigacao={() => setSeletorAberto(true)}
               />
 
+              {/*
+                Escondidos, não desmontados, enquanto se digita no celular.
+
+                O desenho guarda o que está aberto e em edição; desmontá-lo a
+                cada toque no texto jogaria isso fora. `contents` faz o
+                invólucro não existir para o layout: no computador, os dois
+                continuam sendo filhos diretos da coluna, como sempre foram.
+              */}
+              <div className={soTexto ? 'hidden' : 'contents'}>
               <PainelDeLigacoes
                 notaId={nota.id}
                 titulo={nota.titulo}
@@ -659,6 +777,7 @@ export default function NotasPage() {
                 onChange={aoMudarDesenho}
                 tema={tema}
               />
+              </div>
             </>
           )}
         </section>
